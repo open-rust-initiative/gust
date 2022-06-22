@@ -1,0 +1,15 @@
+[package]
+name = "gust"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+rust-crypto = "0.2.36"
+hex = "0.4.3"
+deflate = "1.0.0"
+flate2 = "1.0.22"
+bstr = "0.2.17"
+anyhow = "1.0.56"
+thiserror = "1.0.30"
+spdlog-rs = "0.2.4"
+byteorder = "1.4.3"
