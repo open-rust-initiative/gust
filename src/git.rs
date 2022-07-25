@@ -3,6 +3,7 @@
 //!
 //!
 //!
+//!
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs::File;
@@ -10,8 +11,8 @@ use std::fs::create_dir_all;
 use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
-use std::path::PathBuf;
 use std::io::Cursor;
+use std::path::PathBuf;
 
 use byteorder::{BigEndian, ReadBytesExt};
 use bstr::ByteSlice;
@@ -71,7 +72,6 @@ impl Type {
     }
 
     ///
-    //
     #[allow(unused)]
     fn from_string(s: &str) -> Result<Type, GitError> {
         match s {
@@ -208,44 +208,6 @@ impl Metadata {
         Ok(path.to_str().unwrap().to_string())
     }
 
-    // fn read_object_from_data(data: &[u8]) -> Result<Metadata, GitError> {
-    //     let mut decoder = ZlibDecoder::new(data);
-    //     let mut decoded_data = Vec::new();
-    //     decoder.read_to_end(&mut decoded_data).expect("Decode error!");
-    //
-    //     let mut decoded_data_iter = decoded_data.iter();
-    //     let mut t_bytes = Vec::new();
-    //     let mut size_bytes = Vec::new();
-    //     let mut data_bytes = Vec::new();
-    //
-    //     // read the type
-    //     for _ in 0..4 {
-    //         t_bytes.push(decoded_data_iter.next().unwrap().clone());
-    //     }
-    //
-    //     // read the size
-    //     for _ in 0..10 {
-    //         size_bytes.push(decoded_data_iter.next().unwrap().clone());
-    //     }
-    //
-    //     // read the data
-    //     for _ in 0..usize::from_str_radix(
-    //         str::from_utf8(&size_bytes).unwrap(), 10).unwrap() {
-    //         data_bytes.push(decoded_data_iter.next().unwrap().clone());
-    //     }
-    //
-    //     let t = Type::from_string(str::from_utf8(&t_bytes).unwrap()).unwrap();
-    //     let id = ID::from_bytes(&data_bytes);
-    //
-    //     Ok(Metadata {
-    //         t: t,
-    //         h: Hash::Sha1,
-    //         id: id,
-    //         size: data_bytes.len(),
-    //         data: data_bytes,
-    //     })
-    // }
-
     /// Read the object from the file system and parse to a metadata object.
     #[allow(unused)]
     fn read_object_from_file(path: String) -> Result<Metadata, GitError> {
@@ -331,6 +293,7 @@ pub struct Blob {
     pub data: Vec<u8>,
 }
 
+///
 impl Blob {
     ///
     #[allow(unused)]
@@ -365,6 +328,7 @@ pub enum TreeItemType {
 
 ///
 impl Display for TreeItemType {
+    ///
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             TreeItemType::Blob => write!(f, "blob"),
@@ -376,6 +340,7 @@ impl Display for TreeItemType {
     }
 }
 
+///
 impl TreeItemType {
     ///
     #[allow(unused)]
@@ -419,6 +384,7 @@ pub struct Tree {
     pub tree_items: Vec<TreeItem>,
 }
 
+///
 impl Display for Tree {
     #[allow(unused)]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -432,6 +398,7 @@ impl Display for Tree {
     }
 }
 
+///
 impl Tree {
     ///
     #[allow(unused)]
@@ -509,12 +476,14 @@ pub struct AuthorSign {
     pub timezone: String,
 }
 
+///
 impl Display for AuthorSign {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{} <{}> {} {}", self.name, self.email, self.timestamp, self.timezone)
     }
 }
 
+///
 impl AuthorSign {
     ///
     #[allow(unused)]
@@ -571,6 +540,7 @@ pub struct Commit {
     pub message: String,
 }
 
+///
 impl Commit {
     ///
     #[allow(unused)]
@@ -683,6 +653,7 @@ pub struct Tag {
     pub message: String,
 }
 
+///
 impl Tag {
     ///
     #[allow(unused)]
@@ -768,6 +739,7 @@ struct Pack {
     signature: ID,
 }
 
+///
 impl Pack {
     /// Git [Pack Format](https://github.com/git/git/blob/master/Documentation/technical/pack-format.txt)
     #[allow(unused)]
@@ -801,6 +773,7 @@ impl Pack {
         Ok(())
     }
 
+    ///
     #[allow(unused)]
     fn next_object(&self, data: &mut [u8], index: &mut usize) -> Result<usize, GitError> {
         let mut offset = *index;
@@ -882,6 +855,7 @@ struct IdxItem {
     offset: usize,
 }
 
+///
 impl Display for IdxItem {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{} {} ({})", self.offset, self.id, self.crc32)
@@ -899,6 +873,7 @@ struct Idx {
     idx_signature: ID,
 }
 
+///
 impl Idx {
     ///
     #[allow(unused)]
@@ -992,6 +967,7 @@ impl Idx {
     }
 }
 
+///
 #[cfg(test)]
 mod tests {
     use std::env;
@@ -1038,6 +1014,7 @@ mod tests {
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", id.to_string());
     }
 
+    ///
     #[test]
     fn test_blob_write_to_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1069,6 +1046,7 @@ mod tests {
         assert!(Path::new("/tmp/82/352c3a6a7a8bd32011751699c7a3648d1b5d3c").exists());
     }
 
+    ///
     #[test]
     fn test_tree_write_to_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1115,6 +1093,7 @@ mod tests {
         assert!(Path::new("/tmp/1b/dbc1e723aa199e83e33ecf1bb19f874a56ebc3").exists());
     }
 
+    ///
     #[test]
     fn test_tree_write_to_file_2_blob() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1168,6 +1147,7 @@ mod tests {
         assert!(Path::new("/tmp/9b/be4087bedef91e50dc0c1a930c1d3e86fd5f20").exists());
     }
 
+    ///
     #[test]
     fn test_blob_read_from_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1195,6 +1175,7 @@ mod tests {
         );
     }
 
+    ///
     #[test]
     fn test_tree_read_from_file() {
         // 100644 blob 82352c3a6a7a8bd32011751699c7a3648d1b5d3c	gitmega.md
@@ -1230,6 +1211,7 @@ mod tests {
         assert_eq!(super::TreeItemType::Blob, tree.tree_items[0].item_type);
     }
 
+    ///
     #[test]
     fn test_tree_read_from_file_2_items() {
         // 100644 blob fc1a505ac94f98cc5f29100a2d9aef97027a32fb	gitmega.md
@@ -1281,6 +1263,7 @@ mod tests {
         assert_eq!(super::TreeItemType::Blob, tree.tree_items[1].item_type);
     }
 
+    ///
     #[test]
     fn test_commit_read_from_file_without_parent() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1323,6 +1306,7 @@ mod tests {
 
     }
 
+    ///
     #[test]
     fn test_commit_read_from_file_with_parent() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1364,6 +1348,7 @@ mod tests {
         assert_eq!("9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20", commit.tree_id.to_string());
     }
 
+    ///
     #[test]
     fn test_commit_write_to_file() {
         let meta = super::Metadata {
@@ -1410,6 +1395,7 @@ mod tests {
         assert!(Path::new("/tmp/3b/8bc1e152af7ed6b69f2acfa8be709d1733e1bb").exists());
     }
 
+    ///
     #[test]
     fn test_tag_read_from_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1445,6 +1431,7 @@ mod tests {
         assert_eq!(1653037847, tag.tagger.timestamp);
     }
 
+    ///
     #[test]
     fn test_tag_write_to_file() {
         let meta = super::Metadata {
@@ -1480,6 +1467,7 @@ mod tests {
 
     }
 
+    ///
     #[test]
     fn test_idx_read_from_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1508,6 +1496,7 @@ mod tests {
         assert_eq!("92d07408a070a5fbea3c1f2d00e696293b78e7c6", idx.idx_signature.to_string());
     }
 
+    ///
     #[test]
     fn test_pack_read_from_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1531,11 +1520,13 @@ mod tests {
         assert_eq!("8d36a6464e1f284e5e9d06683689ee751d4b2687", pack.signature.to_string());
     }
 
+    ///
     #[test]
     fn test_idx_write_to_file() {
 
     }
 
+    ///
     #[test]
     fn test_pack_write_to_file() {
 

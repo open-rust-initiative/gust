@@ -8,11 +8,11 @@ Usually, the open source developers use GitHub flow or Git flow to collaborate o
 
 ### 1. Features
 
-#### 1.1 A monolithic repo for all open source projects
+#### 1.1 A monolithic repo for all projects
 
-#### 1.2 A decentralized communication system for all developers
+#### 1.2 A decentralized communication for developers
 
-#### 1.3 A synchronized mechanism to connect with other services
+#### 1.3 A synchronized mechanism to connect with GitHub and GitLab
 
 ### 2. Architecture
 
@@ -24,4 +24,10 @@ Usually, the open source developers use GitHub flow or Git flow to collaborate o
 
 ### 6. License
 
-[MIT LICENSE](LICENSE) @ Open Rust Initiative 
+[MIT LICENSE](LICENSE) @ Open Rust Initiative
+
+### 7. References
+
+[1] [What is monorepo? (and should you use it?)](https://semaphoreci.com/blog/what-is-monorepo)
+
+[2] [action-rs](https://actions-rs.github.io)
