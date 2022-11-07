@@ -93,7 +93,7 @@ impl Idx {
         // Layer 2:
         //  The all the SHA-1 hashes of the objects in the pack.
         for i in (offset..offset + (20 * n) as usize).filter(|x| ((x - offset) % 20 == 0))  {
-            let id = ID::from_bytes(&data[(i as usize)..(i as usize) + 20].to_vec());
+            let id = ID::from_bytes(&data[(i as usize)..(i as usize) + 20]);
             id_of_objects.push(id);
         }
         offset += 20 * n as usize;

@@ -70,7 +70,7 @@ impl ID {
         let mut id = [0u8; 20];
         hash.result(&mut id);
 
-        ID::from_bytes(&id.to_vec())
+        ID::from_bytes(id.as_ref())
     }
 }
 
