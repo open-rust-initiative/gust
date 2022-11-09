@@ -143,21 +143,26 @@ mod tests {
     use std::io::Read;
     use std::path::PathBuf;
 
+    use crate::git::id::ID;
+
+    use super::Pack;
+
     ///
     #[test]
     fn test_pack_read_from_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack");
+
         let f = File::open(path).ok();
         let mut reader = BufReader::new(f.unwrap());
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
 
-        let mut pack = super::Pack {
+        let mut pack = Pack {
             head: "".to_string(),
             version: 0,
             number_of_objects: 0,
-            signature: super::ID { bytes: vec![], hash: "".to_string() },
+            signature: ID { bytes: vec![], hash: "".to_string() },
         };
 
         pack.decode(buffer).unwrap();

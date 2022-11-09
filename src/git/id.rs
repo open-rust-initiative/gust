@@ -92,6 +92,8 @@ mod tests {
 
     use bstr::ByteSlice;
 
+    use super::ID;
+
     /// There is a bug need to be resolve:
     ///     The `\r\n` is a Windows Style, but the `\n` is a POSIX Style.
     ///     The file will be different both length and content between Windows and Mac.
@@ -108,6 +110,7 @@ mod tests {
     fn test_object_id_new() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/gitmega.md");
+
         let f = File::open(path).ok();
         let mut reader = BufReader::new(f.unwrap());
         let mut buffer = Vec::new();
@@ -117,7 +120,7 @@ mod tests {
             buffer = buffer.replace(b"\r\n", b"\n");
         }
 
-        let id = super::ID::from_vec(super::Type::Blob, &mut buffer);
+        let id = ID::from_vec(super::Type::Blob, &mut buffer);
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", id.to_string());
     }
 }

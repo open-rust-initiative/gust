@@ -167,6 +167,14 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
+    use crate::git::{Type, Metadata};
+    use crate::git::blob::Blob;
+    use crate::git::hash::Hash;
+    use crate::git::id::ID;
+
+    use super::Tree;
+    use super::TreeItemType;
+
     ///
     #[test]
     fn test_tree_write_to_file() {
@@ -174,14 +182,14 @@ mod tests {
         path.push("resources/data/test/blob-82352c3a6a7a8bd32011751699c7a3648d1b5d3c-gitmega.md");
 
         let meta =
-            super::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+            Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
-        assert_eq!(meta.t, super::Type::Blob);
+        assert_eq!(meta.t, Type::Blob);
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", meta.id.to_string());
         assert_eq!(16, meta.size);
 
-        let blob = crate::git::blob::Blob {
+        let blob = Blob {
             meta: meta.clone(),
             data: meta.data,
         };
@@ -194,11 +202,11 @@ mod tests {
         let item = blob
             .to_tree_item(String::from("gitmega.md")).unwrap();
 
-        let mut tree = super::Tree {
-            meta: super::Metadata {
-                t: super::Type::Tree,
-                h: super::Hash::Sha1,
-                id: super::ID {
+        let mut tree = Tree {
+            meta: Metadata {
+                t: Type::Tree,
+                h: Hash::Sha1,
+                id: ID {
                     bytes: vec![],
                     hash: String::new(),
                 },
@@ -221,10 +229,10 @@ mod tests {
         path.push("resources/data/test/blob-fc1a505ac94f98cc5f29100a2d9aef97027a32fb-gitmega.md");
 
         let meta_gitmega =
-            super::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+            Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
-        let blob_gitmega = crate::git::blob::Blob {
+        let blob_gitmega = Blob {
             meta: meta_gitmega.clone(),
             data: meta_gitmega.data,
         };
@@ -236,10 +244,10 @@ mod tests {
         path.push("resources/data/test/blob-a3b55a2ce16d2429dae2d690d2c15bcf26fbe33c-gust.md");
 
         let meta_gust =
-            super::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+            Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
-        let blob_gust = crate::git::blob::Blob {
+        let blob_gust = Blob {
             meta: meta_gust.clone(),
             data: meta_gust.data,
         };
@@ -248,11 +256,11 @@ mod tests {
             .to_tree_item(String::from("gust.md")).unwrap();
 
 
-        let mut tree = super::Tree {
-            meta: super::Metadata {
-                t: super::Type::Tree,
-                h: super::Hash::Sha1,
-                id: super::ID {
+        let mut tree = Tree {
+            meta: Metadata {
+                t: Type::Tree,
+                h: Hash::Sha1,
+                id: ID {
                     bytes: vec![],
                     hash: String::new(),
                 },
@@ -275,13 +283,13 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/tree-1bdbc1e723aa199e83e33ecf1bb19f874a56ebc3");
 
-        let meta = super::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(super::Type::Tree, meta.t);
+        assert_eq!(Type::Tree, meta.t);
         assert_eq!(38, meta.size);
 
-        let mut tree = super::Tree {
+        let mut tree = Tree {
             meta,
             tree_items: Vec::new(),
         };
@@ -301,7 +309,7 @@ mod tests {
             "100644",
             String::from_utf8(tree.tree_items[0].mode.to_vec()).unwrap().as_str()
         );
-        assert_eq!(super::TreeItemType::Blob, tree.tree_items[0].item_type);
+        assert_eq!(TreeItemType::Blob, tree.tree_items[0].item_type);
     }
 
     ///
@@ -312,13 +320,13 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/tree-9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20");
 
-        let meta = super::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(super::Type::Tree, meta.t);
+        assert_eq!(Type::Tree, meta.t);
         assert_eq!(73, meta.size);
 
-        let mut tree = super::Tree {
+        let mut tree = Tree {
             meta,
             tree_items: Vec::new(),
         };
@@ -331,28 +339,34 @@ mod tests {
             "gitmega.md",
             tree.tree_items[0].filename.as_str()
         );
+
         assert_eq!(
             "fc1a505ac94f98cc5f29100a2d9aef97027a32fb",
             tree.tree_items[0].id.to_string()
         );
+
         assert_eq!(
             "100644",
             String::from_utf8(tree.tree_items[0].mode.to_vec()).unwrap().as_str()
         );
-        assert_eq!(super::TreeItemType::Blob, tree.tree_items[0].item_type);
+
+        assert_eq!(TreeItemType::Blob, tree.tree_items[0].item_type);
 
         assert_eq!(
             "gust.md",
             tree.tree_items[1].filename.as_str()
         );
+
         assert_eq!(
             "a3b55a2ce16d2429dae2d690d2c15bcf26fbe33c",
             tree.tree_items[1].id.to_string()
         );
+
         assert_eq!(
             "100644",
             String::from_utf8(tree.tree_items[1].mode.to_vec()).unwrap().as_str()
         );
-        assert_eq!(super::TreeItemType::Blob, tree.tree_items[1].item_type);
+
+        assert_eq!(TreeItemType::Blob, tree.tree_items[1].item_type);
     }
 }

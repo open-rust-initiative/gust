@@ -75,3 +75,47 @@ impl AuthorSign {
         Ok(data)
     }
 }
+
+mod tests {
+    use super::AuthorSign;
+
+    #[test]
+    fn test_author_sign_encode() {
+        let author = AuthorSign {
+            t: "author".to_string(),
+            name: "Quanyi Ma".to_string(),
+            email: "eli@patch.sh".to_string(),
+            timestamp: 1649521615,
+            timezone: "+0800".to_string()
+        };
+
+        let data = author.encode_to_data().unwrap();
+
+        let author_data = [97, 117, 116, 104, 111, 114, 32, 81, 117, 97, 110, 121, 105, 32, 77, 97, 32, 60, 101, 108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49, 54, 49, 53, 32, 43, 48, 56, 48, 48]
+            .to_vec();
+
+        assert_eq!(data, author_data);
+    }
+
+    #[test]
+    fn test_author_sign_decode() {
+        let author_data = [97, 117, 116, 104, 111, 114, 32, 81, 117, 97, 110, 121, 105, 32, 77, 97, 32, 60, 101, 108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49, 54, 49, 53, 32, 43, 48, 56, 48, 48]
+            .to_vec();
+
+        let mut author = AuthorSign {
+            t: "".to_string(),
+            name: "".to_string(),
+            email: "".to_string(),
+            timestamp: 0,
+            timezone: "".to_string()
+        };
+
+        author.decode_from_data(author_data).unwrap();
+
+        assert_eq!(author.t, "author");
+        assert_eq!(author.name, "Quanyi Ma");
+        assert_eq!(author.email, "eli@patch.sh");
+        assert_eq!(author.timestamp, 1649521615);
+        assert_eq!(author.timezone, "+0800");
+    }
+}

@@ -132,34 +132,28 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
-    ///
-    #[test]
-    fn test_commit_read_from_file_without_parent() {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("resources/data/test/commit-1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a");
+    use crate::git::Metadata;
+    use crate::git::id::ID;
+    use crate::git::sign::AuthorSign;
 
-        let meta = crate::git::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+    use super::Commit;
+
+    fn get_empty_commit(path: PathBuf) -> super::Commit {
+        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(crate::git::Type::Commit, meta.t);
-        assert_eq!(1065, meta.size);
-        assert_eq!(
-            "1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a",
-            meta.id.to_string()
-        );
-
-        let mut commit = super::Commit {
+        Commit {
             meta,
-            tree_id: crate::git::id::ID { bytes: vec![], hash: "".to_string() },
+            tree_id: ID { bytes: vec![], hash: "".to_string() },
             parent_tree_ids: vec![],
-            author: super::AuthorSign {
+            author: AuthorSign {
                 t: "".to_string(),
                 name: "".to_string(),
                 email: "".to_string(),
                 timestamp: 0,
                 timezone: "".to_string()
             },
-            committer: super::AuthorSign {
+            committer: AuthorSign {
                 t: "".to_string(),
                 name: "".to_string(),
                 email: "".to_string(),
@@ -167,7 +161,16 @@ mod tests {
                 timezone: "".to_string()
             },
             message: "".to_string()
-        };
+        }
+    }
+
+    ///
+    #[test]
+    fn test_commit_read_from_file_without_parent() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources/data/test/commit-1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a");
+
+        let mut commit = get_empty_commit(path);
 
         commit.decode_meta().unwrap();
 
@@ -181,36 +184,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/commit-3b8bc1e152af7ed6b69f2acfa8be709d1733e1bb");
 
-        let meta = crate::git::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
-            .expect("Read error!");
-
-        assert_eq!(crate::git::Type::Commit, meta.t);
-        assert_eq!(1126, meta.size);
-        assert_eq!(
-            "3b8bc1e152af7ed6b69f2acfa8be709d1733e1bb",
-            meta.id.to_string()
-        );
-
-        let mut commit = super::Commit {
-            meta,
-            tree_id: crate::git::id::ID { bytes: vec![], hash: "".to_string() },
-            parent_tree_ids: vec![],
-            author: super::AuthorSign {
-                t: "".to_string(),
-                name: "".to_string(),
-                email: "".to_string(),
-                timestamp: 0,
-                timezone: "".to_string()
-            },
-            committer: super::AuthorSign {
-                t: "".to_string(),
-                name: "".to_string(),
-                email: "".to_string(),
-                timestamp: 0,
-                timezone: "".to_string()
-            },
-            message: "".to_string()
-        };
+        let mut commit = get_empty_commit(path);
 
         commit.decode_meta().unwrap();
 
@@ -220,7 +194,7 @@ mod tests {
     ///
     #[test]
     fn test_commit_write_to_file() {
-        let meta = super::Metadata {
+        let meta = Metadata {
             t: super::Type::Commit,
             h: super::Hash::Sha1,
             size: 0,
@@ -228,7 +202,7 @@ mod tests {
             data: vec![],
         };
 
-        let author = super::AuthorSign {
+        let author = AuthorSign {
             t: "author".to_string(),
             name: "Quanyi Ma".to_string(),
             email: "eli@patch.sh".to_string(),
@@ -236,7 +210,7 @@ mod tests {
             timezone: "+0800".to_string()
         };
 
-        let committer = super::AuthorSign {
+        let committer = AuthorSign {
             t: "committer".to_string(),
             name: "Quanyi Ma".to_string(),
             email: "eli@patch.sh".to_string(),

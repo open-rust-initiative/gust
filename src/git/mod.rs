@@ -22,7 +22,6 @@ use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
 
-
 use bstr::ByteSlice;
 use deflate::write::ZlibEncoder;
 use deflate::Compression;

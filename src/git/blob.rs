@@ -51,6 +51,12 @@ mod tests {
 
     use bstr::ByteSlice;
 
+    use crate::git::id::ID;
+    use crate::git::Type;
+    use crate::git::hash::Hash;
+    use crate::git::Metadata;
+
+    use super::Blob;
     ///
     #[test]
     fn test_blob_write_to_file() {
@@ -65,13 +71,13 @@ mod tests {
             buffer = buffer.replace(b"\r\n", b"\n");
         }
 
-        let id = crate::git::id::ID::from_vec(crate::git::Type::Blob, &mut buffer);
+        let id = ID::from_vec(Type::Blob, &mut buffer);
         let size = buffer.len();
         let data = buffer;
 
         let meta = crate::git::Metadata {
-            t: crate::git::Type::Blob,
-            h: crate::git::Hash::Sha1,
+            t: Type::Blob,
+            h: Hash::Sha1,
             id,
             size,
             data,
@@ -89,12 +95,12 @@ mod tests {
         path.push("resources/data/test/blob-82352c3a6a7a8bd32011751699c7a3648d1b5d3c-gitmega.md");
 
         let meta =
-            super::Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+            Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
         assert_eq!(meta.t, crate::git::Type::Blob);
 
-        let blob = super::Blob {
+        let blob = Blob {
             meta: meta.clone(),
             data: meta.data,
         };
