@@ -1,14 +1,16 @@
-## Gust
+## Gust - Monorepo Platform for DevOps and Open Source Supply Chain
 
-Git is the most popular version control system in the world, and developers usually use GitHub or GitLab to host their codes. Most open source communities base on the services of GitHub to collaborate, track issues and share codes. GitHub's an excellent service to manage all things of open source projects, but it's centralized. GitHub has many ways to influence or limit open source communities. Although the developers have the copyright of the codes, they may not access their repositories. Gust wants to give the communities complete control of their assets.
+Git is a distributed system and an addressed filesystem. It is a great tool for version control and collaboration. 
 
-Gust aims to build self-host service of version control with Git protocol, which can manage and share codes. The Gust is upstream and syncing data to GitHub or other services. Everyone can submit without a signup account and only sign CLA or DCO. There are multiple challenges, particularly syncing the code, PRs and Issues with GitHub, which means it will release when GitHub APIs change and redeploy frequently.
+A monorepo is a single repository that contains multiple projects with huge size. 
 
-Usually, the open source developers use GitHub flow or Git flow to collaborate on GitHub, and modules divide into multiple repositories. But the monolithic repo and trunk-based development have more benefits[1] for open source communities. All members can focus on the primary functions and release schedule like companies developers on Google, Facebook, and Twitter use monorepo to accelerate the development process. So, Gust provides Git host service of monorepo and trunk-based development.
+Gust is a monorepo platform for DevOps and Open Source Supply Chain.
 
 ### 1. Features
 
-#### 1.1 A monolithic repo for all projects
+#### 1.1 A monorepo for enterprise
+
+#### 1.2 A monorepo for open source supply chain
 
 #### 1.2 A decentralized communication for developers
 
@@ -16,18 +18,33 @@ Usually, the open source developers use GitHub flow or Git flow to collaborate o
 
 ### 2. Architecture
 
-### 3. Developing Status
-
-### 4. Getting Started
+### 3. Getting Started
 
 ### 5. Contributing
 
+This project enforce the [DCO](https://developercertificate.org).
+
+Contributors sign-off that they adhere to these requirements by adding a Signed-off-by line to commit messages.
+
+```bash
+This is my commit message
+
+Signed-off-by: Random J Developer <random@developer.example.org>
+```
+
+Git even has a -s command line option to append this automatically to your commit message:
+
+```bash
+$ git commit -s -m 'This is my commit message'
+```
+
 ### 6. License
 
-[MIT LICENSE](LICENSE) @ Open Rust Initiative
+Freighter is licensed under this Licensed:
+
+* MIT LICENSE ( [LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
+* Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or https://www.apache.org/licenses/LICENSE-2.0)
 
 ### 7. References
 
 [1] [What is monorepo? (and should you use it?)](https://semaphoreci.com/blog/what-is-monorepo)
-
-[2] [action-rs](https://actions-rs.github.io)
