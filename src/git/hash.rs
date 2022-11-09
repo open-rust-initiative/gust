@@ -25,10 +25,8 @@ impl Display for Hash {
 }
 
 mod tests {
-    use super::Hash;
-
     #[test]
     fn test_hash() {
-        assert_eq!(Hash::Sha1.to_string(), "sha1");
+        assert_eq!(super::Hash::Sha1.to_string(), "sha1");
     }
 }

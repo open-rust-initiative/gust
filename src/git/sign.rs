@@ -77,11 +77,9 @@ impl AuthorSign {
 }
 
 mod tests {
-    use super::AuthorSign;
-
     #[test]
     fn test_author_sign_encode() {
-        let author = AuthorSign {
+        let author = super::AuthorSign {
             t: "author".to_string(),
             name: "Quanyi Ma".to_string(),
             email: "eli@patch.sh".to_string(),
@@ -102,7 +100,7 @@ mod tests {
         let author_data = [97, 117, 116, 104, 111, 114, 32, 81, 117, 97, 110, 121, 105, 32, 77, 97, 32, 60, 101, 108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49, 54, 49, 53, 32, 43, 48, 56, 48, 48]
             .to_vec();
 
-        let mut author = AuthorSign {
+        let mut author = super::AuthorSign {
             t: "".to_string(),
             name: "".to_string(),
             email: "".to_string(),
