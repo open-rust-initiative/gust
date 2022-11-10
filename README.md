@@ -1,24 +1,21 @@
 ## Gust - Monorepo Platform for DevOps and Open Source Supply Chain
 
-Git is a distributed system and an addressed filesystem. It is a great tool for version control and collaboration. 
+Git is a distributed system and a content-addressable filesystem. All files of a single repository persisted on the disk of the machine. It brings a lot of benefits of performance and maintain. But also challenges for monorepo. It is hard to manage a vast repository like a repo has 20 TB, which is typical in a middle size enterprise.
 
-A monorepo is a single repository that contains multiple projects with huge size. 
+Google has a monolithic repository system named Piper which is implemented on top of standard Google infrastructure. The gust purpose implements a monorepo platform on top of Git and Cloud Native architect in Rust.
 
-Gust is a monorepo platform for DevOps and Open Source Supply Chain.
+### 1. Theory of Git
 
-### 1. Features
+### 2. Gust's features
 
-#### 1.1 A monorepo for enterprise
+1. A monorepo for enterprise
+2. A monorepo for Open Source Supply Chain
+3. A decentralized communication for developers
+4. A synchronized mechanism to connect with GitHub and GitLab
 
-#### 1.2 A monorepo for open source supply chain
+### 3. Architecture
 
-#### 1.2 A decentralized communication for developers
-
-#### 1.3 A synchronized mechanism to connect with GitHub and GitLab
-
-### 2. Architecture
-
-### 3. Getting Started
+### 4. Getting Started
 
 ### 5. Contributing
 
@@ -48,3 +45,7 @@ Freighter is licensed under this Licensed:
 ### 7. References
 
 [1] [What is monorepo? (and should you use it?)](https://semaphoreci.com/blog/what-is-monorepo)
+    
+[2] [Monorepo: A single repository for all your code](https://medium.com/@mattklein123/monorepo-a-single-repository-for-all-your-code-86a852bff054)
+
+[3] [Why Google Stores Billions of Lines of Code in a Single Repository](https://cacm.acm.org/magazines/2016/7/204032-why-google-stores-billions-of-lines-of-code-in-a-single-repository)
