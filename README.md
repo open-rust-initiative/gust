@@ -6,6 +6,8 @@ Google has a monolithic repository platform, Piper, with more than 100 TB of dat
 
 ### 1. Theory of Git
 
+In Git, the content of the file or commit message to store in a file with a specification format, and we call the file an Object. There are four object types: Blob, Tree, Commit and Tag. 
+
 ### 2. Gust's features
 
 #### 2.1 Monorepo for Trunk-based Development
