@@ -15,6 +15,10 @@ mod tag;
 mod sign;
 mod pack;
 mod idx;
+mod errors;
+mod cache;
+mod object;
+mod file;
 
 use std::fmt::Display;
 use std::fs::File;

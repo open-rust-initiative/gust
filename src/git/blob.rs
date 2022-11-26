@@ -77,7 +77,7 @@ mod tests {
 
         let meta = crate::git::Metadata {
             t: Type::Blob,
-            h: Hash::Sha1,
+            h: Hash(0),
             id,
             size,
             data,
