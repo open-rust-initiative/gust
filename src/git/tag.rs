@@ -31,7 +31,7 @@ pub struct Tag {
 ///
 impl Tag {
     pub fn new(meta:Metadata)->Self {
-        Self{
+        let mut  a = Self{
             meta:meta.clone(),
             object: meta.id.clone(),
             t: ObjectType::Commit,
@@ -44,7 +44,10 @@ impl Tag {
                 timezone: "+0000".to_string()
             },
             message: "".to_string(),  
-        }
+        };
+        a.decode_metadata();
+        a
+        
     }
 
     ///
@@ -119,7 +122,8 @@ impl Tag {
 }
 impl Display for Tag{
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "tree {}", BString::new(self.meta.data.clone()))
+        writeln!(f,"Type: Tag");
+        writeln!(f, "{}", BString::new(self.meta.data.clone()))
     }   
 }
 ///

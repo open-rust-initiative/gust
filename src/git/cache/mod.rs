@@ -1,7 +1,6 @@
 use std::collections::{HashMap};
-use anyhow::Ok;
 
-use super::errors::make_error;
+
 use super::object::Object;
 use super::Hash;
 use std::rc::Rc;

@@ -45,31 +45,25 @@ pub struct Pack {
 impl Pack {
     /// Git [Pack Format](https://github.com/git/git/blob/master/Documentation/technical/pack-format.txt)
     #[allow(unused)]
-    pub fn decode() {
-        let mut pack_file  = File::open(&Path::new(
-            //".git/objects/aa/36c1e0d709f96d7b356967e16766bafdf63a75",
-            "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
-        ))
-        .unwrap();
-        let magic = read_bytes(&mut pack_file).unwrap();
+    pub fn decode( pack_file: &mut File) {
+        let magic = read_bytes( pack_file).unwrap();
 
         if magic != *b"PACK" {
              panic!("not stand pack file");
         }
       
-        let version = read_u32(&mut pack_file).unwrap();
+        let version = read_u32( pack_file).unwrap();
         if version != 2 {
             panic!("not support version");
         }
       
-        let total_objects = read_u32(&mut pack_file).unwrap();
+        let total_objects = read_u32( pack_file).unwrap();
         let mut object_cache = PackObjectCache::default();
         let mut first_byte_objects = [0u32; 1 << u8::BITS];
         let mut object_offsets = Vec::with_capacity(total_objects as usize);
         for _ in 0..total_objects {
-          let offset = get_offset(&mut pack_file).unwrap();
-          let object = Pack::read_pack_object(&mut pack_file, offset, &mut object_cache).unwrap();
-          //println!("{}", object);
+          let offset = get_offset( pack_file).unwrap();
+          let object = Pack::read_pack_object( pack_file, offset, &mut object_cache).unwrap();
 
           let object_hash = object.hash();
           first_byte_objects[object_hash.0[0] as usize] += 1;
@@ -149,7 +143,7 @@ impl Pack {
         Ok(obj)
     }
     ///
-    #[allow(unused)]
+    
     fn next_object(&self, data: &mut Vec<u8>, index: &mut usize) -> Result<usize, GitError> {
         let mut offset = *index;
         let mut byte = data[offset];
@@ -226,9 +220,7 @@ impl Pack {
 ///
 #[cfg(test)]
 mod tests {
-    use crate::git::cache::PackObjectCache;
     use crate::git::id::ID;
-    use std::env;
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Read;
@@ -275,6 +267,21 @@ mod tests {
     ///
     #[test]
     fn test_pack_write_to_file() {
-      Pack::decode();
+         let mut pack_file  = File::open(&Path::new(
+            //".git/objects/aa/36c1e0d709f96d7b356967e16766bafdf63a75",
+            "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
+        ))
+        .unwrap();
+      Pack::decode(&mut pack_file);
+    }
+
+    #[test]
+    fn test_parse_simple_pack(){
+        let mut pack_file  = File::open(&Path::new(
+            //".git/objects/aa/36c1e0d709f96d7b356967e16766bafdf63a75",
+            "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
+        ))
+        .unwrap();
+      Pack::decode(&mut pack_file);
     }
 }

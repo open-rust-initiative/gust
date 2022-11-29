@@ -90,6 +90,7 @@ pub struct Tree {
 impl Display for Tree {
     #[allow(unused)]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f,"Type: Tree");
         for item in &self.tree_items {
             writeln!(f, "{} {} {} {}",
                      String::from_utf8(item.mode.to_vec()).unwrap(),
@@ -111,8 +112,7 @@ impl Tree {
         a.decode_metadata().unwrap();
         a
     }
-    ///
-    #[allow(unused)]
+
     pub(crate) fn decode_metadata(&mut self) -> Result<(), GitError> {
         let mut tree_items:Vec<TreeItem> = Vec::new();
         let mut index = 0;

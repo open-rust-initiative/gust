@@ -35,7 +35,7 @@ pub struct Commit {
 impl Commit {
     ///
     pub fn new(metadata: Metadata) -> Self {
-        Self {
+        let mut a = Self {
             meta: metadata,
             tree_id: ID {
                 bytes: vec![],
@@ -57,10 +57,12 @@ impl Commit {
                 timezone: "".to_string(),
             },
             message: "".to_string(),
-        }
+        };
+        a.decode_meta();
+        a
     }
     ///
-    #[allow(unused)]
+   
     pub(crate) fn decode_meta(&mut self) -> Result<(), GitError> {
         let mut data = self.meta.data.clone();
 

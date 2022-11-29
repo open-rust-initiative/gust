@@ -11,7 +11,6 @@ use std::fmt::Display;
 use crate::errors::GitError;
 use crate::git::Metadata;
 use crate::git::tree::{TreeItem, TreeItemType};
-use super::object::types::ObjectType;
 /// Git Object: blob
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Blob {
@@ -52,7 +51,7 @@ impl Blob {
 use bstr::BString;
 impl Display for Blob{
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "tree {}", BString::new(self.data.clone()))
+        writeln!(f, "Type: Blob\n{}", BString::new(self.data.clone()))
     }   
 }
 ///
