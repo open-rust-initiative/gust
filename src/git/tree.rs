@@ -71,6 +71,7 @@ impl TreeItemType {
 }
 
 /// Git Object: tree item
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct TreeItem {
     pub mode: Vec<u8>,
     pub item_type: TreeItemType,
@@ -79,6 +80,7 @@ pub struct TreeItem {
 }
 
 /// Git Object: tree
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Tree {
     pub meta: Metadata,
     pub tree_items: Vec<TreeItem>,
@@ -100,6 +102,15 @@ impl Display for Tree {
 
 ///
 impl Tree {
+
+    pub fn new (metadata:Metadata)-> Self {
+        let mut  a = Self{
+            meta:metadata,
+            tree_items:vec![],
+        };
+        a.decode_metadata().unwrap();
+        a
+    }
     ///
     #[allow(unused)]
     pub(crate) fn decode_metadata(&mut self) -> Result<(), GitError> {

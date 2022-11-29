@@ -6,7 +6,7 @@
 //!
 //!
 
-use bstr::ByteSlice;
+use bstr::{ByteSlice, BString};
 
 use crate::errors::GitError;
 
@@ -15,8 +15,10 @@ use crate::git::Metadata;
 use crate::git::hash::HashType;
 use crate::git::sign::AuthorSign;
 use crate::git::object::types::ObjectType;
+use std::fmt::Display;
 /// Git Object: tag
 #[allow(unused)]
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Tag {
     pub meta: Metadata,
     pub object: ID,
@@ -28,6 +30,23 @@ pub struct Tag {
 
 ///
 impl Tag {
+    pub fn new(meta:Metadata)->Self {
+        Self{
+            meta:meta.clone(),
+            object: meta.id.clone(),
+            t: ObjectType::Commit,
+            tag: "v1.1.0".to_string(),
+            tagger:AuthorSign {
+                t: "".to_string(),
+                name: "".to_string(),
+                email: "".to_string(),
+                timestamp: 0,
+                timezone: "+0000".to_string()
+            },
+            message: "".to_string(),  
+        }
+    }
+
     ///
     #[allow(unused)]
     fn decode_metadata(&mut self) -> Result<(), GitError> {
@@ -98,7 +117,11 @@ impl Tag {
         self.meta.write_to_file(root_path)
     }
 }
-
+impl Display for Tag{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "tree {}", BString::new(self.meta.data.clone()))
+    }   
+}
 ///
 #[cfg(test)]
 mod tests {

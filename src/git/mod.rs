@@ -33,6 +33,7 @@ use deflate::write::ZlibEncoder;
 use deflate::Compression;
 use flate2::read::ZlibDecoder;
 use anyhow::{Context, Result};
+use thiserror::__private::DisplayAsDisplay;
 
 use crate::git::hash::Hash;
 use crate::git::id::ID;
@@ -53,7 +54,24 @@ const NL: &[u8] = &[0x00];
 /// In the git object store format, 0x0a is the line feed character in the commit object.
 #[allow(unused)]
 const LF: &[u8] = &[0x0A];
-
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+pub enum ObjClass {
+    BLOB(blob::Blob),
+    COMMIT(commit::Commit),
+    TREE(tree::Tree),
+    TAG(tag::Tag),
+}
+impl Display for ObjClass {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ObjClass::BLOB(a) => a.fmt( f),
+            ObjClass::COMMIT(b) => b.fmt(f),
+            ObjClass::TREE(c) => c.fmt(f),
+            ObjClass::TAG(d) => d.fmt(f),
+            //(a)=> a.fmt(f),
+        }
+    }
+}
 
 
 /// The metadata of git object.

@@ -8,8 +8,8 @@ use std::rc::Rc;
 
 #[derive(Default)]
 pub struct PackObjectCache {
-  by_hash: HashMap<Hash, Rc<Object>>,
-  by_offset: HashMap<u64, Rc<Object>>,
+  pub by_hash: HashMap<Hash, Rc<Object>>,
+  pub by_offset: HashMap<u64, Rc<Object>>,
 }
 impl PackObjectCache{
   pub fn update(&mut self, object: Rc<Object> , offset : u64 ){

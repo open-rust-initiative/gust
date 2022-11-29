@@ -15,6 +15,7 @@ use super::file::*;
 use super::object::delta::*;
 use super::object::Object;
 use crate::errors::GitError;
+use crate::git::ObjClass;
 
 use std::convert::TryFrom;
 use crate::git::errors::make_error;
@@ -26,7 +27,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
 use std::fs::File;
 use std::rc::Rc;
-
+pub mod decode;
 /// #### Pack文件结构<br>
 ///  `head`: always = "PACK" <br>
 /// `version`: version code <br>
@@ -68,10 +69,6 @@ impl Pack {
         for _ in 0..total_objects {
           let offset = get_offset(&mut pack_file).unwrap();
           let object = Pack::read_pack_object(&mut pack_file, offset, &mut object_cache).unwrap();
-          println!("****************************" );
-          println!("hash :{}",object.hash() );
-          println!("type: {}",object.object_type);
-          println!("{}",BString::new(object.contents.clone()));
           //println!("{}", object);
 
           let object_hash = object.hash();
@@ -81,6 +78,15 @@ impl Pack {
             make_error("Packfile is too large")
           }).unwrap();
           object_offsets.push((object_hash, offset));
+        }
+    
+        let mut result = decode::objDecodedmap::default();
+        result.update_from_cache(& mut object_cache);
+        for (key , value) in result._map_hash.iter() {
+            println!("*********************");
+            println!("Hash :{}",key);
+            println!("{}",value);
+            
         }
     }
     ///GetObject  
@@ -227,15 +233,14 @@ mod tests {
     use std::io::BufReader;
     use std::io::Read;
     use std::path::Path;
-    use std::path::PathBuf;
+   
 
     use super::Pack;
 
     ///
     #[test]
     fn test_pack_read_from_file() {
-        //let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        //path.push("resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack");
+   
 
         let f = File::open(&Path::new(
             //".git/objects/aa/36c1e0d709f96d7b356967e16766bafdf63a75",

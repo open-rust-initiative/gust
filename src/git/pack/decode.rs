@@ -1,0 +1,58 @@
+use std::{collections::HashMap, rc::Rc};
+use crate::git::Metadata;
+use crate::git::hash::HashType;
+use crate::git::id::ID;
+use crate::git::object::types::ObjectType;
+
+use crate::git::{Hash,ObjClass};
+use super::super::cache::PackObjectCache;
+use super::super::{blob,commit,sign,tag,tree};
+///!对取出的object字段进行进一步解码与包装
+/// 
+/// 
+/// 
+/// 
+
+#[derive(Default)]
+pub struct objDecodedmap{
+   pub _map_hash:HashMap<Hash,Rc<ObjClass>>
+}//
+//在解析完object后执行的进一步的解码过程
+impl objDecodedmap {
+    pub fn update_from_cache(&mut self, cache:& PackObjectCache) {
+        for (key, value) in cache.by_hash.iter() {
+
+            let metadata = 
+                Metadata {
+                    t: value.object_type ,  
+                    h: HashType::Sha1,
+                    id: ID::from_string(&value.hash().to_string()),
+                    size: value.contents.len(),
+                    data:value.contents.to_vec(),
+                };
+            
+            let _obj:ObjClass=match value.object_type {// 交给各自的new函数
+                ObjectType::Blob => ObjClass::BLOB(blob::Blob::new(metadata)),
+                ObjectType::Commit => ObjClass::COMMIT(commit::Commit::new(metadata) ),
+                ObjectType::Tag => ObjClass::TAG(tag::Tag::new(metadata)),
+                ObjectType::Tree =>  ObjClass::TREE(tree::Tree::new(metadata)),
+            };
+
+            
+            self._map_hash.insert(key.clone(),Rc::new(_obj));
+        }
+        
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    pub fn test_map_new(){
+        let restamp :&mut PackObjectCache;
+        let newmap :&mut objDecodedmap;
+    }
+}

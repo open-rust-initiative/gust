@@ -6,10 +6,12 @@
 //!
 //!
 
+use std::fmt::Display;
+
 use crate::errors::GitError;
 use crate::git::Metadata;
 use crate::git::tree::{TreeItem, TreeItemType};
-
+use super::object::types::ObjectType;
 /// Git Object: blob
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Blob {
@@ -19,6 +21,14 @@ pub struct Blob {
 
 ///
 impl Blob {
+
+    pub fn new(metadata: Metadata) -> Self {
+        Self {
+            meta: metadata.clone(),
+            data: metadata.data,
+        }
+    }
+
     ///
     #[allow(unused)]
     pub(crate) fn write_to_file(&self, root_path: String) -> Result<String, GitError> {
@@ -39,7 +49,12 @@ impl Blob {
 
     }
 }
-
+use bstr::BString;
+impl Display for Blob{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "tree {}", BString::new(self.data.clone()))
+    }   
+}
 ///
 #[cfg(test)]
 mod tests {

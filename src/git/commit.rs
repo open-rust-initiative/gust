@@ -14,7 +14,6 @@ use crate::errors::GitError;
 use crate::git::id::ID;
 use crate::git::Metadata;
 
-use crate::git::hash::Hash;
 use crate::git::sign::AuthorSign;
 
 use super::hash::HashType;
@@ -22,6 +21,7 @@ use super::object::types::ObjectType;
 
 /// Git Object: commit
 #[allow(unused)]
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Commit {
     pub meta: Metadata,
     pub tree_id: ID,
@@ -33,6 +33,32 @@ pub struct Commit {
 
 ///
 impl Commit {
+    ///
+    pub fn new(metadata: Metadata) -> Self {
+        Self {
+            meta: metadata,
+            tree_id: ID {
+                bytes: vec![],
+                hash: "".to_string(),
+            },
+            parent_tree_ids: vec![],
+            author: AuthorSign {
+                t: "".to_string(),
+                name: "".to_string(),
+                email: "".to_string(),
+                timestamp: 0,
+                timezone: "".to_string(),
+            },
+            committer: AuthorSign {
+                t: "".to_string(),
+                name: "".to_string(),
+                email: "".to_string(),
+                timestamp: 0,
+                timezone: "".to_string(),
+            },
+            message: "".to_string(),
+        }
+    }
     ///
     #[allow(unused)]
     pub(crate) fn decode_meta(&mut self) -> Result<(), GitError> {
@@ -47,13 +73,15 @@ impl Commit {
         // Find the parent tree ids and remove them from the data
         let author_begin = data.find("author").unwrap();
         if data.find_iter("parent").count() > 0 {
-            let mut parents:Vec<ID> = Vec::new();
+            let mut parents: Vec<ID> = Vec::new();
             let mut index = 0;
 
             while index < author_begin {
                 let parent_begin = data.find_byte(0x20).unwrap();
                 let parent_end = data.find_byte(0x0a).unwrap();
-                parents.push(ID::from_string(data[parent_begin + 1..parent_end].to_str().unwrap()));
+                parents.push(ID::from_string(
+                    data[parent_begin + 1..parent_end].to_str().unwrap(),
+                ));
                 index = index + parent_end + 1;
             }
 
@@ -62,14 +90,18 @@ impl Commit {
         data = data[author_begin..].to_vec();
 
         // Find the author and remove it from the data
-        let author_data = data[.. data.find_byte(0x0a).unwrap()].to_vec();
+        let author_data = data[..data.find_byte(0x0a).unwrap()].to_vec();
         self.author.decode_from_data(author_data)?;
         data = data[data.find_byte(0x0a).unwrap() + 1..].to_vec();
 
         // Find the committer and remove it from the data
         let committer_data = data[..data.find_byte(0x0a).unwrap()].to_vec();
         self.committer.decode_from_data(committer_data)?;
-        self.message = data[data.find_byte(0x0a).unwrap() + 1..].to_vec().to_str().unwrap().to_string();
+        self.message = data[data.find_byte(0x0a).unwrap() + 1..]
+            .to_vec()
+            .to_str()
+            .unwrap()
+            .to_string();
 
         Ok(())
     }
@@ -103,14 +135,13 @@ impl Commit {
         data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
         data.extend_from_slice(self.message.as_bytes());
 
-        Ok(
-            Metadata {
-                t: ObjectType::Commit,
-                h: HashType::Sha1,
-                id: ID::from_vec(ObjectType::Commit, &mut data),
-                size: data.len(),
-                data,
-            })
+        Ok(Metadata {
+            t: ObjectType::Commit,
+            h: HashType::Sha1,
+            id: ID::from_vec(ObjectType::Commit, &mut data),
+            size: data.len(),
+            data,
+        })
     }
 }
 
@@ -136,9 +167,9 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
-    use crate::git::Metadata;
     use crate::git::id::ID;
     use crate::git::sign::AuthorSign;
+    use crate::git::Metadata;
 
     use super::Commit;
 
@@ -148,23 +179,26 @@ mod tests {
 
         Commit {
             meta,
-            tree_id: ID { bytes: vec![], hash: "".to_string() },
+            tree_id: ID {
+                bytes: vec![],
+                hash: "".to_string(),
+            },
             parent_tree_ids: vec![],
             author: AuthorSign {
                 t: "".to_string(),
                 name: "".to_string(),
                 email: "".to_string(),
                 timestamp: 0,
-                timezone: "".to_string()
+                timezone: "".to_string(),
             },
             committer: AuthorSign {
                 t: "".to_string(),
                 name: "".to_string(),
                 email: "".to_string(),
                 timestamp: 0,
-                timezone: "".to_string()
+                timezone: "".to_string(),
             },
-            message: "".to_string()
+            message: "".to_string(),
         }
     }
 
@@ -178,8 +212,10 @@ mod tests {
 
         commit.decode_meta().unwrap();
 
-        assert_eq!("1bdbc1e723aa199e83e33ecf1bb19f874a56ebc3", commit.tree_id.hash);
-
+        assert_eq!(
+            "1bdbc1e723aa199e83e33ecf1bb19f874a56ebc3",
+            commit.tree_id.hash
+        );
     }
 
     ///
@@ -192,7 +228,10 @@ mod tests {
 
         commit.decode_meta().unwrap();
 
-        assert_eq!("9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20", commit.tree_id.to_string());
+        assert_eq!(
+            "9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20",
+            commit.tree_id.to_string()
+        );
     }
 
     ///
@@ -202,7 +241,10 @@ mod tests {
             t: super::ObjectType::Commit,
             h: super::HashType::Sha1,
             size: 0,
-            id: super::ID { bytes: vec![], hash: "".to_string() },
+            id: super::ID {
+                bytes: vec![],
+                hash: "".to_string(),
+            },
             data: vec![],
         };
 
@@ -211,7 +253,7 @@ mod tests {
             name: "Quanyi Ma".to_string(),
             email: "eli@patch.sh".to_string(),
             timestamp: 1649521615,
-            timezone: "+0800".to_string()
+            timezone: "+0800".to_string(),
         };
 
         let committer = AuthorSign {
@@ -219,7 +261,7 @@ mod tests {
             name: "Quanyi Ma".to_string(),
             email: "eli@patch.sh".to_string(),
             timestamp: 1649521615,
-            timezone: "+0800".to_string()
+            timezone: "+0800".to_string(),
         };
 
         let mut commit = super::Commit {
@@ -235,9 +277,14 @@ mod tests {
 
         commit.meta = commit.encode_metadata().unwrap();
 
-        assert_eq!("3b8bc1e152af7ed6b69f2acfa8be709d1733e1bb", commit.meta.id.to_string());
+        assert_eq!(
+            "3b8bc1e152af7ed6b69f2acfa8be709d1733e1bb",
+            commit.meta.id.to_string()
+        );
 
-        commit.write_to_file("/tmp".to_string()).expect("Write error!");
+        commit
+            .write_to_file("/tmp".to_string())
+            .expect("Write error!");
 
         assert!(Path::new("/tmp/3b/8bc1e152af7ed6b69f2acfa8be709d1733e1bb").exists());
     }
