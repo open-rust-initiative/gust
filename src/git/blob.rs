@@ -53,7 +53,7 @@ mod tests {
 
     use crate::git::hash::HashType;
     use crate::git::id::ID;
-    use crate::git::Type;
+    use crate::git::object::types::ObjectType;
     
     use crate::git::Metadata;
 
@@ -72,12 +72,12 @@ mod tests {
             buffer = buffer.replace(b"\r\n", b"\n");
         }
 
-        let id = ID::from_vec(Type::Blob, &mut buffer);
+        let id = ID::from_vec(ObjectType::Blob, &mut buffer);
         let size = buffer.len();
         let data = buffer;
 
         let meta = crate::git::Metadata {
-            t: Type::Blob,
+            t: ObjectType::Blob,
             h: HashType::Sha1,
             id,
             size,
@@ -99,7 +99,7 @@ mod tests {
             Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
-        assert_eq!(meta.t, crate::git::Type::Blob);
+        assert_eq!(meta.t, crate::git::object::types::ObjectType::Blob);
 
         let blob = Blob {
             meta: meta.clone(),

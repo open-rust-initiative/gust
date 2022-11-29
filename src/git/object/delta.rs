@@ -163,5 +163,4 @@ fn strip_index_file_name(file_name: &OsStr) -> Option<&str> {
     let file_name = file_name.to_str()?;
     file_name.strip_suffix(INDEX_FILE_SUFFIX)
   }
-  const PACKS_DIRECTORY: &str = ".git/objects/pack";
-  const PACK_FILE_SUFFIX: &str = ".pack";
+

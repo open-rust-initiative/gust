@@ -20,6 +20,7 @@ use std::convert::TryFrom;
 use crate::git::errors::make_error;
 use crate::git::id::ID;
 use anyhow::Result;
+use bstr::BString;
 use bstr::ByteSlice;
 use byteorder::{BigEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
@@ -69,8 +70,9 @@ impl Pack {
           let object = Pack::read_pack_object(&mut pack_file, offset, &mut object_cache).unwrap();
           println!("****************************" );
           println!("hash :{}",object.hash() );
-          println!("{}",object.contents.len());
-          println!("{}", object.contents);
+          println!("type: {}",object.object_type);
+          println!("{}",BString::new(object.contents.clone()));
+          //println!("{}", object);
 
           let object_hash = object.hash();
           first_byte_objects[object_hash.0[0] as usize] += 1;

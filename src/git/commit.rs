@@ -12,11 +12,13 @@ use bstr::ByteSlice;
 
 use crate::errors::GitError;
 use crate::git::id::ID;
-use crate::git::{Metadata, Type};
+use crate::git::Metadata;
+
 use crate::git::hash::Hash;
 use crate::git::sign::AuthorSign;
 
 use super::hash::HashType;
+use super::object::types::ObjectType;
 
 /// Git Object: commit
 #[allow(unused)]
@@ -103,9 +105,9 @@ impl Commit {
 
         Ok(
             Metadata {
-                t: Type::Commit,
+                t: ObjectType::Commit,
                 h: HashType::Sha1,
-                id: ID::from_vec(Type::Commit, &mut data),
+                id: ID::from_vec(ObjectType::Commit, &mut data),
                 size: data.len(),
                 data,
             })
@@ -197,7 +199,7 @@ mod tests {
     #[test]
     fn test_commit_write_to_file() {
         let meta = Metadata {
-            t: super::Type::Commit,
+            t: super::ObjectType::Commit,
             h: super::HashType::Sha1,
             size: 0,
             id: super::ID { bytes: vec![], hash: "".to_string() },

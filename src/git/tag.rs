@@ -11,16 +11,16 @@ use bstr::ByteSlice;
 use crate::errors::GitError;
 
 use crate::git::id::ID;
-use crate::git::{Metadata, Type};
+use crate::git::Metadata;
 use crate::git::hash::HashType;
 use crate::git::sign::AuthorSign;
-
+use crate::git::object::types::ObjectType;
 /// Git Object: tag
 #[allow(unused)]
 pub struct Tag {
     pub meta: Metadata,
     pub object: ID,
-    pub t: Type,
+    pub t: ObjectType,
     pub tag: String,
     pub tagger: AuthorSign,
     pub message: String,
@@ -40,7 +40,7 @@ impl Tag {
 
         let type_begin = data.find_byte(0x20).unwrap();
         let type_end = data.find_byte(0x0a).unwrap();
-        self.t = Type::from_string(data[type_begin + 1..type_end].to_str().unwrap()).unwrap();
+        self.t = ObjectType::from_string(data[type_begin + 1..type_end].to_str().unwrap()).unwrap();
         data = data[type_end + 1..].to_vec();
 
         let tag_begin = data.find_byte(0x20).unwrap();
@@ -84,9 +84,9 @@ impl Tag {
 
         Ok(
             Metadata {
-                t: Type::Tag,
+                t: ObjectType::Tag,
                 h: HashType::Sha1,
-                id: ID::from_vec(Type::Tag, &mut data),
+                id: ID::from_vec(ObjectType::Tag, &mut data),
                 size: data.len(),
                 data,
             })
@@ -107,7 +107,7 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::git::Metadata;
-    use crate::git::Type;
+    use crate::git::ObjectType;
     use crate::git::hash::Hash;
     use crate::git::id::ID;
     use crate::git::sign::AuthorSign;
@@ -123,14 +123,14 @@ mod tests {
         let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(Type::Tag, meta.t);
+        assert_eq!(ObjectType::Tag, meta.t);
         assert_eq!(976, meta.size);
         assert_eq!("e5c324b03b72b26f11557c4955c6d17c68dc8595", meta.id.to_string());
 
         let mut tag = Tag {
             meta,
             object: ID { bytes: vec![], hash: "".to_string() },
-            t: Type::Commit,
+            t: ObjectType::Commit,
             tag: "".to_string(),
             tagger: AuthorSign {
                 t: "".to_string(),
@@ -155,7 +155,7 @@ mod tests {
     fn test_tag_write_to_file() {
         use super::HashType;
         let meta = Metadata {
-            t: Type::Tag,
+            t: ObjectType::Tag,
             h: HashType::Sha1,
             size: 0,
             id: super::ID { bytes: vec![], hash: "".to_string() },
@@ -173,7 +173,7 @@ mod tests {
         let mut tag = Tag {
             meta,
             object: ID::from_string("6414e45babf0bdd043ba40d31123053cfebef26c"),
-            t: Type::Commit,
+            t: ObjectType::Commit,
             tag: "v1.1.0".to_string(),
             tagger,
             message: "\nIt's a lastest object\n-----BEGIN PGP SIGNATURE-----\n\niQIzBAABCAAdFiEEanuf5/5ADLU2lvsCZL9E4tsHuXIFAmKHWxcACgkQZL9E4tsH\nuXIeFhAAtX+foSvc7/1lb98+QfRjHcpO+LX+LroTaq/QGOTX/2gE+tHD2TJAga1I\nVqDEz8fh8AE366FC7UCjCb5nvsCCox2htzbIxAjsc9L/JckWtxl6WOa/5OZssrDQ\nFtX39BNNl+4TfNn/z1XV+28c9yB1N5HSoP2gzdLoASw3y9n6E0FyzLdoXPILgmJI\nL4DAG/OFkixK+I+TsK+6995497h9BCi3x30dOjfxZS9ptiKhqWulbkflvvM9Cnie\n7obXYmnoe0jBjSfO5GgJlOYcLzE9MMYYzIx47/4lcrCbQXnojkW3KV03PEXGfRCL\nw/y8oBHVvNVRF0Jn+o7F+mzIrbF6Ufku63MfRf7WmbbS3B63CILEjNyuOFoe8mDb\nrmAUffzQSrgnvBk+g01slb6Q+q7Urw6wqHtBPn3ums/inHE9ymTqS7ffmRifUfR8\nD8LvhwpSUI7BdiN6HznRFPxMXzohYIqAJbUltjr4Q7qw/kJI+305Xcs1U5AUIaOp\n77p2UFHRVoMM5mpPOCSwsVJ6cSuOjWXf9afcNMrhgclKefM0aXXnd2p5zTUEe99T\nlAtXHuprRwxtSQUzHxJCdGlUGRGRR2aS9W984SNDVmcegnOIrZD2pVm/tjDwVex5\nMuAuKHr8et1EKyvKCnta6USq7WC2l6RdsCaAYzSTQ7ljEi9A+6Q=\n=/9g0\n-----END PGP SIGNATURE-----\n".to_string(),

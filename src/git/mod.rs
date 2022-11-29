@@ -38,6 +38,7 @@ use crate::git::hash::Hash;
 use crate::git::id::ID;
 
 use self::hash::HashType;
+use self::object::types::ObjectType;
 
 use super::errors::GitError;
 
@@ -53,58 +54,12 @@ const NL: &[u8] = &[0x00];
 #[allow(unused)]
 const LF: &[u8] = &[0x0A];
 
-/// Git Object Types: Blob, Tree, Commit, Tag
-#[allow(unused)]
-#[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
-pub enum Type {
-    Blob,
-    Tree,
-    Commit,
-    Tag,
-}
 
-/// Display trait for Git objects type
-impl Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Type::Blob => write!(f, "blob"),
-            Type::Tree => write!(f, "tree"),
-            Type::Commit => write!(f, "commit"),
-            Type::Tag => write!(f, "tag"),
-        }
-    }
-}
-
-///
-impl Type {
-    ///
-    #[allow(unused)]
-    fn to_bytes(self) -> Vec<u8> {
-        match self {
-            Type::Blob => vec![0x62, 0x6c, 0x6f, 0x62],
-            Type::Tree => vec![0x74, 0x72, 0x65, 0x65],
-            Type::Commit => vec![0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74],
-            Type::Tag => vec![0x74, 0x61, 0x67],
-        }
-    }
-
-    ///
-    #[allow(unused)]
-    fn from_string(s: &str) -> Result<Type, GitError> {
-        match s {
-            "blob" => Ok(Type::Blob),
-            "tree" => Ok(Type::Tree),
-            "commit" => Ok(Type::Commit),
-            "tag" => Ok(Type::Tag),
-            _ => Err(GitError::InvalidObjectType(s.to_string())),
-        }
-    }
-}
 
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {
-    pub t: Type,
+    pub t: ObjectType,
     pub h: HashType,
     pub id: ID,
     pub size: usize,
@@ -167,36 +122,36 @@ impl Metadata {
         match String::from_utf8(t.to_vec()).unwrap().as_str() {
             "blob" => {
                 Ok(Metadata {
-                    t: Type::Blob,
+                    t: ObjectType::Blob,
                     h: HashType::Sha1,
-                    id: ID::from_vec(Type::Blob, &mut data),
+                    id: ID::from_vec(ObjectType::Blob, &mut data),
                     size,
                     data,
                 })
             }
             "tree" => {
                 Ok(Metadata {
-                    t: Type::Tree,
+                    t: ObjectType::Tree,
                     h: HashType::Sha1,
-                    id: ID::from_vec(Type::Tree, &mut data),
+                    id: ID::from_vec(ObjectType::Tree, &mut data),
                     size,
                     data,
                 })
             }
             "commit" => {
                 Ok(Metadata {
-                    t: Type::Commit,
+                    t: ObjectType::Commit,
                     h: HashType::Sha1,
-                    id: ID::from_vec(Type::Commit, &mut data),
+                    id: ID::from_vec(ObjectType::Commit, &mut data),
                     size,
                     data,
                 })
             }
             "tag" => {
                 Ok(Metadata {
-                    t: Type::Tag,
+                    t: ObjectType::Tag,
                     h: HashType::Sha1,
-                    id: ID::from_vec(Type::Tag, &mut data),
+                    id: ID::from_vec(ObjectType::Tag, &mut data),
                     size,
                     data,
                 })

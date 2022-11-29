@@ -1,12 +1,56 @@
-use std::io::Error;
+use std::{io::Error, fmt::Display};
+
+use crate::errors::GitError;
 ///四种Objct类型
-#[derive(Clone, Copy, Debug)]
+/// Git Object Types: Blob, Tree, Commit, Tag
+#[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum ObjectType {
-    Commit,
-    Tree,
     Blob,
+    Commit,
     Tag,
+    Tree,
 }
+
+
+/// Display trait for Git objects type
+impl Display for ObjectType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ObjectType::Blob => write!(f, "blob"),
+            ObjectType::Tree => write!(f, "tree"),
+            ObjectType::Commit => write!(f, "commit"),
+            ObjectType::Tag => write!(f, "tag"),
+        }
+    }
+}
+
+///
+impl ObjectType {
+    ///
+    #[allow(unused)]
+    pub fn to_bytes(self) -> Vec<u8> {
+        match self {
+            ObjectType::Blob => vec![0x62, 0x6c, 0x6f, 0x62],
+            ObjectType::Tree => vec![0x74, 0x72, 0x65, 0x65],
+            ObjectType::Commit => vec![0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74],
+            ObjectType::Tag => vec![0x74, 0x61, 0x67],
+        }
+    }
+
+    ///
+    #[allow(unused)]
+    pub fn from_string(s: &str) -> Result<ObjectType, GitError> {
+        match s {
+            "blob" => Ok(ObjectType::Blob),
+            "tree" => Ok(ObjectType::Tree),
+            "commit" => Ok(ObjectType::Commit),
+            "tag" => Ok(ObjectType::Tag),
+            _ => Err(GitError::InvalidObjectType(s.to_string())),
+        }
+    }
+}
+
+
 ///六种Objec存储类型
 pub enum PackObjectType {
     Base(ObjectType),

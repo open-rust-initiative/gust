@@ -12,7 +12,8 @@ use bstr::ByteSlice;
 
 use crate::errors::GitError;
 use crate::git::id::ID;
-use crate::git::{Metadata, Type};
+use crate::git::Metadata;
+use crate::git::object::types::ObjectType;
 use crate::git::hash::HashType;
 
 ///
@@ -144,9 +145,9 @@ impl Tree {
 
         Ok(
             Metadata {
-                t: Type::Tree,
+                t: ObjectType::Tree,
                 h: HashType::Sha1,
-                id: ID::from_vec(Type::Tree, &mut data),
+                id: ID::from_vec(ObjectType::Tree, &mut data),
                 size: data.len(),
                 data,
             },
@@ -167,7 +168,8 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
-    use crate::git::{Type, Metadata};
+    use super::ObjectType;
+    use crate::git::Metadata;
     use crate::git::blob::Blob;
     use crate::git::hash::HashType;
     use crate::git::id::ID;
@@ -185,7 +187,7 @@ mod tests {
             Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
-        assert_eq!(meta.t, Type::Blob);
+        assert_eq!(meta.t, ObjectType::Blob);
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", meta.id.to_string());
         assert_eq!(16, meta.size);
 
@@ -204,7 +206,7 @@ mod tests {
 
         let mut tree = Tree {
             meta: Metadata {
-                t: Type::Tree,
+                t: ObjectType::Tree,
                 h: HashType::Sha1,
                 id: ID {
                     bytes: vec![],
@@ -258,7 +260,7 @@ mod tests {
 
         let mut tree = Tree {
             meta: Metadata {
-                t: Type::Tree,
+                t: ObjectType::Tree,
                 h: HashType::Sha1,
                 id: ID {
                     bytes: vec![],
@@ -286,7 +288,7 @@ mod tests {
         let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(Type::Tree, meta.t);
+        assert_eq!(ObjectType::Tree, meta.t);
         assert_eq!(38, meta.size);
 
         let mut tree = Tree {
@@ -323,7 +325,7 @@ mod tests {
         let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(Type::Tree, meta.t);
+        assert_eq!(ObjectType::Tree, meta.t);
         assert_eq!(73, meta.size);
 
         let mut tree = Tree {
