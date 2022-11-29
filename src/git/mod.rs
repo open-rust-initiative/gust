@@ -37,6 +37,8 @@ use anyhow::{Context, Result};
 use crate::git::hash::Hash;
 use crate::git::id::ID;
 
+use self::hash::HashType;
+
 use super::errors::GitError;
 
 /// In the git object store format, between the type and size fields has a space character
@@ -103,7 +105,7 @@ impl Type {
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {
     pub t: Type,
-    pub h: Hash,
+    pub h: HashType,
     pub id: ID,
     pub size: usize,
     pub data: Vec<u8>,
@@ -166,7 +168,7 @@ impl Metadata {
             "blob" => {
                 Ok(Metadata {
                     t: Type::Blob,
-                    h: Hash::Sha1,
+                    h: HashType::Sha1,
                     id: ID::from_vec(Type::Blob, &mut data),
                     size,
                     data,
@@ -175,7 +177,7 @@ impl Metadata {
             "tree" => {
                 Ok(Metadata {
                     t: Type::Tree,
-                    h: Hash::Sha1,
+                    h: HashType::Sha1,
                     id: ID::from_vec(Type::Tree, &mut data),
                     size,
                     data,
@@ -184,7 +186,7 @@ impl Metadata {
             "commit" => {
                 Ok(Metadata {
                     t: Type::Commit,
-                    h: Hash::Sha1,
+                    h: HashType::Sha1,
                     id: ID::from_vec(Type::Commit, &mut data),
                     size,
                     data,
@@ -193,7 +195,7 @@ impl Metadata {
             "tag" => {
                 Ok(Metadata {
                     t: Type::Tag,
-                    h: Hash::Sha1,
+                    h: HashType::Sha1,
                     id: ID::from_vec(Type::Tag, &mut data),
                     size,
                     data,

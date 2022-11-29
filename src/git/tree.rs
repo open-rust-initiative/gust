@@ -13,7 +13,7 @@ use bstr::ByteSlice;
 use crate::errors::GitError;
 use crate::git::id::ID;
 use crate::git::{Metadata, Type};
-use crate::git::hash::Hash;
+use crate::git::hash::HashType;
 
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -145,7 +145,7 @@ impl Tree {
         Ok(
             Metadata {
                 t: Type::Tree,
-                h: Hash::Sha1,
+                h: HashType::Sha1,
                 id: ID::from_vec(Type::Tree, &mut data),
                 size: data.len(),
                 data,
@@ -169,7 +169,7 @@ mod tests {
 
     use crate::git::{Type, Metadata};
     use crate::git::blob::Blob;
-    use crate::git::hash::Hash;
+    use crate::git::hash::HashType;
     use crate::git::id::ID;
 
     use super::Tree;
@@ -205,7 +205,7 @@ mod tests {
         let mut tree = Tree {
             meta: Metadata {
                 t: Type::Tree,
-                h: Hash::Sha1,
+                h: HashType::Sha1,
                 id: ID {
                     bytes: vec![],
                     hash: String::new(),
@@ -259,7 +259,7 @@ mod tests {
         let mut tree = Tree {
             meta: Metadata {
                 t: Type::Tree,
-                h: Hash::Sha1,
+                h: HashType::Sha1,
                 id: ID {
                     bytes: vec![],
                     hash: String::new(),

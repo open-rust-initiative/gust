@@ -6,59 +6,33 @@
 //!
 //!
 
-use std::io::Cursor;
-use std::io::Read;
 
+use std::io::Read;
+use std::path::Path;
+
+use super::cache::PackObjectCache;
+use super::file::*;
+use super::object::delta::*;
+use super::object::Object;
+use crate::errors::GitError;
+
+use std::convert::TryFrom;
+use crate::git::errors::make_error;
+use crate::git::id::ID;
 use anyhow::Result;
 use bstr::ByteSlice;
 use byteorder::{BigEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
 use std::fs::File;
-use super::object::Object;
-use crate::errors::GitError;
-use crate::git::id::ID;
 use std::rc::Rc;
-use super::cache::PackObjectCache;
 
-
-use super::file::*;
-///GetObject  PackObjectCache ObjectType PackObjectType
-/// read_type_and_size
-/// read_zlib_stream_exact
-/// read_offset_encoding
-/// get_offset
-/// read_hash
-/// seek
-/// apply_delta
-fn read_pack_object(
-    pack_file: &mut File,
-    offset: u64,
-    cache: &mut PackObjectCache,
-) -> std::io::Result<Rc<Object>> {
-    
-    use super::object::types::PackObjectType::*;
-    seek(pack_file, offset)?;
-    let (object_type, size) = read_type_and_size(pack_file)?;
-    let object_type = PackObjectType::typeNumber2Type(object_type);
-
-    let object = match object_type {
-        // Undeltified representation
-        Base(object_type) =>{},
-        // Deltified; base object is at an offset in the same packfile
-        OffsetDelta => {},
-        // Deltified; base object is given by a hash outside the packfile
-        HashDelta => {},
-    }?;
- 
-    Ok(cache.update(object))
-}
 /// #### Pack文件结构<br>
 ///  `head`: always = "PACK" <br>
 /// `version`: version code <br>
 /// `number_of_objects` : Total mount of objects <br>
 /// `signature`:ID
 #[allow(unused)]
-struct Pack {
+pub struct Pack {
     head: String,
     version: u32,
     number_of_objects: u32,
@@ -69,44 +43,103 @@ struct Pack {
 impl Pack {
     /// Git [Pack Format](https://github.com/git/git/blob/master/Documentation/technical/pack-format.txt)
     #[allow(unused)]
-    fn decode(&mut self, mut data: Vec<u8>) -> Result<(), GitError> {
-        let mut index = 0;
+    pub fn decode() {
+        let mut pack_file  = File::open(&Path::new(
+            //".git/objects/aa/36c1e0d709f96d7b356967e16766bafdf63a75",
+            "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
+        ))
+        .unwrap();
+        let magic = read_bytes(&mut pack_file).unwrap();
 
-        // 4-byte signature:
-        //          The signature is: {'P', 'A', 'C', 'K'}
-        if data[0..4].to_vec() != vec![80, 65, 67, 75] {
-            return Err(GitError::InvalidPackFile(format!(
-                "Invalid pack header: {:?}",
-                data[0..4].to_vec()
-            )));
+        if magic != *b"PACK" {
+             panic!("not stand pack file");
         }
-        self.head = data[0..4].to_vec().to_str().unwrap().to_string();
-        index += 4;
-
-        //4-byte version number (network byte order):
-        // 	 Git currently accepts version number 2 or 3 but generates version 2 only.
-        //[0,0,0,2] for version 2, [0,0,0,3] for version 3.
-        let mut v = Cursor::new(data[index..8].to_vec());
-        self.version = v.read_u32::<BigEndian>().unwrap();
-        index += 4;
-
-        //4-byte number of objects contained in the pack (network byte order)
-        // Observation: we cannot have more than 4G versions ;-) and more than 4G objects in a pack.
-        // So we can safely ignore the 4-byte number of objects.
-        let mut n = Cursor::new(data[index..12].to_vec());
-        self.number_of_objects = n.read_u32::<BigEndian>().unwrap();
-        index += 4;
-
-        let mut i = 1;
-        while i < self.number_of_objects {
-            index = self.next_object(&mut data, &mut index)?;
-            i += 1;
+      
+        let version = read_u32(&mut pack_file).unwrap();
+        if version != 2 {
+            panic!("not support version");
         }
-        self.signature = ID::from_bytes(&data[data.len() - 20..data.len()]);
+      
+        let total_objects = read_u32(&mut pack_file).unwrap();
+        let mut object_cache = PackObjectCache::default();
+        let mut first_byte_objects = [0u32; 1 << u8::BITS];
+        let mut object_offsets = Vec::with_capacity(total_objects as usize);
+        for _ in 0..total_objects {
+          let offset = get_offset(&mut pack_file).unwrap();
+          let object = Pack::read_pack_object(&mut pack_file, offset, &mut object_cache).unwrap();
+          println!("****************************" );
+          println!("hash :{}",object.hash() );
+          println!("{}",object.contents.len());
+          println!("{}", object.contents);
 
-        Ok(())
+          let object_hash = object.hash();
+          first_byte_objects[object_hash.0[0] as usize] += 1;
+          // Larger offsets would require a version-2 pack index
+          let offset = u32::try_from(offset).map_err(|_| {
+            make_error("Packfile is too large")
+          }).unwrap();
+          object_offsets.push((object_hash, offset));
+        }
     }
+    ///GetObject  
+    pub fn read_pack_object(
+        pack_file: &mut File,
+        offset: u64,
+        cache: &mut PackObjectCache,
+    ) -> std::io::Result<Rc<Object>> {
+        use super::object::types::PackObjectType::*;
+        seek(pack_file, offset)?;
+        let (object_type, size) = read_type_and_size(pack_file)?;
+        let object_type = super::object::types::typeNumber2Type(object_type);
+        let object = match object_type {
+            // Undeltified representation
+            Some(Base(object_type)) => read_zlib_stream_exact(pack_file, |decompressed| {
+                let mut contents = Vec::with_capacity(size);
+                decompressed.read_to_end(&mut contents)?;
+                if contents.len() != size {
+                    return Err(make_error("Incorrect object size"));
+                }
 
+                Ok(Object {
+                    object_type,
+                    contents,
+                })
+            }),
+            // Deltified; base object is at an offset in the same packfile
+            Some(OffsetDelta) => {
+                let delta_offset = read_offset_encoding(pack_file)?;
+                let base_offset = offset
+                    .checked_sub(delta_offset)
+                    .ok_or_else(|| make_error("Invalid OffsetDelta offset"))?;
+                let offset = get_offset(pack_file)?;
+                let base_object = if let Some(object) = cache.Offset_object(base_offset) {
+                    Rc::clone(object)
+                } else {
+                    Pack::read_pack_object(pack_file, base_offset, cache)?
+                };
+                seek(pack_file, offset)?;
+                let objs = apply_delta(pack_file, &base_object)?;
+                Ok(objs)
+                
+            }
+            // Deltified; base object is given by a hash outside the packfile
+            Some(HashDelta) => {
+                let hash = read_hash(pack_file)?;
+                let object;
+                let base_object = if let Some(object) = cache.Hash_object(hash) {
+                    object
+                } else {
+                    object = read_object(hash)?;
+                    &object
+                };
+                apply_delta(pack_file, &base_object)
+            }
+            None => return Err(make_error("Unkonw type of the Object!!")),
+        }?;
+        let obj = Rc::new(object);
+        cache.update(obj.clone(), offset);
+        Ok(obj)
+    }
     ///
     #[allow(unused)]
     fn next_object(&self, data: &mut Vec<u8>, index: &mut usize) -> Result<usize, GitError> {
@@ -185,6 +218,7 @@ impl Pack {
 ///
 #[cfg(test)]
 mod tests {
+    use crate::git::cache::PackObjectCache;
     use crate::git::id::ID;
     use std::env;
     use std::fs::File;
@@ -221,7 +255,7 @@ mod tests {
             },
         };
 
-        pack.decode(buffer).unwrap();
+        //pack.decode(buffer).unwrap();
 
         assert_eq!("PACK", pack.head);
         assert_eq!(2, pack.version);
@@ -233,5 +267,7 @@ mod tests {
 
     ///
     #[test]
-    fn test_pack_write_to_file() {}
+    fn test_pack_write_to_file() {
+      Pack::decode();
+    }
 }

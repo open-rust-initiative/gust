@@ -10,12 +10,12 @@ const TAG_OBJECT_TYPE: &[u8] = b"tag";
 const HASH_BYTES: usize = 20;
 
 pub mod types;
-
+pub mod delta;
 //Object内存存储类型
 #[derive(Clone, Debug)]
 pub struct Object {
-  object_type: ObjectType,
-  contents: Vec<u8>,
+  pub object_type: ObjectType,
+  pub contents: Vec<u8>,
 }
 impl Object {
     /// object 的hash转化函数
@@ -34,6 +34,6 @@ impl Object {
         .finalize();
       Hash(<[u8; HASH_BYTES]>::try_from(new_hash.as_slice()).unwrap())
     }
-    pub fn GetObjectFromPack()
+   // pub fn GetObjectFromPack()
   }
 

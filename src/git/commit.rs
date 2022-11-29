@@ -16,6 +16,8 @@ use crate::git::{Metadata, Type};
 use crate::git::hash::Hash;
 use crate::git::sign::AuthorSign;
 
+use super::hash::HashType;
+
 /// Git Object: commit
 #[allow(unused)]
 pub struct Commit {
@@ -102,7 +104,7 @@ impl Commit {
         Ok(
             Metadata {
                 t: Type::Commit,
-                h: Hash::Sha1,
+                h: HashType::Sha1,
                 id: ID::from_vec(Type::Commit, &mut data),
                 size: data.len(),
                 data,
@@ -196,7 +198,7 @@ mod tests {
     fn test_commit_write_to_file() {
         let meta = Metadata {
             t: super::Type::Commit,
-            h: super::Hash::Sha1,
+            h: super::HashType::Sha1,
             size: 0,
             id: super::ID { bytes: vec![], hash: "".to_string() },
             data: vec![],

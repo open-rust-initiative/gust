@@ -1,4 +1,7 @@
 use std::collections::{HashMap};
+use anyhow::Ok;
+
+use super::errors::make_error;
 use super::object::Object;
 use super::Hash;
 use std::rc::Rc;
@@ -9,14 +12,21 @@ pub struct PackObjectCache {
   by_offset: HashMap<u64, Rc<Object>>,
 }
 impl PackObjectCache{
-  pub fn update(&mut self, object:Object , offset :u64 ) -> Rc<Object>{
-    let object_new = Rc::new(object);
-    self.by_hash.insert(object.hash(), Rc::clone(&object_new));
-    self.by_offset.insert(offset, Rc::clone(&object_new));
-    Ok(object_new)
+  pub fn update(&mut self, object: Rc<Object> , offset : u64 ){
+    
+    self.by_hash.insert(object.hash(), object.clone());
+    self.by_offset.insert(offset, object.clone());
   }
   pub fn clean(&mut self){
     self.by_hash.clear();
     self.by_offset.clear();
+   
+  }
+  pub fn Offset_object(&mut self,offset :u64) -> Option<&mut Rc<Object>>{
+    self.by_offset.get_mut(&offset)
+  }
+
+  pub fn Hash_object(&mut self,hash :Hash) -> Option<&mut Rc<Object>>{
+    self.by_hash.get_mut(&hash)
   }
 }

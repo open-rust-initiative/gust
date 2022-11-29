@@ -15,7 +15,7 @@ pub enum PackObjectType {
 }
 
 /// 通过类型号分辨类型
-pub fn typeNumber2Type(type_number: i32) -> Option<PackObjectType> {
+pub fn typeNumber2Type(type_number: u8) -> Option<PackObjectType> {
     use ObjectType::*;
     use PackObjectType::*;
     match type_number {

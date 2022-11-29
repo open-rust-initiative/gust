@@ -51,9 +51,10 @@ mod tests {
 
     use bstr::ByteSlice;
 
+    use crate::git::hash::HashType;
     use crate::git::id::ID;
     use crate::git::Type;
-    use crate::git::hash::Hash;
+    
     use crate::git::Metadata;
 
     use super::Blob;
@@ -77,7 +78,7 @@ mod tests {
 
         let meta = crate::git::Metadata {
             t: Type::Blob,
-            h: Hash(0),
+            h: HashType::Sha1,
             id,
             size,
             data,

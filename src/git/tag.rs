@@ -12,7 +12,7 @@ use crate::errors::GitError;
 
 use crate::git::id::ID;
 use crate::git::{Metadata, Type};
-use crate::git::hash::Hash;
+use crate::git::hash::HashType;
 use crate::git::sign::AuthorSign;
 
 /// Git Object: tag
@@ -85,7 +85,7 @@ impl Tag {
         Ok(
             Metadata {
                 t: Type::Tag,
-                h: Hash::Sha1,
+                h: HashType::Sha1,
                 id: ID::from_vec(Type::Tag, &mut data),
                 size: data.len(),
                 data,
@@ -153,9 +153,10 @@ mod tests {
     ///
     #[test]
     fn test_tag_write_to_file() {
+        use super::HashType;
         let meta = Metadata {
             t: Type::Tag,
-            h: Hash::Sha1,
+            h: HashType::Sha1,
             size: 0,
             id: super::ID { bytes: vec![], hash: "".to_string() },
             data: vec![],

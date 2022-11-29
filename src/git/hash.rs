@@ -30,7 +30,11 @@ pub struct Hash(pub [u8; HASH_BYTES]);
 /// Display trait for Hash type
 impl Display for Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "sha1")
+        let mut hashstr =String::new();
+        for i in self.0{
+            hashstr += (format!("{:2x}",i).as_mut_str());               
+        }
+        write!(f,"{}",hashstr)
     }
 }
 
