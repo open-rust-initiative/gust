@@ -26,7 +26,7 @@ impl objDecodedmap {
                 Metadata {
                     t: value.object_type ,  
                     h: HashType::Sha1,
-                    id: ID::from_string(&value.hash().to_string()),
+                    id: ID::from_bytes(&value.hash().0),
                     size: value.contents.len(),
                     data:value.contents.to_vec(),
                 };

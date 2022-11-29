@@ -68,7 +68,7 @@ impl Display for ObjClass {
             ObjClass::COMMIT(b) => b.fmt(f),
             ObjClass::TREE(c) => c.fmt(f),
             ObjClass::TAG(d) => d.fmt(f),
-            //(a)=> a.fmt(f),
+           
         }
     }
 }
