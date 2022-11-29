@@ -1,7 +1,7 @@
 # 基于Rust的Git-pack文件解析
 
 本项目为openEuler开源实习OSCourse SIG任务
-(Link)[https://gitee.com/openeuler/opensource-intern/issues/I62B08#]
+[Link](https://gitee.com/openeuler/opensource-intern/issues/I62B08#)
 
 
 ## Gust - Monorepo Platform for DevOps and Open Source Supply Chain
