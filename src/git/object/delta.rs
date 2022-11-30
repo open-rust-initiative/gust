@@ -86,7 +86,7 @@ pub fn read_object(hash: Hash) -> Result<Object> {
       // Found in objects directory
       Ok(object) => object,
       // Not found in objects directory; look in packfiles
-      Err(err)  => panic!("not found object"),
+      Err(_err)  => panic!("not found object"),
     };
   
     let object_hash = object.hash();
@@ -162,5 +162,5 @@ fn decimal_char_value(decimal_char: u8) -> Option<u8> {
 fn strip_index_file_name(file_name: &OsStr) -> Option<&str> {
     let file_name = file_name.to_str()?;
     file_name.strip_suffix(INDEX_FILE_SUFFIX)
-  }
+}
 

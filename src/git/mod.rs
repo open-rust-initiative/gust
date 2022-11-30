@@ -19,6 +19,7 @@ mod errors;
 mod cache;
 mod object;
 mod file;
+mod index;
 
 use std::fmt::Display;
 use std::fs::File;

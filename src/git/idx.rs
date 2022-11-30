@@ -17,10 +17,10 @@ use crate::git::id::ID;
 
 ///
 #[allow(unused)]
-struct IdxItem {
-    id: ID,
-    crc32: String,
-    offset: usize,
+pub struct IdxItem {
+    pub id: ID,
+    pub crc32: String,
+    pub offset: usize,
 }
 
 ///
@@ -32,13 +32,13 @@ impl Display for IdxItem {
 
 ///
 #[allow(unused)]
-struct Idx {
-    version: u32,
-    number_of_objects: usize,
-    map_of_prefix: HashMap<String, usize>,
-    idx_items: Vec<IdxItem>,
-    pack_signature: ID,
-    idx_signature: ID,
+pub struct Idx {
+    pub version: u32,
+    pub number_of_objects: usize,
+    pub map_of_prefix: HashMap<String, usize>,
+    pub idx_items: Vec<IdxItem>,
+    pub pack_signature: ID,
+    pub idx_signature: ID,
 }
 
 ///
@@ -57,13 +57,13 @@ impl Idx {
 
     ///
     #[allow(unused)]
-    fn decode(& mut self, data: Vec<u8>) -> Result<(), GitError> {
+    pub fn decode(& mut self, data: Vec<u8>) -> Result<(), GitError> {
         let mut offset : usize = 0;
 
         let mut id_of_objects: Vec<ID> = Vec::new();
         let mut crc32_of_objects: Vec<String> = Vec::new();
 
-        // 4-byte Header:
+        // 4-byte Header: //FF 74 4F 63
         if data[offset..4].to_vec() != vec![255, 116, 79, 99] {
             return Err(GitError::InvalidIdxFile(format!("Invalid idx header: {:?}", data[0..4].to_vec())));
         }

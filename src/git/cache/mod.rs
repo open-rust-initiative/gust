@@ -10,6 +10,7 @@ pub struct PackObjectCache {
   pub by_hash: HashMap<Hash, Rc<Object>>,
   pub by_offset: HashMap<u64, Rc<Object>>,
 }
+
 impl PackObjectCache{
   pub fn update(&mut self, object: Rc<Object> , offset : u64 ){
     
@@ -21,11 +22,12 @@ impl PackObjectCache{
     self.by_offset.clear();
    
   }
-  pub fn Offset_object(&mut self,offset :u64) -> Option<&mut Rc<Object>>{
+  
+  pub fn offset_object(&mut self,offset :u64) -> Option<&mut Rc<Object>>{
     self.by_offset.get_mut(&offset)
   }
-
-  pub fn Hash_object(&mut self,hash :Hash) -> Option<&mut Rc<Object>>{
+  
+  pub fn hash_object(&mut self,hash :Hash) -> Option<&mut Rc<Object>>{
     self.by_hash.get_mut(&hash)
   }
 }

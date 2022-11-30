@@ -9,16 +9,13 @@ use super::super::cache::PackObjectCache;
 use super::super::{blob,commit,sign,tag,tree};
 ///!对取出的object字段进行进一步解码与包装
 /// 
-/// 
-/// 
-/// 
 
 #[derive(Default)]
-pub struct objDecodedmap{
+pub struct objDecodedMap{
    pub _map_hash:HashMap<Hash,Rc<ObjClass>>
 }//
 //在解析完object后执行的进一步的解码过程
-impl objDecodedmap {
+impl objDecodedMap {
     pub fn update_from_cache(&mut self, cache:& PackObjectCache) {
         for (key, value) in cache.by_hash.iter() {
 
@@ -36,9 +33,7 @@ impl objDecodedmap {
                 ObjectType::Commit => ObjClass::COMMIT(commit::Commit::new(metadata) ),
                 ObjectType::Tag => ObjClass::TAG(tag::Tag::new(metadata)),
                 ObjectType::Tree =>  ObjClass::TREE(tree::Tree::new(metadata)),
-            };
-
-            
+            }; 
             self._map_hash.insert(key.clone(),Rc::new(_obj));
         }
         
@@ -53,6 +48,6 @@ mod tests {
     #[test]
     pub fn test_map_new(){
         let restamp :&mut PackObjectCache;
-        let newmap :&mut objDecodedmap;
+        let newmap :&mut objDecodedMap;
     }
 }

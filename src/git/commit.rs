@@ -58,7 +58,7 @@ impl Commit {
             },
             message: "".to_string(),
         };
-        a.decode_meta();
+        a.decode_meta().unwrap();
         a
     }
     ///

@@ -20,7 +20,7 @@ pub struct Blob {
 
 ///
 impl Blob {
-
+    #[allow(unused)]
     pub fn new(metadata: Metadata) -> Self {
         Self {
             meta: metadata.clone(),
