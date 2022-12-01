@@ -34,7 +34,6 @@ use deflate::write::ZlibEncoder;
 use deflate::Compression;
 use flate2::read::ZlibDecoder;
 use anyhow::{Context, Result};
-use thiserror::__private::DisplayAsDisplay;
 
 use crate::git::hash::Hash;
 use crate::git::id::ID;

@@ -28,7 +28,7 @@ impl objDecodedMap {
                     data:value.contents.to_vec(),
                 };
             
-            let _obj:ObjClass=match value.object_type {// 交给各自的new函数
+            let _obj:ObjClass=match value.object_type {// 交给各自的new函数,通过metadata来解码
                 ObjectType::Blob => ObjClass::BLOB(blob::Blob::new(metadata)),
                 ObjectType::Commit => ObjClass::COMMIT(commit::Commit::new(metadata) ),
                 ObjectType::Tag => ObjClass::TAG(tag::Tag::new(metadata)),

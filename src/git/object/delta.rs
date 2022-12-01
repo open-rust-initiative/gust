@@ -14,7 +14,7 @@ const COPY_OFFSET_BYTES: u8 = 4;
 const COPY_SIZE_BYTES: u8 = 3;
 const COPY_ZERO_SIZE: usize = 0x10000;
 
-//使用delta指令
+///使用delta指令
 pub fn apply_delta(pack_file: &mut File, base: &Object) -> Result<Object> {
     let Object { object_type, contents: ref base } = *base;
     read_zlib_stream_exact(pack_file, |delta| {

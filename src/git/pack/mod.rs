@@ -22,6 +22,7 @@ use std::convert::TryFrom;
 use std::fs::File;
 use std::rc::Rc;
 pub mod decode;
+mod encode;
 /// #### Pack文件结构<br>
 ///  `head`: always = "PACK" <br>
 /// `version`: version code <br>
@@ -33,6 +34,7 @@ pub struct Pack {
     version: u32,
     number_of_objects: u32,
     signature: ID,
+    result:PackObjectCache,
 }
 
 ///
@@ -51,6 +53,7 @@ impl Pack {
                 bytes: vec![],
                 hash: "".to_string(),
             },
+            result:PackObjectCache::default(),
         };
 
         let magic = read_bytes(pack_file).unwrap();
@@ -84,14 +87,9 @@ impl Pack {
             object_offsets.push((object_hash, offset));
         }
 
-        let mut result = decode::objDecodedMap::default();
-        result.update_from_cache(&mut object_cache);
-        for (key, value) in result._map_hash.iter() {
-            println!("*********************");
-            println!("Hash :{}", key);
-            println!("{}", value);
-        }
 
+        _pack.result = object_cache;
+    
         //_pack.signature = ID::from_bytes(&pack_file[pack_file.len() - 20..pack_file.len()]);
         let offset = get_offset(pack_file).unwrap();
         let _id: [u8; 20] = read_bytes(pack_file).unwrap();
@@ -109,6 +107,7 @@ impl Pack {
                 bytes: vec![],
                 hash: "".to_string(),
             },
+            result:PackObjectCache::default(),
         };
         let magic = read_bytes(pack_file).unwrap();
         if magic != *b"PACK" {
@@ -180,6 +179,7 @@ impl Pack {
                 let base_object = if let Some(object) = cache.offset_object(base_offset) {
                     Rc::clone(object)
                 } else {
+                    //递归调用 找出base object
                     Pack::next_object(pack_file, base_offset, cache)?
                 };
                 seek(pack_file, offset)?;
@@ -248,6 +248,14 @@ mod tests {
             "8d36a6464e1f284e5e9d06683689ee751d4b2687",
             decoded_pack.signature.to_string()
         );
+
+        let mut result = super::decode::objDecodedMap::default();
+        result.update_from_cache(& decoded_pack.result);
+        for (key, value) in result._map_hash.iter() {
+            println!("*********************");
+            println!("Hash :{}", key);
+            println!("{}", value);
+        }
     }
     
     
