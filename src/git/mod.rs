@@ -14,7 +14,6 @@ mod commit;
 mod tag;
 mod sign;
 mod pack;
-mod errors;
 mod object;
 mod idx;
 
