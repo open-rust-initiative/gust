@@ -7,7 +7,7 @@
 //!
 //!
 mod blob;
-mod hash;
+pub mod hash;
 mod id;
 mod tree;
 mod commit;
@@ -16,7 +16,6 @@ mod sign;
 mod pack;
 mod errors;
 mod object;
-mod file;
 mod idx;
 
 use std::fmt::Display;
@@ -33,8 +32,7 @@ use deflate::Compression;
 use flate2::read::ZlibDecoder;
 use anyhow::{Context, Result};
 
-use crate::git::hash::Hash;
-use crate::git::id::ID;
+use self::id::ID;
 
 use self::hash::HashType;
 use self::object::types::ObjectType;

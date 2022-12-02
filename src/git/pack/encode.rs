@@ -26,8 +26,8 @@ mod tests{
         println!("{}",diff_str);
         
     }
-
-    fn test_aReal_pack(){
+    #[test]
+    fn test_a_real_pack(){
         let mut pack_file = File::open(&Path::new(
             //".git/objects/aa/36c1e0d709f96d7b356967e16766bafdf63a75",
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
@@ -37,7 +37,5 @@ mod tests{
         let decoded_pack = Pack::decode(&mut pack_file);
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
-
-
     }
 }

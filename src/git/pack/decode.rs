@@ -1,10 +1,11 @@
 use std::{collections::HashMap, rc::Rc};
 use crate::git::Metadata;
-use crate::git::hash::HashType;
-use crate::git::id::ID;
+use super::ID;
+use crate::git::hash::{Hash,HashType};
+
 use crate::git::object::types::ObjectType;
 
-use crate::git::{Hash,ObjClass};
+use crate::git::ObjClass;
 use super::super::{blob,commit,tag,tree};
 use super::cache::PackObjectCache;
 ///!对取出的object字段进行进一步解码与包装
@@ -16,9 +17,9 @@ pub struct ObjDecodedMap{
 }//
 //在解析完object后执行的进一步的解码过程
 impl ObjDecodedMap {
+    #[allow(unused)]
     pub fn update_from_cache(&mut self, cache:& PackObjectCache) {
         for (key, value) in cache.by_hash.iter() {
-
             let metadata = 
                 Metadata {
                     t: value.object_type ,  
@@ -43,11 +44,9 @@ impl ObjDecodedMap {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     
     #[test]
     pub fn test_map_new(){
-        let restamp :&mut PackObjectCache;
-        let newmap :&mut ObjDecodedMap;
+//TODO 写map的测试
     }
 }

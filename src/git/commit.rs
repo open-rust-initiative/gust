@@ -11,11 +11,10 @@ use std::fmt::Display;
 use bstr::ByteSlice;
 
 use crate::errors::GitError;
-use crate::git::id::ID;
-use crate::git::Metadata;
 
+use super::ID;
+use super::Metadata;
 use crate::git::sign::AuthorSign;
-
 use super::hash::HashType;
 use super::object::types::ObjectType;
 

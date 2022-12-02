@@ -1,8 +1,8 @@
 use std::collections::{HashMap};
-
+use super::super::hash::Hash;
 
 use super::super::object::Object;
-use super::super::Hash;
+
 use std::rc::Rc;
 
 #[derive(Default)]
@@ -17,6 +17,7 @@ impl PackObjectCache{
     self.by_hash.insert(object.hash(), object.clone());
     self.by_offset.insert(offset, object.clone());
   }
+  #[allow(unused)]
   pub fn clean(&mut self){
     self.by_hash.clear();
     self.by_offset.clear();

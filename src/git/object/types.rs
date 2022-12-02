@@ -1,7 +1,7 @@
 use std:: fmt::Display;
 
 use crate::errors::GitError;
-///四种Objct类型
+///四种Object类型
 /// Git Object Types: Blob, Tree, Commit, Tag
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum ObjectType {
@@ -51,7 +51,7 @@ impl ObjectType {
 }
 
 
-///六种Objec存储类型
+///六种Object存储类型
 pub enum PackObjectType {
     Base(ObjectType),
     OffsetDelta,
@@ -59,7 +59,7 @@ pub enum PackObjectType {
 }
 
 /// 通过类型号分辨类型
-pub fn typeNumber2Type(type_number: u8) -> Option<PackObjectType> {
+pub fn type_number2_type(type_number: u8) -> Option<PackObjectType> {
     use ObjectType::*;
     use PackObjectType::*;
     match type_number {
@@ -72,8 +72,8 @@ pub fn typeNumber2Type(type_number: u8) -> Option<PackObjectType> {
         _ => None,
     }
 }
-
-pub fn type2Number(_type: Option<PackObjectType>) -> i32{
+#[allow(unused)]
+pub fn type2_number(_type: Option<PackObjectType>) -> i32{
     use ObjectType::*;
     use PackObjectType::*;
     match _type {

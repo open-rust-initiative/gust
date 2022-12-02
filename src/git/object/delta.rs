@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::git::errors::make_error;
 
 use super::Hash;
-use super::super::file::*;
+use crate::utils;
 use  super::Object;
 
 const INDEX_FILE_SUFFIX: &str = ".idx";
@@ -17,13 +17,13 @@ const COPY_ZERO_SIZE: usize = 0x10000;
 ///使用delta指令
 pub fn apply_delta(pack_file: &mut File, base: &Object) -> Result<Object> {
     let Object { object_type, contents: ref base } = *base;
-    read_zlib_stream_exact(pack_file, |delta| {
-      let base_size = read_size_encoding(delta)?;
+    utils::read_zlib_stream_exact(pack_file, |delta| {
+      let base_size = utils::read_size_encoding(delta)?;
       if base.len() != base_size {
         return Err(make_error("Incorrect base object length"))
       }
   
-      let result_size = read_size_encoding(delta)?;
+      let result_size = utils::read_size_encoding(delta)?;
       let mut result = Vec::with_capacity(result_size);
       while apply_delta_instruction(delta, base, &mut result)? {
   
@@ -44,7 +44,7 @@ fn apply_delta_instruction<R: Read>(
     stream: &mut R, base: &[u8], result: &mut Vec<u8>
   ) -> Result<bool> {
     // Check if the stream has ended, meaning the new object is done
-    let instruction = match read_bytes(stream) {
+    let instruction = match utils::read_bytes(stream) {
       Ok([instruction]) => instruction,
       Err(err) if err.kind() == ErrorKind::UnexpectedEof => return Ok(false),
       Err(err) => return Err(err),
@@ -65,9 +65,9 @@ fn apply_delta_instruction<R: Read>(
       // Copy instruction
       let mut nonzero_bytes = instruction;
       let offset =
-        read_partial_int(stream, COPY_OFFSET_BYTES, &mut nonzero_bytes)?;
+      utils::read_partial_int(stream, COPY_OFFSET_BYTES, &mut nonzero_bytes)?;
       let mut size =
-        read_partial_int(stream, COPY_SIZE_BYTES, &mut nonzero_bytes)?;
+      utils::read_partial_int(stream, COPY_SIZE_BYTES, &mut nonzero_bytes)?;
       if size == 0 {
         // Copying 0 bytes doesn't make sense, so git assumes a different size
         size = COPY_ZERO_SIZE;
@@ -102,6 +102,7 @@ pub fn read_object(hash: Hash) -> Result<Object> {
 const OBJECTS_DIRECTORY: &str = ".git/objects";
 use flate2::read::ZlibDecoder;
 ///读出unpack 的Object
+#[allow(unused)]
 fn read_unpacked_object(hash: Hash) -> Result<Object> {
     use super::ObjectType::*;
   
@@ -112,7 +113,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Object> {
       .join(file_name);
     let object_file = File::open(object_file)?;
     let mut object_stream = ZlibDecoder::new(object_file);
-    let object_type = read_until_delimiter(&mut object_stream, b' ')?;
+    let object_type = utils::read_until_delimiter(&mut object_stream, b' ')?;
     let object_type = match &object_type[..] {
       _commit_object_type => Commit,
       _tree_object_type => Tree,
@@ -124,7 +125,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Object> {
         ))
       }
     };
-    let size = read_until_delimiter(&mut object_stream, b'\0')?;
+    let size = utils::read_until_delimiter(&mut object_stream, b'\0')?;
     let size = parse_decimal(&size).ok_or_else(|| {
       make_error(&format!("Invalid object size: {:?}", size))
     })?;
@@ -159,6 +160,7 @@ fn decimal_char_value(decimal_char: u8) -> Option<u8> {
   }
 
 ///获取idx文件的文件名
+#[allow(unused)]
 fn strip_index_file_name(file_name: &OsStr) -> Option<&str> {
     let file_name = file_name.to_str()?;
     file_name.strip_suffix(INDEX_FILE_SUFFIX)

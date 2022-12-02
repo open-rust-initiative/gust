@@ -11,13 +11,13 @@ use std::io::Read;
 
 use self::cache::PackObjectCache;
 
-use super::file::*;
 use super::idx::Idx;
 use super::object::delta::*;
 use super::object::Object;
 
 use crate::git::errors::make_error;
 use crate::git::id::ID;
+use crate::utils;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::rc::Rc;
@@ -47,6 +47,7 @@ impl Pack {
     /// ## Decode the Pack File standalone
     ///  - in: pack_file: &mut File
     ///  - out: The `Pack` Struct
+    #[allow(unused)]
     pub fn decode(pack_file: &mut File) -> Self {
         let mut _pack = Self {
             head: [0, 0, 0, 0],
@@ -59,26 +60,26 @@ impl Pack {
             result:PackObjectCache::default(),
         };
 
-        let magic = read_bytes(pack_file).unwrap();
+        let magic = utils::read_bytes(pack_file).unwrap();
 
         if magic != *b"PACK" {
             panic!("not stand pack file");
         }
         _pack.head = magic;
 
-        let version = read_u32(pack_file).unwrap();
+        let version = utils::read_u32(pack_file).unwrap();
         if version != 2 {
             panic!("not support pack version");
         }
         _pack.version = version;
 
-        let total_objects = read_u32(pack_file).unwrap();
+        let total_objects = utils::read_u32(pack_file).unwrap();
         let mut object_cache = PackObjectCache::default();
         let mut first_byte_objects = [0u32; 1 << u8::BITS];
         let mut object_offsets = Vec::with_capacity(total_objects as usize);
         _pack.number_of_objects = total_objects;
         for _ in 0..total_objects {
-            let offset = get_offset(pack_file).unwrap();
+            let offset = utils::get_offset(pack_file).unwrap();
             let object = Pack::next_object(pack_file, offset, &mut object_cache).unwrap();
             //获取取出的object的Hash值
             let object_hash = object.hash();
@@ -95,12 +96,13 @@ impl Pack {
     
         //_pack.signature = ID::from_bytes(&pack_file[pack_file.len() - 20..pack_file.len()]);
         
-        let _id: [u8; 20] = read_bytes(pack_file).unwrap();
+        let _id: [u8; 20] = utils::read_bytes(pack_file).unwrap();
         _pack.signature = ID::from_bytes(&_id[..]);
         //return
         _pack
     }
 
+    #[allow(unused)]
     pub fn decode_by_idx(idx: &mut Idx, pack_file: &mut File) -> Self {
         let mut _pack = Self {
             head: [0, 0, 0, 0],
@@ -112,12 +114,12 @@ impl Pack {
             },
             result:PackObjectCache::default(),
         };
-        let magic = read_bytes(pack_file).unwrap();
+        let magic = utils::read_bytes(pack_file).unwrap();
         if magic != *b"PACK" {
             panic!("not stand pack file");
         }
         _pack.head = magic;
-        let version = read_u32(pack_file).unwrap();
+        let version = utils::read_u32(pack_file).unwrap();
         if version != 2 {
             panic!("not support pack version");
         }
@@ -154,13 +156,13 @@ impl Pack {
         offset: u64,
         cache: &mut PackObjectCache,
     ) -> std::io::Result<Rc<Object>> {
-        use super::object::types::PackObjectType::*;
-        seek(pack_file, offset)?;
-        let (object_type, size) = read_type_and_size(pack_file)?;
-        let object_type = super::object::types::typeNumber2Type(object_type);
+        use super::object::types::PackObjectType::{*};
+        utils::seek(pack_file, offset)?;
+        let (object_type, size) = utils::read_type_and_size(pack_file)?;
+        let object_type = super::object::types::type_number2_type(object_type);
         let object = match object_type {
-            // Undeltified representation
-            Some(Base(object_type)) => read_zlib_stream_exact(pack_file, |decompressed| {
+            // Undelta representation
+            Some(Base(object_type)) => utils::read_zlib_stream_exact(pack_file, |decompressed| {
                 let mut contents = Vec::with_capacity(size);
                 decompressed.read_to_end(&mut contents)?;
                 if contents.len() != size {
@@ -172,26 +174,26 @@ impl Pack {
                     contents,
                 })
             }),
-            // Deltified; base object is at an offset in the same packfile
+            // Delta; base object is at an offset in the same packfile
             Some(OffsetDelta) => {
-                let delta_offset = read_offset_encoding(pack_file)?;
+                let delta_offset = utils::read_offset_encoding(pack_file)?;
                 let base_offset = offset
                     .checked_sub(delta_offset)
                     .ok_or_else(|| make_error("Invalid OffsetDelta offset"))?;
-                let offset = get_offset(pack_file)?;
+                let offset = utils::get_offset(pack_file)?;
                 let base_object = if let Some(object) = cache.offset_object(base_offset) {
                     Rc::clone(object)
                 } else {
                     //递归调用 找出base object
                     Pack::next_object(pack_file, base_offset, cache)?
                 };
-                seek(pack_file, offset)?;
+                utils::seek(pack_file, offset)?;
                 let objs = apply_delta(pack_file, &base_object)?;
                 Ok(objs)
             }
-            // Deltified; base object is given by a hash outside the packfile
+            // Delta; base object is given by a hash outside the packfile
             Some(HashDelta) => {
-                let hash = read_hash(pack_file)?;
+                let hash = utils::read_hash(pack_file)?;
                 let object;
                 let base_object = if let Some(object) = cache.hash_object(hash) {
                     object
@@ -201,7 +203,7 @@ impl Pack {
                 };
                 apply_delta(pack_file, &base_object)
             }
-            None => return Err(make_error("Unkonw type of the Object!!")),
+            None => return Err(make_error("Unknown type of the Object!!")),
         }?;
         let obj = Rc::new(object);
         cache.update(obj.clone(), offset);

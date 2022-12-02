@@ -133,9 +133,9 @@ impl Tag {
 }
 impl Display for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "Type: Tag");
-        writeln!(f, "Tag: {}", self.tag);
-        self.tagger.fmt(f);
+        writeln!(f, "Type: Tag").unwrap();
+        writeln!(f, "Tag: {}", self.tag).unwrap();
+        self.tagger.fmt(f).unwrap();
         writeln!(f,"{}",self.message)
     }
 }
