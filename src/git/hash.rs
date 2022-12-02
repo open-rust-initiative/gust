@@ -78,6 +78,7 @@ impl FromStr for Hash {
 
 mod tests {
 
+    /// The Right Hash decode
     #[test]
     fn test_hash() {
         use super::Hash;
@@ -89,6 +90,7 @@ mod tests {
         ];
         assert_eq!(test_hash.0, result_hash);
     }
+    /// The Wrong Hash decode
     #[test]
     fn test_error_hash() {
         use super::Hash;
@@ -100,7 +102,6 @@ mod tests {
             format!("The {} is not a valid Hash value ", test_str),
             test_hash.to_string()
         );
-        //let result_hash:[u8;20] = [24,253,45,234,175,21,44,127,18,34,197,47,178,103,63,97,146,179,117,240];
-        //assert_eq!(test_hash.0,result_hash)
+
     }
 }
