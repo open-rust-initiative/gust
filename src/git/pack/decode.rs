@@ -5,17 +5,17 @@ use crate::git::id::ID;
 use crate::git::object::types::ObjectType;
 
 use crate::git::{Hash,ObjClass};
-use super::super::cache::PackObjectCache;
-use super::super::{blob,commit,sign,tag,tree};
+use super::super::{blob,commit,tag,tree};
+use super::cache::PackObjectCache;
 ///!对取出的object字段进行进一步解码与包装
 /// 
 
 #[derive(Default)]
-pub struct objDecodedMap{
+pub struct ObjDecodedMap{
    pub _map_hash:HashMap<Hash,Rc<ObjClass>>
 }//
 //在解析完object后执行的进一步的解码过程
-impl objDecodedMap {
+impl ObjDecodedMap {
     pub fn update_from_cache(&mut self, cache:& PackObjectCache) {
         for (key, value) in cache.by_hash.iter() {
 
@@ -48,6 +48,6 @@ mod tests {
     #[test]
     pub fn test_map_new(){
         let restamp :&mut PackObjectCache;
-        let newmap :&mut objDecodedMap;
+        let newmap :&mut ObjDecodedMap;
     }
 }

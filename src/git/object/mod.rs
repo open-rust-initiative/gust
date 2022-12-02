@@ -22,10 +22,10 @@ impl Object {
     pub fn hash(&self) -> Hash {
       let new_hash = Sha1::new()
         .chain(match self.object_type {
-          Commit => COMMIT_OBJECT_TYPE,
-          Tree => TREE_OBJECT_TYPE,
-          Blob => BLOB_OBJECT_TYPE,
-          Tag => TAG_OBJECT_TYPE,
+          ObjectType::Commit => COMMIT_OBJECT_TYPE,
+          ObjectType::Tree => TREE_OBJECT_TYPE,
+          ObjectType::Blob => BLOB_OBJECT_TYPE,
+          ObjectType::Tag => TAG_OBJECT_TYPE,
         })
         .chain(b" ")
         .chain(self.contents.len().to_string())

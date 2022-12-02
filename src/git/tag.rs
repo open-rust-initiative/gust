@@ -15,7 +15,7 @@ use crate::git::id::ID;
 use crate::git::object::types::ObjectType;
 use crate::git::sign::AuthorSign;
 use crate::git::Metadata;
-use std::fmt::{Display, write};
+use std::fmt::{Display};
 /// Git Object: tag
 #[allow(unused)]
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
@@ -145,9 +145,6 @@ mod tests {
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
-    use std::str::FromStr;
-
-    use crate::git::hash::Hash;
     use crate::git::id::ID;
     use crate::git::sign::AuthorSign;
     use crate::git::Metadata;

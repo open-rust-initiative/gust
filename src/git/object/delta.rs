@@ -114,10 +114,10 @@ fn read_unpacked_object(hash: Hash) -> Result<Object> {
     let mut object_stream = ZlibDecoder::new(object_file);
     let object_type = read_until_delimiter(&mut object_stream, b' ')?;
     let object_type = match &object_type[..] {
-      COMMIT_OBJECT_TYPE => Commit,
-      TREE_OBJECT_TYPE => Tree,
-      BLOB_OBJECT_TYPE => Blob,
-      TAG_OBJECT_TYPE => Tag,
+      _commit_object_type => Commit,
+      _tree_object_type => Tree,
+      _blob_object_type => Blob,
+      _tag_object_type => Tag,
       _ => {
         return Err(make_error(
           &format!("Invalid object type: {:?}", object_type)

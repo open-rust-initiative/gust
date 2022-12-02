@@ -114,9 +114,7 @@ impl Tree {
     }
 
     pub(crate) fn decode_metadata(&mut self) -> Result<(), GitError> {
-        let mut tree_items:Vec<TreeItem> = Vec::new();
         let mut index = 0;
-
         while index < self.meta.data.len() {
             let mode_index = &self.meta.data[index..].find_byte(0x20).unwrap();
             let mode = &self.meta.data[index..index + *mode_index];

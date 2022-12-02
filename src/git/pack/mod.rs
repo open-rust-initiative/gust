@@ -9,20 +9,23 @@
 use std::convert::TryInto;
 use std::io::Read;
 
-use super::cache::PackObjectCache;
+use self::cache::PackObjectCache;
+
 use super::file::*;
 use super::idx::Idx;
 use super::object::delta::*;
 use super::object::Object;
-use crate::errors::GitError;
 
 use crate::git::errors::make_error;
 use crate::git::id::ID;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::rc::Rc;
+
 pub mod decode;
-mod encode;
+pub mod encode;
+mod cache;
+
 /// #### Pack文件结构<br>
 ///  `head`: always = "PACK" <br>
 /// `version`: version code <br>
@@ -91,7 +94,7 @@ impl Pack {
         _pack.result = object_cache;
     
         //_pack.signature = ID::from_bytes(&pack_file[pack_file.len() - 20..pack_file.len()]);
-        let offset = get_offset(pack_file).unwrap();
+        
         let _id: [u8; 20] = read_bytes(pack_file).unwrap();
         _pack.signature = ID::from_bytes(&_id[..]);
         //return
@@ -130,7 +133,7 @@ impl Pack {
             Pack::next_object(pack_file, idx_item.offset.try_into().unwrap(), &mut cache).unwrap();
         };
 
-        let mut result = decode::objDecodedMap::default();
+        let mut result = decode::ObjDecodedMap::default();
         result.update_from_cache(&mut cache);
         for (key, value) in result._map_hash.iter() {
             println!("*********************");
@@ -233,6 +236,13 @@ mod tests {
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_string()
         );
+        let mut result = super::decode::ObjDecodedMap::default();
+        result.update_from_cache(& decoded_pack.result);
+        for (key, value) in result._map_hash.iter() {
+            println!("*********************");
+            println!("Hash :{}", key);
+            println!("{}", value);
+        }
     }
 
     #[test]
@@ -249,7 +259,7 @@ mod tests {
             decoded_pack.signature.to_string()
         );
 
-        let mut result = super::decode::objDecodedMap::default();
+        let mut result = super::decode::ObjDecodedMap::default();
         result.update_from_cache(& decoded_pack.result);
         for (key, value) in result._map_hash.iter() {
             println!("*********************");

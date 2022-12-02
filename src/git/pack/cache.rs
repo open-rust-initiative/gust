@@ -1,8 +1,8 @@
 use std::collections::{HashMap};
 
 
-use super::object::Object;
-use super::Hash;
+use super::super::object::Object;
+use super::super::Hash;
 use std::rc::Rc;
 
 #[derive(Default)]
@@ -20,7 +20,6 @@ impl PackObjectCache{
   pub fn clean(&mut self){
     self.by_hash.clear();
     self.by_offset.clear();
-   
   }
   
   pub fn offset_object(&mut self,offset :u64) -> Option<&mut Rc<Object>>{

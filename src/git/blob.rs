@@ -50,8 +50,18 @@ impl Blob {
 }
 use bstr::BString;
 impl Display for Blob{
+    ///为了节省输出空间 暂时只输出第一行内容
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "Type: Blob\n{}", BString::new(self.data.clone()))
+        let mut print_data:Vec<u8> = vec![];
+        for value in self.data.iter(){
+            if *value != b'\n'{
+                print_data.push(value.clone());
+            }else {
+                break;
+            }
+        }
+        writeln!(f, "Type: Blob\n{}", BString::new(print_data) ).unwrap();
+        writeln!(f, "Only Show the first line of the File...")
     }   
 }
 ///

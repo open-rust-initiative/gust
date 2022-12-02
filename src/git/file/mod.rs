@@ -14,7 +14,6 @@ fn keep_bits(value: usize, bits: u8) -> usize {
     value & ((1 << bits) - 1)
 }
 
-
 ///从read中读取出N个u8
 pub fn read_bytes<R: Read, const N: usize>(stream: &mut R) -> io::Result<[u8; N]> {
     let mut bytes = [0; N];
@@ -114,7 +113,7 @@ pub fn read_partial_int<R: Read>(
     bytes: u8,
     present_bytes: &mut u8,
 ) -> io::Result<usize> {
-    let mut value = 0;
+    let mut value:usize = 0;
     for byte_index in 0..bytes {
         if *present_bytes & 1 != 0 {
             let [byte] = read_bytes(stream)?;
