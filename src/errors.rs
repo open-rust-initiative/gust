@@ -21,6 +21,13 @@ pub enum GitError {
     #[error("The {0} is not a valid Hash value ")]
     InvalidHashValue(String),
 
+    #[error("Delta Object Error Info:{0}")]
+    DeltaObjError(String),
+
+    #[error("Error decode in the Object ,info:{0}")]
+    InvalidObjectInfo(String),
+
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+
 }

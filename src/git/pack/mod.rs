@@ -1,4 +1,3 @@
-
 use std::convert::TryInto;
 use std::io::Read;
 
@@ -8,18 +7,16 @@ use super::idx::Idx;
 use super::object::delta::*;
 use super::object::Object;
 
-use crate::git::errors::make_error;
 use crate::errors::GitError;
-
 use crate::git::id::ID;
 use crate::utils;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::rc::Rc;
 
+mod cache;
 pub mod decode;
 pub mod encode;
-mod cache;
 
 /// #### Pack文件结构<br>
 ///  `head`: always = "PACK" <br>
@@ -32,7 +29,7 @@ pub struct Pack {
     version: u32,
     number_of_objects: u32,
     signature: ID,
-    result:PackObjectCache,
+    result: PackObjectCache,
 }
 
 ///
@@ -43,7 +40,7 @@ impl Pack {
     ///  - in: pack_file: &mut File
     ///  - out: The `Pack` Struct
     #[allow(unused)]
-    pub fn decode(pack_file: &mut File) -> Result<Self,GitError> {
+    pub fn decode(pack_file: &mut File) -> Result<Self, GitError> {
         let mut _pack = Self {
             head: [0, 0, 0, 0],
             version: 0,
@@ -52,20 +49,22 @@ impl Pack {
                 bytes: vec![],
                 hash: "".to_string(),
             },
-            result:PackObjectCache::default(),
+            result: PackObjectCache::default(),
         };
 
         let magic = utils::read_bytes(pack_file).unwrap();
 
         if magic != *b"PACK" {
-            return Err(GitError::InvalidPackHeader(format!("{},{},{},{}",magic[0],magic[1],magic[2],magic[3])))       
+            return Err(GitError::InvalidPackHeader(format!(
+                "{},{},{},{}",
+                magic[0], magic[1], magic[2], magic[3]
+            )));
         }
         _pack.head = magic;
 
         let version = utils::read_u32(pack_file).unwrap();
         if version != 2 {
-            return Err(GitError::InvalidPackFile(format!("Current File")))       
-
+            return Err(GitError::InvalidPackFile(format!("Current File")));
         }
         _pack.version = version;
 
@@ -82,16 +81,15 @@ impl Pack {
             first_byte_objects[object_hash.0[0] as usize] += 1;
             // Larger offsets would require a version-2 pack index
             let offset = u32::try_from(offset)
-                .map_err(|_| make_error("Packfile is too large"))
+                .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
                 .unwrap();
             object_offsets.push((object_hash, offset));
         }
 
-
         _pack.result = object_cache;
-    
+
         //_pack.signature = ID::from_bytes(&pack_file[pack_file.len() - 20..pack_file.len()]);
-        
+
         let _id: [u8; 20] = utils::read_bytes(pack_file).unwrap();
         _pack.signature = ID::from_bytes(&_id[..]);
         //return
@@ -108,7 +106,7 @@ impl Pack {
                 bytes: vec![],
                 hash: "".to_string(),
             },
-            result:PackObjectCache::default(),
+            result: PackObjectCache::default(),
         };
         let magic = utils::read_bytes(pack_file).unwrap();
         if magic != *b"PACK" {
@@ -123,13 +121,13 @@ impl Pack {
 
         let total_objects = idx.number_of_objects;
         _pack.number_of_objects = u32::try_from(total_objects)
-            .map_err(|_| make_error("Packfile is too large"))
+            .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
             .unwrap();
         let mut cache = PackObjectCache::default();
 
-        for idx_item in idx.idx_items.iter(){
+        for idx_item in idx.idx_items.iter() {
             Pack::next_object(pack_file, idx_item.offset.try_into().unwrap(), &mut cache).unwrap();
-        };
+        }
 
         let mut result = decode::ObjDecodedMap::default();
         result.update_from_cache(&mut cache);
@@ -138,11 +136,9 @@ impl Pack {
             println!("Hash :{}", key);
             println!("{}", value);
         }
-        
-        
-      
+
         _pack.signature = idx.pack_signature.clone();
-       
+
         _pack
     }
     ///Get the Object from File by the Give Offset
@@ -151,18 +147,20 @@ impl Pack {
         pack_file: &mut File,
         offset: u64,
         cache: &mut PackObjectCache,
-    ) -> std::io::Result<Rc<Object>> {
-        use super::object::types::PackObjectType::{*};
+    ) -> Result<Rc<Object>, GitError> {
+        use super::object::types::PackObjectType::*;
         utils::seek(pack_file, offset)?;
         let (object_type, size) = utils::read_type_and_size(pack_file)?;
-        let object_type = super::object::types::type_number2_type(object_type);
-        let object = match object_type {
+        let object_types = super::object::types::type_number2_type(object_type);
+        let object = match object_types {
             // Undelta representation
             Some(Base(object_type)) => utils::read_zlib_stream_exact(pack_file, |decompressed| {
                 let mut contents = Vec::with_capacity(size);
                 decompressed.read_to_end(&mut contents)?;
                 if contents.len() != size {
-                    return Err(make_error("Incorrect object size"));
+                    return Err(GitError::InvalidObjectInfo(format!(
+                        "Incorrect object size"
+                    )));
                 }
 
                 Ok(Object {
@@ -175,7 +173,7 @@ impl Pack {
                 let delta_offset = utils::read_offset_encoding(pack_file)?;
                 let base_offset = offset
                     .checked_sub(delta_offset)
-                    .ok_or_else(|| make_error("Invalid OffsetDelta offset"))?;
+                    .ok_or_else(|| GitError::InvalidObjectInfo(format!("Invalid OffsetDelta offset")))?;
                 let offset = utils::get_offset(pack_file)?;
                 let base_object = if let Some(object) = cache.offset_object(base_offset) {
                     Rc::clone(object)
@@ -199,7 +197,7 @@ impl Pack {
                 };
                 apply_delta(pack_file, &base_object)
             }
-            None => return Err(make_error("Unknown type of the Object!!")),
+            None => return Err(GitError::InvalidObjectType(object_type.to_string())),
         }?;
         let obj = Rc::new(object);
         cache.update(obj.clone(), offset);
@@ -227,9 +225,9 @@ mod tests {
             "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
         ))
         .unwrap();
-        let decoded_pack = match Pack::decode(&mut pack_file){
-            Ok(f)=> f,
-            Err(e) => panic!("{}",e.to_string()),
+        let decoded_pack = match Pack::decode(&mut pack_file) {
+            Ok(f) => f,
+            Err(e) => panic!("{}", e.to_string()),
         };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
@@ -238,7 +236,7 @@ mod tests {
             decoded_pack.signature.to_string()
         );
         let mut result = super::decode::ObjDecodedMap::default();
-        result.update_from_cache(& decoded_pack.result);
+        result.update_from_cache(&decoded_pack.result);
         for (key, value) in result._map_hash.iter() {
             println!("*********************");
             println!("Hash :{}", key);
@@ -252,9 +250,9 @@ mod tests {
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack",
         ))
         .unwrap();
-        let decoded_pack = match Pack::decode(&mut pack_file){
-            Ok(f)=> f,
-            Err(e) => panic!("{}",e.to_string()),
+        let decoded_pack = match Pack::decode(&mut pack_file) {
+            Ok(f) => f,
+            Err(e) => panic!("{}", e.to_string()),
         };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
@@ -264,15 +262,14 @@ mod tests {
         );
 
         let mut result = super::decode::ObjDecodedMap::default();
-        result.update_from_cache(& decoded_pack.result);
+        result.update_from_cache(&decoded_pack.result);
         for (key, value) in result._map_hash.iter() {
             println!("*********************");
             println!("Hash :{}", key);
             println!("{}", value);
         }
     }
-    
-    
+
     #[test]
     fn test_parse_simple_pack() {
         let mut pack_file = File::open(&Path::new(
@@ -280,9 +277,9 @@ mod tests {
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
         ))
         .unwrap();
-        let decoded_pack = match Pack::decode(&mut pack_file){
-            Ok(f)=> f,
-            Err(e) => panic!("{}",e.to_string()),
+        let decoded_pack = match Pack::decode(&mut pack_file) {
+            Ok(f) => f,
+            Err(e) => panic!("{}", e.to_string()),
         };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
@@ -291,10 +288,10 @@ mod tests {
             decoded_pack.signature.to_string()
         );
     }
-    
+
     ///Test the pack decode by the Idx File
     #[test]
-    fn test_pack_idx_decode(){
+    fn test_pack_idx_decode() {
         let mut pack_file = File::open(&Path::new(
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack",
         ))
@@ -312,12 +309,18 @@ mod tests {
             number_of_objects: 0,
             map_of_prefix: HashMap::new(),
             idx_items: Vec::new(),
-            pack_signature: ID { bytes: vec![], hash: "".to_string() },
-            idx_signature: ID { bytes: vec![], hash: "".to_string() },
+            pack_signature: ID {
+                bytes: vec![],
+                hash: "".to_string(),
+            },
+            idx_signature: ID {
+                bytes: vec![],
+                hash: "".to_string(),
+            },
         };
 
         idx.decode(buffer).unwrap();
-        let decoded_pack = Pack::decode_by_idx(&mut idx,&mut pack_file);
+        let decoded_pack = Pack::decode_by_idx(&mut idx, &mut pack_file);
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
         assert_eq!(
@@ -325,5 +328,4 @@ mod tests {
             decoded_pack.signature.to_string()
         );
     }
-
 }
