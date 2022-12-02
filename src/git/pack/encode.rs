@@ -34,7 +34,10 @@ mod tests{
         ))
         .unwrap();
         use super::super::Pack;
-        let decoded_pack = Pack::decode(&mut pack_file);
+        let decoded_pack = match Pack::decode(&mut pack_file){
+            Ok(f)=> f,
+            Err(e) => panic!("{}",e.to_string()),
+        };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
     }

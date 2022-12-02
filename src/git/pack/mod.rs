@@ -1,10 +1,3 @@
-//!
-//!
-//!
-//!
-//!
-//!
-//!
 
 use std::convert::TryInto;
 use std::io::Read;
@@ -16,6 +9,8 @@ use super::object::delta::*;
 use super::object::Object;
 
 use crate::git::errors::make_error;
+use crate::errors::GitError;
+
 use crate::git::id::ID;
 use crate::utils;
 use std::convert::TryFrom;
@@ -48,7 +43,7 @@ impl Pack {
     ///  - in: pack_file: &mut File
     ///  - out: The `Pack` Struct
     #[allow(unused)]
-    pub fn decode(pack_file: &mut File) -> Self {
+    pub fn decode(pack_file: &mut File) -> Result<Self,GitError> {
         let mut _pack = Self {
             head: [0, 0, 0, 0],
             version: 0,
@@ -63,13 +58,14 @@ impl Pack {
         let magic = utils::read_bytes(pack_file).unwrap();
 
         if magic != *b"PACK" {
-            panic!("not stand pack file");
+            return Err(GitError::InvalidPackHeader(format!("{},{},{},{}",magic[0],magic[1],magic[2],magic[3])))       
         }
         _pack.head = magic;
 
         let version = utils::read_u32(pack_file).unwrap();
         if version != 2 {
-            panic!("not support pack version");
+            return Err(GitError::InvalidPackFile(format!("Current File")))       
+
         }
         _pack.version = version;
 
@@ -99,7 +95,7 @@ impl Pack {
         let _id: [u8; 20] = utils::read_bytes(pack_file).unwrap();
         _pack.signature = ID::from_bytes(&_id[..]);
         //return
-        _pack
+        Ok(_pack)
     }
 
     #[allow(unused)]
@@ -231,7 +227,10 @@ mod tests {
             "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
         ))
         .unwrap();
-        let decoded_pack = Pack::decode(&mut pack_file);
+        let decoded_pack = match Pack::decode(&mut pack_file){
+            Ok(f)=> f,
+            Err(e) => panic!("{}",e.to_string()),
+        };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
         assert_eq!(
@@ -253,7 +252,10 @@ mod tests {
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack",
         ))
         .unwrap();
-        let decoded_pack = Pack::decode(&mut pack_file);
+        let decoded_pack = match Pack::decode(&mut pack_file){
+            Ok(f)=> f,
+            Err(e) => panic!("{}",e.to_string()),
+        };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
         assert_eq!(
@@ -278,7 +280,10 @@ mod tests {
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
         ))
         .unwrap();
-        let decoded_pack = Pack::decode(&mut pack_file);
+        let decoded_pack = match Pack::decode(&mut pack_file){
+            Ok(f)=> f,
+            Err(e) => panic!("{}",e.to_string()),
+        };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
         assert_eq!(
