@@ -31,7 +31,9 @@ impl Display for Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut hash_str = String::new();
         for i in self.0 {
-            hash_str += format!("{:2x}", i).as_str();
+            
+            hash_str += format!("{:1X}", i>>4 & 0x0f).as_str();
+            hash_str += format!("{:1X}", i & 0x0f).as_str();
         }
         write!(f, "{}", hash_str)
     }
@@ -89,7 +91,22 @@ mod tests {
             240,
         ];
         assert_eq!(test_hash.0, result_hash);
+        println!("{}",test_hash);
     }
+
+
+        /// The Right Hash decode
+        #[test]
+        fn test_hash_with_zero() {
+            use super::Hash;
+            use std::str::FromStr;
+            let test_hash = Hash::from_str("08fd2deaaf152c7f1222c52fb2673f6192b37500").unwrap();
+            let result_hash: [u8; 20] = [
+                8, 253, 45, 234, 175, 21, 44, 127, 18, 34, 197, 47, 178, 103, 63, 97, 146, 179, 117, 0
+            ];
+             assert_eq!(test_hash.0, result_hash);
+            println!("{}",test_hash);
+        }
     /// The Wrong Hash decode
     #[test]
     fn test_error_hash() {

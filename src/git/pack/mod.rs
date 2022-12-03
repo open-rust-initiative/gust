@@ -131,11 +131,11 @@ impl Pack {
 
         let mut result = decode::ObjDecodedMap::default();
         result.update_from_cache(&mut cache);
-        for (key, value) in result._map_hash.iter() {
-            println!("*********************");
-            println!("Hash :{}", key);
-            println!("{}", value);
-        }
+        // for (key, value) in result._map_hash.iter() {
+        //     println!("*********************");
+        //     println!("Hash :{}", key);
+        //     println!("{}", value);
+        // }
 
         _pack.signature = idx.pack_signature.clone();
 
@@ -152,6 +152,7 @@ impl Pack {
         utils::seek(pack_file, offset)?;
         let (object_type, size) = utils::read_type_and_size(pack_file)?;
         let object_types = super::object::types::type_number2_type(object_type);
+
         let object = match object_types {
             // Undelta representation
             Some(Base(object_type)) => utils::read_zlib_stream_exact(pack_file, |decompressed| {
@@ -199,6 +200,12 @@ impl Pack {
             }
             None => return Err(GitError::InvalidObjectType(object_type.to_string())),
         }?;
+
+        match super::object::types::type_number2_type(object_type) {
+            Some(a) => println!("Hash:{} \t Types: {:?}",object.hash(), a),
+            None =>{},
+        }
+
         let obj = Rc::new(object);
         cache.update(obj.clone(), offset);
         Ok(obj)
@@ -287,6 +294,32 @@ mod tests {
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             decoded_pack.signature.to_string()
         );
+    }
+
+
+    #[test]
+    fn test_parse_simple_pack_2() {
+        let mut pack_file = File::open(&Path::new(
+            "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
+        ))
+        .unwrap();
+        let decoded_pack = match Pack::decode(&mut pack_file) {
+            Ok(f) => f,
+            Err(e) => panic!("{}", e.to_string()),
+        };
+        assert_eq!(*b"PACK", decoded_pack.head);
+        assert_eq!(2, decoded_pack.version);
+        assert_eq!(
+            "8c81e90db37ef77494efe4f31daddad8b494e099",
+            decoded_pack.signature.to_string()
+        );
+        let mut result = super::decode::ObjDecodedMap::default();
+        result.update_from_cache(&decoded_pack.result);
+        for (key, value) in result._map_hash.iter() {
+            println!("*********************");
+            println!("Hash :{}", key);
+            println!("{}", value);
+        }
     }
 
     ///Test the pack decode by the Idx File

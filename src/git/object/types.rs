@@ -52,6 +52,7 @@ impl ObjectType {
 
 
 ///六种Object存储类型
+#[derive(Debug)]
 pub enum PackObjectType {
     Base(ObjectType),
     OffsetDelta,
