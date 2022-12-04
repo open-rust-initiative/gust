@@ -1,8 +1,9 @@
 
 use types::ObjectType;
-use super::hash::Hash;
+use super::{hash::Hash, id::ID};
 use sha1::{Digest, Sha1};
-use std::convert::TryFrom;
+use std::{convert::TryFrom};
+use super::Metadata;
 const COMMIT_OBJECT_TYPE: &[u8] = b"commit";
 const TREE_OBJECT_TYPE: &[u8] = b"tree";
 const BLOB_OBJECT_TYPE: &[u8] = b"blob";
@@ -35,5 +36,14 @@ impl Object {
       Hash(<[u8; HASH_BYTES]>::try_from(new_hash.as_slice()).unwrap())
     }
    // pub fn GetObjectFromPack()
+    pub fn to_metadata(&self) -> Metadata{
+      Metadata{
+        t: self.object_type,
+        h: super::hash::HashType::Sha1,
+        id: ID::from_bytes(&self.hash().0),
+        size: self.contents.len(),
+        data: self.contents.clone(),
+    }
+    }
   }
 

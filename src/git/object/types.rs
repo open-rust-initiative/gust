@@ -48,6 +48,14 @@ impl ObjectType {
             _ => Err(GitError::InvalidObjectType(s.to_string())),
         }
     }
+    pub fn type2_number(&self)->u8{
+        match self {
+            ObjectType::Blob=> 1,
+            ObjectType::Commit=> 2,
+            ObjectType::Tag=> 3,
+            ObjectType::Tree=> 4,
+        }
+    }
 }
 
 
@@ -73,17 +81,17 @@ pub fn type_number2_type(type_number: u8) -> Option<PackObjectType> {
         _ => None,
     }
 }
-#[allow(unused)]
-pub fn type2_number(_type: Option<PackObjectType>) -> i32{
-    use ObjectType::*;
-    use PackObjectType::*;
-    match _type {
-        Some(Base(Commit)) => 1,
-        Some(Base(Tree)) => 2,
-        Some(Base(Blob)) => 3,
-        Some(Base(Tag)) => 4,
-        Some(OffsetDelta) => 6,
-        Some(HashDelta) => 7,
-        None => 5,
-    }
-}
+
+// pub fn type2_number(_type: Option<PackObjectType>) -> i32{
+//     use ObjectType::*;
+//     use PackObjectType::*;
+//     match _type {
+//         Some(Base(Commit)) => 1,
+//         Some(Base(Tree)) => 2,
+//         Some(Base(Blob)) => 3,
+//         Some(Base(Tag)) => 4,
+//         Some(OffsetDelta) => 6,
+//         Some(HashDelta) => 7,
+//         None => 5,
+//     }
+// }

@@ -74,7 +74,7 @@ impl Tag {
             .unwrap()
             .parse()
             .unwrap();
-        data = data[tag_end + 1 ..].to_vec();//Fixed Bug: bug tyep_end to tag_end 
+        data = data[tag_end + 1 ..].to_vec();//Fixed Bug: bug type_end to tag_end 
        
 
         let tagger_begin = data.find("tagger").unwrap();
