@@ -5,10 +5,10 @@ use crate::errors::GitError;
 /// Git Object Types: Blob, Tree, Commit, Tag
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum ObjectType {
-    Blob,
     Commit,
-    Tag,
     Tree,
+    Blob,
+    Tag,
 }
 
 
@@ -50,10 +50,10 @@ impl ObjectType {
     }
     pub fn type2_number(&self)->u8{
         match self {
-            ObjectType::Blob=> 1,
-            ObjectType::Commit=> 2,
-            ObjectType::Tag=> 3,
-            ObjectType::Tree=> 4,
+            ObjectType::Commit=> 1,
+            ObjectType::Tree=> 2,
+            ObjectType::Blob=> 3,
+            ObjectType::Tag=> 4,
         }
     }
 }

@@ -61,7 +61,9 @@ impl Commit {
         a
     }
     ///
-   
+    
+    /// Decode the Metadata.data and convert to `Commit` Class
+    // If there a 
     pub(crate) fn decode_meta(&mut self) -> Result<(), GitError> {
         let mut data = self.meta.data.clone();
 

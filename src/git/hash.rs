@@ -7,10 +7,10 @@
 //!
 
 use std::fmt::Display;
-
 use crate::errors::GitError;
 use std::convert::TryFrom;
 use std::str::FromStr;
+use sha1::{Digest, Sha1};
 ///Hash值的位数 - sha1
 const HASH_BYTES: usize = 20;
 /// Git Object hash type. only support SHA1 for now.
@@ -40,6 +40,12 @@ impl Display for Hash {
 }
 
 impl Hash {
+    pub fn new(data:&Vec<u8>) -> Hash{
+        let new_hash = Sha1::new()
+        .chain(data)
+        .finalize();
+      Hash(<[u8; HASH_BYTES]>::try_from(new_hash.as_slice()).unwrap())
+    }
     ///解析出16进制数字0-f
     fn hex_char_value(hex_char: u8) -> Option<u8> {
         match hex_char {

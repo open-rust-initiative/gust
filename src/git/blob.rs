@@ -60,6 +60,9 @@ impl Display for Blob{
                 break;
             }
         }
+        
+        writeln!(f,"size:{}",self.data.len()).unwrap();
+        writeln!(f,"meta data size:{}",self.meta.size).unwrap();
         writeln!(f, "Type: Blob\n{}", BString::new(print_data) ).unwrap();
         writeln!(f, "Only Show the first line of the File...")
     }   

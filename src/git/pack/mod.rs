@@ -215,6 +215,8 @@ impl Pack {
 ///
 #[cfg(test)]
 mod tests {
+
+
     use crate::git::id::ID;
     use crate::git::idx::Idx;
     use std::collections::HashMap;
@@ -242,13 +244,8 @@ mod tests {
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_string()
         );
-        let mut result = super::decode::ObjDecodedMap::default();
-        result.update_from_cache(&decoded_pack.result);
-        for (key, value) in result._map_hash.iter() {
-            println!("*********************");
-            println!("Hash :{}", key);
-            println!("{}", value);
-        }
+
+        
     }
 
     #[test]

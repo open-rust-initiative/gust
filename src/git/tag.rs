@@ -31,7 +31,7 @@ pub struct Tag {
 ///
 impl Tag {
     /// Tag 的构造函数 接收一个@param meta::Metadata
-    /// 同时执行tag解码
+    /// 同时执行tag解码 -> `fn decode_metadata`
     pub fn new(meta: Metadata) -> Self {
         
         let mut a = Self {
