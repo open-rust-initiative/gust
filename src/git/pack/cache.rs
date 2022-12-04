@@ -5,6 +5,9 @@ use super::super::object::Object;
 
 use std::rc::Rc;
 
+/// #### Build Cache Info for the decode packed object
+/// There are two hashmap for object ,<br>
+/// the keys is `hash value` and the `Offset` of The object 
 #[derive(Default)]
 pub struct PackObjectCache {
   pub by_hash: HashMap<Hash, Rc<Object>>,
@@ -12,8 +15,9 @@ pub struct PackObjectCache {
 }
 
 impl PackObjectCache{
+
+  /// update cache by input object:`Rc<Object>` and the offset:`u64`
   pub fn update(&mut self, object: Rc<Object> , offset : u64 ){
-    
     self.by_hash.insert(object.hash(), object.clone());
     self.by_offset.insert(offset, object.clone());
   }

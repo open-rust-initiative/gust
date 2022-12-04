@@ -12,7 +12,7 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 use sha1::{Digest, Sha1};
 ///Hash值的位数 - sha1
-const HASH_BYTES: usize = 20;
+pub const HASH_BYTES: usize = 20;
 /// Git Object hash type. only support SHA1 for now.
 ///
 ///

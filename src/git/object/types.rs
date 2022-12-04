@@ -1,8 +1,15 @@
+//! ### Types enums for object types
+//! There are ObjectType
+//! PackObjectType
+//! 
+//! 
 use std:: fmt::Display;
-
 use crate::errors::GitError;
-///四种Object类型
-/// Git Object Types: Blob, Tree, Commit, Tag
+/// Four abstract Object Types:
+/// - Blob
+/// - Tree
+/// - Commit 
+/// - Tag
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum ObjectType {
     Commit,
@@ -59,39 +66,46 @@ impl ObjectType {
 }
 
 
-///六种Object存储类型
+///Six Storage Object Type in the Pack File
+/// - Blob(1)
+/// - Tree(2)
+/// - Commit(3) 
+/// - Tag(4)
+/// -  OffsetDelta(6)
+/// -  HashDelta(7)
 #[derive(Debug)]
 pub enum PackObjectType {
     Base(ObjectType),
     OffsetDelta,
     HashDelta,
 }
-
-/// 通过类型号分辨类型
-pub fn type_number2_type(type_number: u8) -> Option<PackObjectType> {
-    use ObjectType::*;
-    use PackObjectType::*;
-    match type_number {
-        1 => Some(Base(Commit)),
-        2 => Some(Base(Tree)),
-        3 => Some(Base(Blob)),
-        4 => Some(Base(Tag)),
-        6 => Some(OffsetDelta),
-        7 => Some(HashDelta),
-        _ => None,
+impl PackObjectType {
+    pub fn type_number2_type(type_number: u8) -> Option<Self> {
+        use ObjectType::*;
+        match type_number {
+            1 => Some(Self::Base(Commit)),
+            2 => Some(Self::Base(Tree)),
+            3 => Some(Self::Base(Blob)),
+            4 => Some(Self::Base(Tag)),
+            6 => Some(Self::OffsetDelta),
+            7 => Some(Self::HashDelta),
+            _ => None,
+        }
     }
+    #[allow(unused)]
+    pub fn type2_number(&self) -> u8{
+        use ObjectType::*;
+        match self {
+            Self::Base(Commit) => 1,
+            Self::Base(Tree) => 2,
+            Self::Base(Blob) => 3,
+            Self::Base(Tag) => 4,
+            Self::OffsetDelta => 6,
+            Self::HashDelta => 7,
+        }
+    }
+
 }
 
-// pub fn type2_number(_type: Option<PackObjectType>) -> i32{
-//     use ObjectType::*;
-//     use PackObjectType::*;
-//     match _type {
-//         Some(Base(Commit)) => 1,
-//         Some(Base(Tree)) => 2,
-//         Some(Base(Blob)) => 3,
-//         Some(Base(Tag)) => 4,
-//         Some(OffsetDelta) => 6,
-//         Some(HashDelta) => 7,
-//         None => 5,
-//     }
-// }
+
+

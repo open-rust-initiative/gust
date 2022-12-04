@@ -8,8 +8,7 @@ const COMMIT_OBJECT_TYPE: &[u8] = b"commit";
 const TREE_OBJECT_TYPE: &[u8] = b"tree";
 const BLOB_OBJECT_TYPE: &[u8] = b"blob";
 const TAG_OBJECT_TYPE: &[u8] = b"tag";
-const HASH_BYTES: usize = 20;
-
+use super::hash::HASH_BYTES;
 pub mod types;
 pub mod delta;
 //Object内存存储类型

@@ -18,13 +18,10 @@ mod tag;
 mod tree;
 
 use std::fmt::Display;
-use std::fs::create_dir_all;
-use std::fs::File;
-use std::io::BufReader;
-use std::io::Read;
-use std::io::Write;
-use std::path::PathBuf;
+use std::fs::{File,create_dir_all};
+use std::io::{BufReader,Read,Write};
 
+use std::path::PathBuf;
 use anyhow::{Context, Result};
 use bstr::ByteSlice;
 use deflate::write::ZlibEncoder;
@@ -40,15 +37,14 @@ use super::errors::GitError;
 
 /// In the git object store format, between the type and size fields has a space character
 /// in Hex means 0x20.
-#[allow(unused)]
-const SPACE: &[u8] = &[0x20];
+pub const SPACE: &[u8] = &[0x20];
+
 /// In the git object store format, between the size and trunk data has a special character
 /// in Hex means 0x00.
-#[allow(unused)]
-const NL: &[u8] = &[0x00];
+pub const NL: &[u8] = &[0x00];
+
 /// In the git object store format, 0x0a is the line feed character in the commit object.
-#[allow(unused)]
-const LF: &[u8] = &[0x0A];
+// pub const LF: &[u8] = &[0x0A];
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub enum ObjClass {
     BLOB(blob::Blob),
@@ -80,6 +76,11 @@ pub struct Metadata {
 /// Implement function for Metadata
 impl Metadata {
     /// Write the object to the file system with folder and file.
+    /// This function can create a “loose” object format,
+    /// which can convert into the `.pack` format by the Command:
+    /// ```bash
+    ///     git gc
+    /// ```
     #[allow(unused)]
     pub(crate) fn write_to_file(&self, root_path: String) -> Result<String, GitError> {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
@@ -106,38 +107,32 @@ impl Metadata {
 
     ///Convert Metadata to the Vec<u8> ,so that it can write to File
     pub fn convert_to_vec(&self) -> Result<Vec<u8>, GitError> {
-
-        // match self.t {
-        //     ObjectType::Blob => {blob::Blob::new(&self)},
-        //     ObjectType::Commit =>{commit::Commit::new(&self).encode_metadata()},
-        //     ObjectType::Tag => todo!(),
-        //     ObjectType::Tree => todo!(),
-        // };
-
         let mut compressed_data =
-        vec![
-        (0x80 | (self.t.type2_number() << 4)) + (self.size & 0x0f) as u8   ];
+            vec![(0x80 | (self.t.type2_number() << 4)) + (self.size & 0x0f) as u8];
         //TODO : 完善Size编码
-        let mut _size = self.size>>4;
+        let mut _size = self.size >> 4;
         if _size > 0 {
-            while  _size > 0 {
-                if _size>>7 > 0 {
-                    compressed_data.push((0x80 | _size) as u8 );
-                   _size>>=7;
-                }else{
-                    compressed_data.push(( _size) as u8 );
+            while _size > 0 {
+                if _size >> 7 > 0 {
+                    compressed_data.push((0x80 | _size) as u8);
+                    _size >>= 7;
+                } else {
+                    compressed_data.push((_size) as u8);
                     break;
                 }
             }
-        }else {compressed_data.push(0);}
-       
+        } else {
+            compressed_data.push(0);
+        }
 
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
         encoder.write_all(&self.data).expect("Write error!");
-        compressed_data.append(&mut encoder.finish().expect("Failed to finish compression!"));  
+        compressed_data.append(&mut encoder.finish().expect("Failed to finish compression!"));
         Ok(compressed_data)
     }
-    /// Read the object from the file system and parse to a metadata object.
+
+    /// Read the object from the file system and parse to a metadata object.<br>
+    /// This file is the “loose” object format.
     #[allow(unused)]
     pub(crate) fn read_object_from_file(path: String) -> Result<Metadata, GitError> {
         let file = File::open(path)?;
@@ -202,11 +197,9 @@ impl Metadata {
 ///
 #[cfg(test)]
 mod tests {
-
     #[test]
-    fn test_a_single_blob(){
+    fn test_a_single_blob() {
         // let metadata = Metadata::
         // blob::Blob::new(metadata);
     }
-
 }
