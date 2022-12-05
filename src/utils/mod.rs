@@ -7,7 +7,7 @@ const TYPE_BYTE_SIZE_BITS: u8 = VAR_INT_ENCODING_BITS - TYPE_BITS;
 const VAR_INT_CONTINUE_FLAG: u8 = 1 << VAR_INT_ENCODING_BITS;
 
 
-use std::{io::{self,Read,SeekFrom,Seek}, fs::File};
+use std::{io::{self,Read,SeekFrom,Seek}, fs::File, vec};
 use flate2::read::ZlibDecoder;
 
 use crate::errors::GitError;
@@ -135,10 +135,20 @@ pub fn get_offset(file: &mut File) -> io::Result<u64> {
 pub fn read_zlib_stream_exact<T, F>(file: &mut File, reader: F) -> Result<T,GitError>
   where F: FnOnce(&mut ZlibDecoder<&mut File>) -> Result<T,GitError>
 {
+
   let offset = get_offset(file)?;
   let mut decompressed = ZlibDecoder::new(file);
   let result = reader(&mut decompressed);
   let zlib_end = offset + decompressed.total_in();
   seek(decompressed.into_inner(), zlib_end).unwrap();
   result
+}
+
+pub fn u32_vec(value: u32)->Vec<u8>{
+    let mut result :Vec<u8> = vec![];
+    result.push((value >> 24 & 0xff) as u8  );
+    result.push((value >> 16 & 0xff) as u8  );
+    result.push((value >> 8  & 0xff) as u8  );
+    result.push((value       & 0xff) as u8  );
+    result
 }

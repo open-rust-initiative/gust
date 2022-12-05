@@ -14,6 +14,9 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::errors::GitError;
 use crate::git::id::ID;
+use crate::utils;
+
+use super::pack::Pack;
 
 ///
 #[allow(unused)]
@@ -32,6 +35,7 @@ impl Display for IdxItem {
 
 ///
 #[allow(unused)]
+#[derive(Default)]
 pub struct Idx {
     pub version: u32,
     pub number_of_objects: usize,
@@ -39,6 +43,7 @@ pub struct Idx {
     pub idx_items: Vec<IdxItem>,
     pub pack_signature: ID,
     pub idx_signature: ID,
+    _file_data:Vec<u8>,
 }
 
 ///
@@ -133,19 +138,76 @@ impl Idx {
 
         Ok(())
     }
+
+    #[allow(unused)]
+    pub fn encode(pack:Pack) -> Self{
+        let mut idx = Self::default();
+        let mut result:Vec<u8>  =  vec![255, 116, 79, 99];//header
+        let mut version:Vec<u8> = vec![0,0,0,2];
+        result.append(&mut version);
+        idx.version = 2;
+
+        // Layer 1:
+        //  Number of objects in the pack (network byte order)
+        //  The prefix of the SHA-1 hash of the object has how many objects it is in the pack.
+        idx.number_of_objects = pack.get_object_number();
+        let mut  fan_out :[u32;256] = [0;256];
+        let cache = pack.get_cache();
+        for (key,value) in cache.by_hash.iter() {
+            fan_out[key.get_first() as usize] +=1;
+        }
+        let mut _sum = 0;
+        for i in 0..255 {
+            _sum +=fan_out[i];
+            fan_out[i] = _sum;
+            result.append(&mut utils::u32_vec(fan_out[i])); 
+        }
+
+        // Layer 2:
+        //  The all the SHA-1 hashes of the objects in the pack.
+        for key in cache.by_hash.keys() {
+            result.append(&mut key.0.to_vec())
+        }
+
+
+        // Layer 3:
+        //   The CRC32 of the object data.
+        use crc::{Crc, Algorithm, CRC_32_ISCSI};
+        pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
+        assert_eq!(CASTAGNOLI.checksum(b"123456789"), 0xe3069283);
+        for values in cache.by_hash.values() {
+            result.append(&mut utils::u32_vec(CASTAGNOLI.checksum(&values.contents))); 
+        }
+
+        // Layer 4:
+        //   the object offset in the pack file.
+        for offset in cache.by_offset.values(){
+            result.append(&mut utils::u32_vec( *offset as u32));
+        }
+        
+        // Layer 5
+
+        // Layer 6:
+        //  The SHA-1 hash of the pack file itself.
+        //  The SHA-1 hash of the index file itself.
+        idx
+    }
 }
 
 ///
 #[cfg(test)]
 mod tests {
     use std::env;
-    use std::collections::HashMap;
+
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Read;
     use std::path::PathBuf;
 
-    use crate::git::id::ID;
+ 
+
+
+    use crate::utils;
 
     use super::Idx;
 
@@ -160,14 +222,7 @@ mod tests {
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
 
-        let mut idx = Idx {
-            version: 0,
-            number_of_objects: 0,
-            map_of_prefix: HashMap::new(),
-            idx_items: Vec::new(),
-            pack_signature: ID { bytes: vec![], hash: "".to_string() },
-            idx_signature: ID { bytes: vec![], hash: "".to_string() },
-        };
+        let mut idx = Idx::default();
 
         idx.decode(buffer).unwrap();
 
@@ -182,6 +237,28 @@ mod tests {
     ///
     #[test]
     fn test_idx_write_to_file() {
+
+    }
+
+    #[test]
+    fn unsafe_fan_out(){
+        let mut result :Vec<u8>= vec![];
+        let mut  fan_out :[u32;256] = [0;256];
+        let mut _sum  = 0;
+        for i in 0..255 {
+            _sum +=fan_out[i]+5;
+            fan_out[i] = _sum;
+            result.append(&mut utils::u32_vec(fan_out[i])); 
+        }
+
+        print!("{:?}",result);
+    }
+
+    #[test]
+    fn test_crc32(){
+        use crc::{Crc, CRC_32_ISCSI};
+        pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
+        assert_eq!(CASTAGNOLI.checksum(b"123456789"), 0xe3069283);
 
     }
 }

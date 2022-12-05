@@ -200,14 +200,21 @@ impl Pack {
         cache.update(obj.clone(), offset);
         Ok(obj)
     }
+
+    pub fn get_object_number(&self)-> usize{
+        return self.number_of_objects as usize;
+    }
+    pub fn get_cache(&self) -> PackObjectCache{
+        return self.result.clone();
+    }
 }
 
 ///
 #[cfg(test)]
 mod tests {
-    use crate::git::id::ID;
+
     use crate::git::idx::Idx;
-    use std::collections::HashMap;
+  
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Read;
@@ -229,7 +236,7 @@ mod tests {
 
         let mut result = super::decode::ObjDecodedMap::default();
         result.update_from_cache(&decoded_pack.result);
-        for (key, value) in result._map_hash.iter() {
+        for (key, value) in result._map_hash.iter(){
             println!("*********************");
             println!("Hash: {}", key);
             println!("{}", value);
@@ -279,21 +286,7 @@ mod tests {
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
 
-        let mut idx = Idx {
-            version: 0,
-            number_of_objects: 0,
-            map_of_prefix: HashMap::new(),
-            idx_items: Vec::new(),
-            pack_signature: ID {
-                bytes: vec![],
-                hash: "".to_string(),
-            },
-            idx_signature: ID {
-                bytes: vec![],
-                hash: "".to_string(),
-            },
-        };
-
+        let mut idx = Idx::default();
         idx.decode(buffer).unwrap();
         let decoded_pack = Pack::decode_by_idx(&mut idx, &mut pack_file).unwrap();
         assert_eq!(*b"PACK", decoded_pack.head);

@@ -33,8 +33,8 @@ impl Display for Hash {
         let mut hash_str = String::new();
         for i in self.0 {
             
-            hash_str += format!("{:1X}", i>>4 & 0x0f).as_str();
-            hash_str += format!("{:1X}", i & 0x0f).as_str();
+            hash_str += format!("{:1x}", i>>4 & 0x0f).as_str();
+            hash_str += format!("{:1x}", i & 0x0f).as_str();
         }
         write!(f, "{}", hash_str.red().bold())
     }
@@ -75,6 +75,10 @@ impl Hash {
         let bytes = <[u8; HASH_BYTES]>::try_from(bytes).ok()?;
         Some(Hash(bytes))
     }
+
+    pub fn get_first(&self)->u8{
+        return self.0[0];
+    }
 }
 
 impl FromStr for Hash {
@@ -86,6 +90,8 @@ impl FromStr for Hash {
 }
 
 mod tests {
+   
+
 
     /// The Right Hash decode
     #[test]
@@ -126,6 +132,21 @@ mod tests {
             format!("The {} is not a valid Hash value ", test_str),
             test_hash.to_string()
         );
+
+    }
+    #[test]
+    fn test_btree_map(){
+        use std::collections::BTreeMap;
+        use super::Hash;
+        use std::str::FromStr;
+        let mut map = BTreeMap::new();
+        map.insert(Hash::from_str("cd64b12b3949483d42d34979a3f89589aad804c2").unwrap(), 1);
+        map.insert(Hash::from_str("1c6ec4271e3e75b585e8d150f9758e4ee4890dd5").unwrap(), 2);
+        map.insert(Hash::from_str("f4010b9167a3c7d81bc81bfbffbeac0c9e95052f").unwrap(), 3);
+        map.insert(Hash::from_str("aa36c1e0d709f96d7b356967e16766bafdf63a75").unwrap(), 4);
+       for (key ,value) in map.iter() {
+           println!("key: {} \t value :{}",key,value );
+       }
 
     }
 }

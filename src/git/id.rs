@@ -17,7 +17,7 @@ use super::object::types::ObjectType;
 
 /// Git Object ID: a SHA-1 hash for now, and we will support multiple hash algorithms later.
 /// The SHA-1 Hax ID is a 40-byte hexadecimal string.
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone,Default)]
 pub struct ID {
     pub bytes: Vec<u8>,
     pub hash: String,
