@@ -148,18 +148,19 @@ impl Commit {
     }
 }
 
-///
+
 impl Display for Commit {
+ 
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "tree {}\n", self.tree_id)?;
+        writeln!(f, "Tree: {}", self.tree_id)?;
 
         for parent in self.parent_tree_ids.iter() {
-            writeln!(f, "parent {}\n", parent)?;
+            writeln!(f, "parent: {}", parent)?;
         }
 
-        writeln!(f, "author {}\n", self.author)?;
-        writeln!(f, "committer {}\n", self.committer)?;
-        writeln!(f, "\n{}", self.message)
+        writeln!(f, "author {}", self.author)?;
+        writeln!(f, "committer {}", self.committer)?;
+        writeln!(f, "Message: {}", self.message)
     }
 }
 

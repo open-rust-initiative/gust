@@ -231,7 +231,7 @@ mod tests {
         result.update_from_cache(&decoded_pack.result);
         for (key, value) in result._map_hash.iter() {
             println!("*********************");
-            println!("Hash :{}", key);
+            println!("Hash: {}", key);
             println!("{}", value);
         }
         decoded_pack

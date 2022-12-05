@@ -27,6 +27,7 @@ pub enum HashType {
 pub struct Hash(pub [u8; HASH_BYTES]);
 
 /// Display trait for Hash type
+use colored::Colorize;
 impl Display for Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut hash_str = String::new();
@@ -35,7 +36,7 @@ impl Display for Hash {
             hash_str += format!("{:1X}", i>>4 & 0x0f).as_str();
             hash_str += format!("{:1X}", i & 0x0f).as_str();
         }
-        write!(f, "{}", hash_str)
+        write!(f, "{}", hash_str.red().bold())
     }
 }
 

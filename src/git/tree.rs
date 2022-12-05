@@ -26,17 +26,18 @@ pub enum TreeItemType {
     Link,
 }
 
-///
+use colored::Colorize;
 impl Display for TreeItemType {
     ///
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            TreeItemType::Blob => write!(f, "blob"),
-            TreeItemType::BlobExecutable => write!(f, "blob executable"),
-            TreeItemType::Tree => write!(f, "tree"),
-            TreeItemType::Commit => write!(f, "commit"),
-            TreeItemType::Link => write!(f, "link"),
-        }
+        let _print = match *self {
+            TreeItemType::Blob => "blob",
+            TreeItemType::BlobExecutable => "blob executable",
+            TreeItemType::Tree => "tree",
+            TreeItemType::Commit => "commit",
+            TreeItemType::Link => "link",
+        };
+        write!(f, "{}",String::from(_print).blue())
     }
 }
 
@@ -86,13 +87,13 @@ pub struct Tree {
     pub tree_items: Vec<TreeItem>,
 }
 
-///
+
 impl Display for Tree {
     #[allow(unused)]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f,"Type: Tree");
         for item in &self.tree_items {
-            writeln!(f, "{} {} {} {}",
+            writeln!(f, "{:6} {} {} {}",
                      String::from_utf8(item.mode.to_vec()).unwrap(),
                      item.item_type, item.id, item.filename);
         }
