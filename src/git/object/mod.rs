@@ -11,14 +11,14 @@ const TAG_OBJECT_TYPE: &[u8] = b"tag";
 use super::hash::HASH_BYTES;
 pub mod types;
 pub mod delta;
-//Object内存存储类型
+//Object内存存储类型 
 #[derive(Clone, Debug)]
 pub struct Object {
   pub object_type: ObjectType,
   pub contents: Vec<u8>,
 }
 impl Object {
-    /// object 的hash转化函数
+    /// object 的 hash转化函数
     pub fn hash(&self) -> Hash {
       let new_hash = Sha1::new()
         .chain(match self.object_type {

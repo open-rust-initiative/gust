@@ -1,6 +1,7 @@
 use super::super::hash::Hash;
 use super::Pack;
-
+///
+/// Pack类的encode函数，将解析出的pack或其他途径生成的pack生成对应的文件
 impl Pack {
     #[allow(unused)]
     pub fn encode(&self) -> Vec<u8> {
@@ -42,6 +43,7 @@ mod tests {
 
     use crate::git::pack::decode::ObjDecodedMap;
 
+    //diff Test 
     #[test]
     fn test_imara_diff() {
         use imara_diff::intern::InternedInput;
@@ -69,6 +71,8 @@ mod tests {
         );
         println!("{}", diff_str);
     }
+
+    //
     #[test]
     fn test_a_real_pack_de_en() {
         let mut pack_file = File::open(&Path::new(
@@ -85,11 +89,12 @@ mod tests {
 
 
         let result = decoded_pack.encode();
-        let mut file = std::fs::File::create("data.txt").expect("create failed");
+        let mut file = std::fs::File::create("data.pack").expect("create failed");
         file.write_all(result.as_bytes()).expect("write failed");
 
         println!("data written to file");
-        let mut pack_file = File::open(&Path::new("./data.txt")).unwrap();
+        // 将生成的pack文件重新进行一遍解析，以此验证生成文件的正确性
+        let mut pack_file = File::open(&Path::new("./data.pack")).unwrap();
         let decoded_pack = match Pack::decode(&mut pack_file) {
             Ok(f) => f,
             Err(e) => panic!("{}", e.to_string()),

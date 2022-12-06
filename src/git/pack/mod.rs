@@ -40,7 +40,7 @@ pub struct Pack {
     head: [u8; 4],
     version: u32,
     number_of_objects: u32,
-    signature: ID,
+    signature: ID, 
     result: PackObjectCache,
 }
 

@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 /// #### Build Cache Info for the decode packed object
 /// There are two hashmap for object ,<br>
-/// the keys is `hash value` and the `Offset` of The object 
+/// the keys is `hash value` of The object 
 #[derive(Default,Clone)]
 pub struct PackObjectCache {
   pub by_hash: BTreeMap<Hash, Rc<Object>>,

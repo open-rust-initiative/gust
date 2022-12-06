@@ -1,10 +1,9 @@
+//!Idx file , which is in the dir:`.git/object/pack/*.idx`
 //!
-//!
-//!
-//!
-//!
-//!
-//!
+//!This file provides the offset of different objects, 
+//! which is used to quickly find the target object in the pack file(*.pack).
+//! 
+
 
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -174,11 +173,13 @@ impl Idx {
        
         // Layer 3: 
         //   The CRC32 of the object data.
-        //BUG: The Algorithm of the crc32 is different from the official git, 
-        // and maybe the compress data is not same between the different storage type
-        // So this crc32 computing is different from the git crc32.
-        // But cause we haven't do the crc32 check , so That's Ok ,
-        // Other code still can parse objects by the idx and pack file correctly
+            //BUG: The Algorithm of the crc32 is different from the official git, 
+            // and maybe the compress data is not same between the different storage type
+            // So this crc32 computing is different from the git crc32.
+            // But cause we haven't do the crc32 check , so That's Ok ,
+            // Other code still can parse objects by the idx and pack file correctly
+
+        // NO.1 try code seg。crc32编码的尝试代码
         use crc::{Crc, Algorithm, CRC_32_ISO_HDLC};
         pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
         for values in cache.by_hash.values() {
@@ -187,6 +188,11 @@ impl Idx {
             let zlib_data =   encoder.finish().expect("Failed to finish compression!");
             result.append(&mut utils::u32_vec(CASTAGNOLI.checksum(&zlib_data))); 
         }
+            // NO.2 try code seg 。crc32编码的尝试代码
+            // for values in cache.by_hash.values() {
+            //    let mut crc32s = hex::decode(values.contents.clone()).unwrap();
+            //    result.append(&mut crc32s);
+            // }
 
         // Layer 4:
         //   the object offset in the pack file.
@@ -194,7 +200,7 @@ impl Idx {
             result.append(&mut utils::u32_vec( *offset as u32));
         }
         
-        // Layer 5
+        // Layer 5 only for the big offset > 4G , temporary skip
 
         // Layer 6:
         //  The SHA-1 hash of the pack file itself.
@@ -212,24 +218,13 @@ impl Idx {
 #[cfg(test)]
 mod tests {
     use std::env;
-
     use std::fs::File;
-    use std::io::BufReader;
-    use std::io::Read;
-    use std::io::Write;
-    use std::path::Path;
-    use std::path::PathBuf;
-
- 
-
-
+    use std::io::{BufReader,Read,Write};
+    use std::path::{Path,PathBuf};
     use bstr::ByteSlice;
-
     use crate::utils;
-
     use super::Idx;
-
-    ///
+    ///测试读取idx
     #[test]
     fn test_idx_read_from_file() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -239,9 +234,7 @@ mod tests {
         let mut reader = BufReader::new(f.unwrap());
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
-
         let mut idx = Idx::default();
-
         idx.decode(buffer).unwrap();
 
         assert_eq!(2, idx.version);
@@ -252,7 +245,7 @@ mod tests {
         assert_eq!("92d07408a070a5fbea3c1f2d00e696293b78e7c6", idx.idx_signature.to_string());
     }
 
-    ///
+    ///测试写入idx文件
     #[test]
     fn test_idx_write_to_file() {
         
@@ -304,8 +297,4 @@ mod tests {
 
     }
 
-    #[test]
-    fn test_idx_write(){
-
-    }
 }

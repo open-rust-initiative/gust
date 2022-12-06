@@ -9,14 +9,14 @@ use crate::git::ObjClass;
 use super::super::{blob,commit,tag,tree};
 use super::cache::PackObjectCache;
 ///!对取出的object字段进行进一步解码与包装
-/// 
-
+/// 用于存储解析出的object抽象对象的hashmap
 #[derive(Default)]
 pub struct ObjDecodedMap{
    pub _map_hash:HashMap<Hash,Rc<ObjClass>>
 }//
 //在解析完object后执行的进一步的解码过程
 impl ObjDecodedMap {
+    /// 通过cache对不同结构进行进一步解析
     #[allow(unused)]
     pub fn update_from_cache(&mut self, cache:& PackObjectCache) {
         for (key, value) in cache.by_hash.iter() {

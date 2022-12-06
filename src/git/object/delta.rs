@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 use std::str::FromStr;
-
+use flate2::read::ZlibDecoder;
 use super::Hash;
 use super::Object;
 use crate::utils;
@@ -118,7 +118,7 @@ pub fn read_object(hash: Hash) -> Result<Object, GitError> {
 }
 
 const OBJECTS_DIRECTORY: &str = ".git/objects";
-use flate2::read::ZlibDecoder;
+
 ///读出unpack 的Object
 #[allow(unused)]
 fn read_unpacked_object(hash: Hash) -> Result<Object, GitError> {
