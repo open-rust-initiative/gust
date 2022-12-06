@@ -9,6 +9,7 @@
 mod blob;
 mod commit;
 pub mod hash;
+mod midx;
 mod id;
 mod idx;
 mod object;
