@@ -13,6 +13,7 @@ use std::io::Cursor;
 use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::errors::GitError;
+use crate::git::hash::Hash;
 use crate::git::id::ID;
 use crate::utils;
 
@@ -189,7 +190,12 @@ impl Idx {
 
         // Layer 6:
         //  The SHA-1 hash of the pack file itself.
+        let pack_hash = pack.get_hash();
+        result.append(&mut pack_hash.0.to_vec());
         //  The SHA-1 hash of the index file itself.
+        let idx_hash = Hash::new(&result) ;
+        result.append(&mut idx_hash.0.to_vec());
+        idx._file_data = result;
         idx
     }
 }
@@ -240,6 +246,7 @@ mod tests {
 
     }
 
+    /// fan out table create test
     #[test]
     fn unsafe_fan_out(){
         let mut result :Vec<u8>= vec![];
@@ -250,10 +257,11 @@ mod tests {
             fan_out[i] = _sum;
             result.append(&mut utils::u32_vec(fan_out[i])); 
         }
-
-        print!("{:?}",result);
+        assert_eq!(result[0..4],[0,0,0,5]);
+        assert_eq!(result[4..8],[0,0,0,10]);
     }
 
+    // crc32 create test
     #[test]
     fn test_crc32(){
         use crc::{Crc, CRC_32_ISCSI};

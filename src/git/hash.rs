@@ -28,6 +28,8 @@ pub struct Hash(pub [u8; HASH_BYTES]);
 
 /// Display trait for Hash type
 use colored::Colorize;
+
+use super::id::ID;
 impl Display for Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut hash_str = String::new();
@@ -78,6 +80,9 @@ impl Hash {
 
     pub fn get_first(&self)->u8{
         return self.0[0];
+    }
+    pub fn from_id(id:& ID) -> Hash{
+        Hash::new(&id.bytes)
     }
 }
 

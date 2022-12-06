@@ -3,6 +3,7 @@ use std::io::Read;
 
 use self::cache::PackObjectCache;
 
+use super::hash::Hash;
 use super::idx::Idx;
 use super::object::delta::*;
 use super::object::Object;
@@ -206,6 +207,9 @@ impl Pack {
     }
     pub fn get_cache(&self) -> PackObjectCache{
         return self.result.clone();
+    }
+    pub fn get_hash(&self) -> Hash{
+        return Hash::from_id(&self.signature) ;
     }
 }
 
