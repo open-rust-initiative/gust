@@ -11,11 +11,13 @@ use std::fmt::Display;
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
 
-use crate::git::{NL, SPACE, Type};
+use crate::git::{NL, SPACE};
+
+use super::object::types::ObjectType;
 
 /// Git Object ID: a SHA-1 hash for now, and we will support multiple hash algorithms later.
 /// The SHA-1 Hax ID is a 40-byte hexadecimal string.
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone,Default)]
 pub struct ID {
     pub bytes: Vec<u8>,
     pub hash: String,
@@ -55,7 +57,7 @@ impl ID {
     }
 
     #[allow(unused)]
-    pub(crate) fn from_vec(t: Type, data: &mut [u8]) -> Self {
+    pub(crate) fn from_vec(t: ObjectType, data: &mut [u8]) -> Self {
         let mut hash = Sha1::new();
 
         let object: &[u8] = &[
@@ -120,7 +122,7 @@ mod tests {
             buffer = buffer.replace(b"\r\n", b"\n");
         }
 
-        let id = ID::from_vec(super::Type::Blob, &mut buffer);
+        let id = ID::from_vec(super::ObjectType::Blob, &mut buffer);
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", id.to_string());
     }
 }

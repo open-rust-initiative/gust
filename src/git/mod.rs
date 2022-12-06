@@ -7,90 +7,59 @@
 //!
 //!
 mod blob;
-mod hash;
-mod id;
-mod tree;
 mod commit;
-mod tag;
-mod sign;
-mod pack;
+pub mod hash;
+mod midx;
+mod id;
 mod idx;
+mod object;
+mod pack;
+mod sign;
+mod tag;
+mod tree;
 
 use std::fmt::Display;
-use std::fs::File;
-use std::fs::create_dir_all;
-use std::io::BufReader;
-use std::io::Read;
-use std::io::Write;
-use std::path::PathBuf;
+use std::fs::{File,create_dir_all};
+use std::io::{BufReader,Read,Write};
 
+use std::path::PathBuf;
+use anyhow::{Context, Result};
 use bstr::ByteSlice;
 use deflate::write::ZlibEncoder;
 use deflate::Compression;
 use flate2::read::ZlibDecoder;
-use anyhow::{Context, Result};
 
-use crate::git::hash::Hash;
-use crate::git::id::ID;
+use self::id::ID;
+
+use self::hash::HashType;
+use self::object::types::ObjectType;
 
 use super::errors::GitError;
 
 /// In the git object store format, between the type and size fields has a space character
 /// in Hex means 0x20.
-#[allow(unused)]
-const SPACE: &[u8] = &[0x20];
+pub const SPACE: &[u8] = &[0x20];
+
 /// In the git object store format, between the size and trunk data has a special character
 /// in Hex means 0x00.
-#[allow(unused)]
-const NL: &[u8] = &[0x00];
+pub const NL: &[u8] = &[0x00];
+
 /// In the git object store format, 0x0a is the line feed character in the commit object.
-#[allow(unused)]
-const LF: &[u8] = &[0x0A];
-
-/// Git Object Types: Blob, Tree, Commit, Tag
-#[allow(unused)]
-#[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
-pub enum Type {
-    Blob,
-    Tree,
-    Commit,
-    Tag,
+// pub const LF: &[u8] = &[0x0A];
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+pub enum ObjClass {
+    BLOB(blob::Blob),
+    COMMIT(commit::Commit),
+    TREE(tree::Tree),
+    TAG(tag::Tag),
 }
-
-/// Display trait for Git objects type
-impl Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for ObjClass {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Type::Blob => write!(f, "blob"),
-            Type::Tree => write!(f, "tree"),
-            Type::Commit => write!(f, "commit"),
-            Type::Tag => write!(f, "tag"),
-        }
-    }
-}
-
-///
-impl Type {
-    ///
-    #[allow(unused)]
-    fn to_bytes(self) -> Vec<u8> {
-        match self {
-            Type::Blob => vec![0x62, 0x6c, 0x6f, 0x62],
-            Type::Tree => vec![0x74, 0x72, 0x65, 0x65],
-            Type::Commit => vec![0x63, 0x6f, 0x6d, 0x6d, 0x69, 0x74],
-            Type::Tag => vec![0x74, 0x61, 0x67],
-        }
-    }
-
-    ///
-    #[allow(unused)]
-    fn from_string(s: &str) -> Result<Type, GitError> {
-        match s {
-            "blob" => Ok(Type::Blob),
-            "tree" => Ok(Type::Tree),
-            "commit" => Ok(Type::Commit),
-            "tag" => Ok(Type::Tag),
-            _ => Err(GitError::InvalidObjectType(s.to_string())),
+            ObjClass::BLOB(a) => a.fmt(f),
+            ObjClass::COMMIT(b) => b.fmt(f),
+            ObjClass::TREE(c) => c.fmt(f),
+            ObjClass::TAG(d) => d.fmt(f),
         }
     }
 }
@@ -98,8 +67,8 @@ impl Type {
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {
-    pub t: Type,
-    pub h: Hash,
+    pub t: ObjectType,
+    pub h: HashType,
     pub id: ID,
     pub size: usize,
     pub data: Vec<u8>,
@@ -108,33 +77,63 @@ pub struct Metadata {
 /// Implement function for Metadata
 impl Metadata {
     /// Write the object to the file system with folder and file.
+    /// This function can create a “loose” object format,
+    /// which can convert into the `.pack` format by the Command:
+    /// ```bash
+    ///     git gc
+    /// ```
     #[allow(unused)]
     pub(crate) fn write_to_file(&self, root_path: String) -> Result<String, GitError> {
-        let mut encoder = ZlibEncoder::new(Vec::new(),
-                                           Compression::Default);
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
         encoder.write_all(&self.data).expect("Write error!");
-        let compressed_data =
-            encoder.finish().expect("Failed to finish compression!");
+        let compressed_data = encoder.finish().expect("Failed to finish compression!");
 
         let mut path = PathBuf::from(root_path);
         path.push(&self.id.to_folder());
-        create_dir_all(&path).with_context(|| {
-            format!("Failed to create directory: {}", path.display())
-        }).unwrap();
+        create_dir_all(&path)
+            .with_context(|| format!("Failed to create directory: {}", path.display()))
+            .unwrap();
 
         path.push(&self.id.to_filename());
 
-        let mut file = File::create(&path).with_context(|| {
-            format!("Failed to create file: {}", path.display())
-        }).unwrap();
-        file.write_all(&compressed_data).with_context(|| {
-            format!("Failed to write to file: {}", path.display())
-        }).unwrap();
+        let mut file = File::create(&path)
+            .with_context(|| format!("Failed to create file: {}", path.display()))
+            .unwrap();
+        file.write_all(&compressed_data)
+            .with_context(|| format!("Failed to write to file: {}", path.display()))
+            .unwrap();
 
         Ok(path.to_str().unwrap().to_string())
     }
 
-    /// Read the object from the file system and parse to a metadata object.
+    ///Convert Metadata to the Vec<u8> ,so that it can write to File
+    pub fn convert_to_vec(&self) -> Result<Vec<u8>, GitError> {
+        let mut compressed_data =
+            vec![(0x80 | (self.t.type2_number() << 4)) + (self.size & 0x0f) as u8];
+        //TODO : 完善Size编码
+        let mut _size = self.size >> 4;
+        if _size > 0 {
+            while _size > 0 {
+                if _size >> 7 > 0 {
+                    compressed_data.push((0x80 | _size) as u8);
+                    _size >>= 7;
+                } else {
+                    compressed_data.push((_size) as u8);
+                    break;
+                }
+            }
+        } else {
+            compressed_data.push(0);
+        }
+
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
+        encoder.write_all(&self.data).expect("Write error!");
+        compressed_data.append(&mut encoder.finish().expect("Failed to finish compression!"));
+        Ok(compressed_data)
+    }
+
+    /// Read the object from the file system and parse to a metadata object.<br>
+    /// This file is the “loose” object format.
     #[allow(unused)]
     pub(crate) fn read_object_from_file(path: String) -> Result<Metadata, GitError> {
         let file = File::open(path)?;
@@ -150,7 +149,9 @@ impl Metadata {
         let t = &decoded[0..type_index];
 
         let size_index = decoded.find_byte(0x00).unwrap();
-        let size = decoded[type_index + 1..size_index].iter().copied()
+        let size = decoded[type_index + 1..size_index]
+            .iter()
+            .copied()
             .map(|x| x as char)
             .collect::<String>()
             .parse::<usize>()
@@ -159,43 +160,37 @@ impl Metadata {
         let mut data = decoded[size_index + 1..].to_vec();
 
         match String::from_utf8(t.to_vec()).unwrap().as_str() {
-            "blob" => {
-                Ok(Metadata {
-                    t: Type::Blob,
-                    h: Hash::Sha1,
-                    id: ID::from_vec(Type::Blob, &mut data),
-                    size,
-                    data,
-                })
-            }
-            "tree" => {
-                Ok(Metadata {
-                    t: Type::Tree,
-                    h: Hash::Sha1,
-                    id: ID::from_vec(Type::Tree, &mut data),
-                    size,
-                    data,
-                })
-            }
-            "commit" => {
-                Ok(Metadata {
-                    t: Type::Commit,
-                    h: Hash::Sha1,
-                    id: ID::from_vec(Type::Commit, &mut data),
-                    size,
-                    data,
-                })
-            }
-            "tag" => {
-                Ok(Metadata {
-                    t: Type::Tag,
-                    h: Hash::Sha1,
-                    id: ID::from_vec(Type::Tag, &mut data),
-                    size,
-                    data,
-                })
-            }
-            _ => Err(GitError::InvalidObjectType(String::from_utf8(t.to_vec()).unwrap())),
+            "blob" => Ok(Metadata {
+                t: ObjectType::Blob,
+                h: HashType::Sha1,
+                id: ID::from_vec(ObjectType::Blob, &mut data),
+                size,
+                data,
+            }),
+            "tree" => Ok(Metadata {
+                t: ObjectType::Tree,
+                h: HashType::Sha1,
+                id: ID::from_vec(ObjectType::Tree, &mut data),
+                size,
+                data,
+            }),
+            "commit" => Ok(Metadata {
+                t: ObjectType::Commit,
+                h: HashType::Sha1,
+                id: ID::from_vec(ObjectType::Commit, &mut data),
+                size,
+                data,
+            }),
+            "tag" => Ok(Metadata {
+                t: ObjectType::Tag,
+                h: HashType::Sha1,
+                id: ID::from_vec(ObjectType::Tag, &mut data),
+                size,
+                data,
+            }),
+            _ => Err(GitError::InvalidObjectType(
+                String::from_utf8(t.to_vec()).unwrap(),
+            )),
         }
     }
 }
@@ -203,5 +198,9 @@ impl Metadata {
 ///
 #[cfg(test)]
 mod tests {
-
+    #[test]
+    fn test_a_single_blob() {
+        // let metadata = Metadata::
+        // blob::Blob::new(metadata);
+    }
 }

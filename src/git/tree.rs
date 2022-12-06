@@ -12,8 +12,9 @@ use bstr::ByteSlice;
 
 use crate::errors::GitError;
 use crate::git::id::ID;
-use crate::git::{Metadata, Type};
-use crate::git::hash::Hash;
+use crate::git::Metadata;
+use crate::git::object::types::ObjectType;
+use crate::git::hash::HashType;
 
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -25,17 +26,18 @@ pub enum TreeItemType {
     Link,
 }
 
-///
+use colored::Colorize;
 impl Display for TreeItemType {
     ///
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            TreeItemType::Blob => write!(f, "blob"),
-            TreeItemType::BlobExecutable => write!(f, "blob executable"),
-            TreeItemType::Tree => write!(f, "tree"),
-            TreeItemType::Commit => write!(f, "commit"),
-            TreeItemType::Link => write!(f, "link"),
-        }
+        let _print = match *self {
+            TreeItemType::Blob => "blob",
+            TreeItemType::BlobExecutable => "blob executable",
+            TreeItemType::Tree => "tree",
+            TreeItemType::Commit => "commit",
+            TreeItemType::Link => "link",
+        };
+        write!(f, "{}",String::from(_print).blue())
     }
 }
 
@@ -70,6 +72,7 @@ impl TreeItemType {
 }
 
 /// Git Object: tree item
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct TreeItem {
     pub mode: Vec<u8>,
     pub item_type: TreeItemType,
@@ -78,17 +81,19 @@ pub struct TreeItem {
 }
 
 /// Git Object: tree
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Tree {
     pub meta: Metadata,
     pub tree_items: Vec<TreeItem>,
 }
 
-///
+
 impl Display for Tree {
     #[allow(unused)]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f,"Type: Tree");
         for item in &self.tree_items {
-            writeln!(f, "{} {} {} {}",
+            writeln!(f, "{:6} {} {} {}",
                      String::from_utf8(item.mode.to_vec()).unwrap(),
                      item.item_type, item.id, item.filename);
         }
@@ -99,12 +104,18 @@ impl Display for Tree {
 
 ///
 impl Tree {
-    ///
-    #[allow(unused)]
-    pub(crate) fn decode_metadata(&mut self) -> Result<(), GitError> {
-        let mut tree_items:Vec<TreeItem> = Vec::new();
-        let mut index = 0;
 
+    pub fn new (metadata:Metadata)-> Self {
+        let mut  a = Self{
+            meta:metadata,
+            tree_items:vec![],
+        };
+        a.decode_metadata().unwrap();
+        a
+    }
+
+    pub(crate) fn decode_metadata(&mut self) -> Result<(), GitError> {
+        let mut index = 0;
         while index < self.meta.data.len() {
             let mode_index = &self.meta.data[index..].find_byte(0x20).unwrap();
             let mode = &self.meta.data[index..index + *mode_index];
@@ -144,9 +155,9 @@ impl Tree {
 
         Ok(
             Metadata {
-                t: Type::Tree,
-                h: Hash::Sha1,
-                id: ID::from_vec(Type::Tree, &mut data),
+                t: ObjectType::Tree,
+                h: HashType::Sha1,
+                id: ID::from_vec(ObjectType::Tree, &mut data),
                 size: data.len(),
                 data,
             },
@@ -167,9 +178,10 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
-    use crate::git::{Type, Metadata};
+    use super::ObjectType;
+    use crate::git::Metadata;
     use crate::git::blob::Blob;
-    use crate::git::hash::Hash;
+    use crate::git::hash::HashType;
     use crate::git::id::ID;
 
     use super::Tree;
@@ -185,7 +197,7 @@ mod tests {
             Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
-        assert_eq!(meta.t, Type::Blob);
+        assert_eq!(meta.t, ObjectType::Blob);
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", meta.id.to_string());
         assert_eq!(16, meta.size);
 
@@ -204,8 +216,8 @@ mod tests {
 
         let mut tree = Tree {
             meta: Metadata {
-                t: Type::Tree,
-                h: Hash::Sha1,
+                t: ObjectType::Tree,
+                h: HashType::Sha1,
                 id: ID {
                     bytes: vec![],
                     hash: String::new(),
@@ -258,8 +270,8 @@ mod tests {
 
         let mut tree = Tree {
             meta: Metadata {
-                t: Type::Tree,
-                h: Hash::Sha1,
+                t: ObjectType::Tree,
+                h: HashType::Sha1,
                 id: ID {
                     bytes: vec![],
                     hash: String::new(),
@@ -286,7 +298,7 @@ mod tests {
         let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(Type::Tree, meta.t);
+        assert_eq!(ObjectType::Tree, meta.t);
         assert_eq!(38, meta.size);
 
         let mut tree = Tree {
@@ -323,7 +335,7 @@ mod tests {
         let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
-        assert_eq!(Type::Tree, meta.t);
+        assert_eq!(ObjectType::Tree, meta.t);
         assert_eq!(73, meta.size);
 
         let mut tree = Tree {

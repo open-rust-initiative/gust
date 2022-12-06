@@ -26,7 +26,7 @@ pub struct AuthorSign {
 ///
 impl Display for AuthorSign {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} <{}> {} {}", self.name, self.email, self.timestamp, self.timezone)
+        write!(f, "{} \n Email:<{}> \n timestamp:{}\n timezone:{}", self.name, self.email, self.timestamp, self.timezone)
     }
 }
 

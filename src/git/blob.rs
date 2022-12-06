@@ -1,15 +1,16 @@
 //!
+//!Blob 文件对象结构体
 //!
 //!
 //!
 //!
 //!
-//!
+
+use std::fmt::Display;
 
 use crate::errors::GitError;
 use crate::git::Metadata;
 use crate::git::tree::{TreeItem, TreeItemType};
-
 /// Git Object: blob
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Blob {
@@ -19,6 +20,14 @@ pub struct Blob {
 
 ///
 impl Blob {
+    #[allow(unused)]
+    pub fn new(metadata: Metadata) -> Self {
+        Self {
+            meta: metadata.clone(),
+            data: metadata.data,
+        }
+    }
+
     ///
     #[allow(unused)]
     pub(crate) fn write_to_file(&self, root_path: String) -> Result<String, GitError> {
@@ -39,7 +48,25 @@ impl Blob {
 
     }
 }
-
+use bstr::BString;
+impl Display for Blob{
+    ///为了节省输出空间 暂时只输出第一行内容
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let mut print_data:Vec<u8> = vec![];
+        for value in self.data.iter(){
+            if *value != b'\n'{
+                print_data.push(value.clone());
+            }else {
+                break;
+            }
+        }
+        
+        writeln!(f,"size:{}",self.data.len()).unwrap();
+        writeln!(f,"meta data size:{}",self.meta.size).unwrap();
+        writeln!(f, "Type: Blob\n{}", BString::new(print_data) ).unwrap();
+        writeln!(f, "Only Show the first line of the File...")
+    }   
+}
 ///
 #[cfg(test)]
 mod tests {
@@ -49,11 +76,11 @@ mod tests {
     use std::io::Read;
     use std::path::{Path, PathBuf};
 
-    use bstr::ByteSlice;
 
+    use crate::git::hash::HashType;
     use crate::git::id::ID;
-    use crate::git::Type;
-    use crate::git::hash::Hash;
+    use crate::git::object::types::ObjectType;
+    
     use crate::git::Metadata;
 
     use super::Blob;
@@ -67,17 +94,17 @@ mod tests {
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
 
-        if env::consts::OS == "windows" {
-            buffer = buffer.replace(b"\r\n", b"\n");
-        }
+        // if env::consts::OS == "windows" {
+        //     buffer = buffer.replace(b"\r\n", b"\n");
+        // }
 
-        let id = ID::from_vec(Type::Blob, &mut buffer);
+        let id = ID::from_vec(ObjectType::Blob, &mut buffer);
         let size = buffer.len();
         let data = buffer;
 
         let meta = crate::git::Metadata {
-            t: Type::Blob,
-            h: Hash::Sha1,
+            t: ObjectType::Blob,
+            h: HashType::Sha1,
             id,
             size,
             data,
@@ -86,6 +113,7 @@ mod tests {
         meta.write_to_file("/tmp".to_string())
             .expect("Write error!");
         assert!(Path::new("/tmp/82/352c3a6a7a8bd32011751699c7a3648d1b5d3c").exists());
+
     }
 
     ///
@@ -98,7 +126,7 @@ mod tests {
             Metadata::read_object_from_file(path.to_str().unwrap().to_string())
                 .expect("Read error!");
 
-        assert_eq!(meta.t, crate::git::Type::Blob);
+        assert_eq!(meta.t, crate::git::object::types::ObjectType::Blob);
 
         let blob = Blob {
             meta: meta.clone(),

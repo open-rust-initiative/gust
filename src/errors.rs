@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-#[allow(unused)]
+
 #[derive(Error, Debug)]
 pub enum GitError {
     #[error("The `{0}` is not a valid git object type.")]
@@ -18,6 +18,16 @@ pub enum GitError {
     #[error("The `{0}` is not a valid git tree type.")]
     InvalidTreeItem(String),
 
+    #[error("The {0} is not a valid Hash value ")]
+    InvalidHashValue(String),
+
+    #[error("Delta Object Error Info:{0}")]
+    DeltaObjError(String),
+
+    #[error("Error decode in the Object ,info:{0}")]
+    InvalidObjectInfo(String),
+
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+
 }
