@@ -76,7 +76,6 @@ mod tests {
     use std::io::Read;
     use std::path::{Path, PathBuf};
 
-    use bstr::ByteSlice;
 
     use crate::git::hash::HashType;
     use crate::git::id::ID;
@@ -95,9 +94,9 @@ mod tests {
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
 
-        if env::consts::OS == "windows" {
-            buffer = buffer.replace(b"\r\n", b"\n");
-        }
+        // if env::consts::OS == "windows" {
+        //     buffer = buffer.replace(b"\r\n", b"\n");
+        // }
 
         let id = ID::from_vec(ObjectType::Blob, &mut buffer);
         let size = buffer.len();
@@ -114,6 +113,7 @@ mod tests {
         meta.write_to_file("/tmp".to_string())
             .expect("Write error!");
         assert!(Path::new("/tmp/82/352c3a6a7a8bd32011751699c7a3648d1b5d3c").exists());
+
     }
 
     ///

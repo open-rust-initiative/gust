@@ -8,10 +8,11 @@
 
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 
 use byteorder::{BigEndian, ReadBytesExt};
-
+use deflate::Compression;
+use deflate::write::ZlibEncoder;
 use crate::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::id::ID;
@@ -158,7 +159,7 @@ impl Idx {
             fan_out[key.get_first() as usize] +=1;
         }
         let mut _sum = 0;
-        for i in 0..255 {
+        for i in 0..256 {
             _sum +=fan_out[i];
             fan_out[i] = _sum;
             result.append(&mut utils::u32_vec(fan_out[i])); 
@@ -170,14 +171,21 @@ impl Idx {
             result.append(&mut key.0.to_vec())
         }
 
-
-        // Layer 3:
+       
+        // Layer 3: 
         //   The CRC32 of the object data.
-        use crc::{Crc, Algorithm, CRC_32_ISCSI};
-        pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
-        assert_eq!(CASTAGNOLI.checksum(b"123456789"), 0xe3069283);
+        //BUG: The Algorithm of the crc32 is different from the official git, 
+        // and maybe the compress data is not same between the different storage type
+        // So this crc32 computing is different from the git crc32.
+        // But cause we haven't do the crc32 check , so That's Ok ,
+        // Other code still can parse objects by the idx and pack file correctly
+        use crc::{Crc, Algorithm, CRC_32_ISO_HDLC};
+        pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISO_HDLC);
         for values in cache.by_hash.values() {
-            result.append(&mut utils::u32_vec(CASTAGNOLI.checksum(&values.contents))); 
+            let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
+            encoder.write_all(&values.contents[..]).expect("Write error!");
+            let zlib_data =   encoder.finish().expect("Failed to finish compression!");
+            result.append(&mut utils::u32_vec(CASTAGNOLI.checksum(&zlib_data))); 
         }
 
         // Layer 4:
@@ -208,10 +216,14 @@ mod tests {
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Read;
+    use std::io::Write;
+    use std::path::Path;
     use std::path::PathBuf;
 
  
 
+
+    use bstr::ByteSlice;
 
     use crate::utils;
 
@@ -243,6 +255,28 @@ mod tests {
     ///
     #[test]
     fn test_idx_write_to_file() {
+        
+          // "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack"
+       use super::super::pack;
+       let  packs = pack::Pack::decode_file(
+       "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack" 
+       );
+       let idx = Idx::encode(packs);
+
+       let mut file = std::fs::File::create("./test.idx").expect("create failed");
+       file.write_all(idx._file_data.as_bytes()).expect("write failed");
+
+       println!("data written to file");
+       let  idx_file = File::open(&Path::new("./test.idx")).unwrap();
+
+       let mut reader = BufReader::new(idx_file);
+       let mut buffer = Vec::new();
+       reader.read_to_end(&mut buffer).ok();
+
+        let mut idx = Idx::default();
+
+        idx.decode(buffer).unwrap();
+
 
     }
 
@@ -267,6 +301,11 @@ mod tests {
         use crc::{Crc, CRC_32_ISCSI};
         pub const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
         assert_eq!(CASTAGNOLI.checksum(b"123456789"), 0xe3069283);
+
+    }
+
+    #[test]
+    fn test_idx_write(){
 
     }
 }

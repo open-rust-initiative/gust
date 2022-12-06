@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 use std::io::Read;
+use std::path::Path;
 
 use self::cache::PackObjectCache;
 
@@ -10,6 +11,7 @@ use super::object::Object;
 
 use crate::errors::GitError;
 use crate::git::id::ID;
+use crate::git::pack::decode::ObjDecodedMap;
 use crate::utils;
 use std::convert::TryFrom;
 use std::fs::File;
@@ -211,6 +213,31 @@ impl Pack {
     pub fn get_hash(&self) -> Hash{
         return Hash::from_id(&self.signature) ;
     }
+
+    #[allow(unused)]
+    pub fn decode_file(file:&str)->Pack{
+        let mut pack_file = File::open(&Path::new(
+            file,
+        ))
+        .unwrap();
+        let decoded_pack = match Pack::decode(&mut pack_file) {
+            Ok(f) => f,
+            Err(e) => panic!("{}", e.to_string()),
+        };
+
+        assert_eq!(*b"PACK", decoded_pack.head);
+        assert_eq!(2, decoded_pack.version);
+
+        let mut result = ObjDecodedMap::default();
+        result.update_from_cache(&decoded_pack.result);
+        for (key, value) in result._map_hash.iter(){
+            println!("*********************");
+            println!("Hash: {}", key);
+            println!("{}", value);
+        }
+        decoded_pack
+        
+    }
 }
 
 ///
@@ -225,33 +252,11 @@ mod tests {
     use std::path::Path;
     use super::Pack;
 
-    fn decode_file(file:&str)->Pack{
-        let mut pack_file = File::open(&Path::new(
-            file,
-        ))
-        .unwrap();
-        let decoded_pack = match Pack::decode(&mut pack_file) {
-            Ok(f) => f,
-            Err(e) => panic!("{}", e.to_string()),
-        };
-
-        assert_eq!(*b"PACK", decoded_pack.head);
-        assert_eq!(2, decoded_pack.version);
-
-        let mut result = super::decode::ObjDecodedMap::default();
-        result.update_from_cache(&decoded_pack.result);
-        for (key, value) in result._map_hash.iter(){
-            println!("*********************");
-            println!("Hash: {}", key);
-            println!("{}", value);
-        }
-        decoded_pack
-        
-    }
+   
     /// Test the pack File decode standalone
     #[test]
     fn test_decode_pack_file1() {
-        let decoded_pack = decode_file("./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack");
+        let decoded_pack = Pack::decode_file("./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack");
         assert_eq!(
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_string()
@@ -259,7 +264,7 @@ mod tests {
     }
     #[test]
     fn test_decode_pack_file_with_print() {
-        let decoded_pack = decode_file("./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack");
+        let decoded_pack = Pack::decode_file("./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack");
         assert_eq!(
             "8d36a6464e1f284e5e9d06683689ee751d4b2687",
             decoded_pack.signature.to_string()
@@ -267,7 +272,7 @@ mod tests {
     }
     #[test]
     fn test_parse_simple_pack() {
-        let decoded_pack = decode_file("./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack");
+        let decoded_pack = Pack::decode_file("./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack");
         assert_eq!(
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             decoded_pack.signature.to_string()
