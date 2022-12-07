@@ -7,24 +7,25 @@
 //!
 
 use std::fmt::Display;
+use std::str::FromStr;
 
 use bstr::ByteSlice;
 
 use crate::errors::GitError;
 
-use super::ID;
+use super::hash::{Hash, HashType};
+use super::object::types::ObjectType;
+use super::object::Object;
 use super::Metadata;
 use crate::git::sign::AuthorSign;
-use super::hash::HashType;
-use super::object::types::ObjectType;
 
 /// Git Object: commit
 #[allow(unused)]
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[derive(PartialEq, Eq, Debug, Hash,Ord, PartialOrd, Clone)]
 pub struct Commit {
     pub meta: Metadata,
-    pub tree_id: ID,
-    pub parent_tree_ids: Vec<ID>,
+    pub tree_id: Hash,
+    pub parent_tree_ids: Vec<Hash>,
     pub author: AuthorSign,
     pub committer: AuthorSign,
     pub message: String,
@@ -36,10 +37,7 @@ impl Commit {
     pub fn new(metadata: Metadata) -> Self {
         let mut a = Self {
             meta: metadata,
-            tree_id: ID {
-                bytes: vec![],
-                hash: "".to_string(),
-            },
+            tree_id: Hash::default(),
             parent_tree_ids: vec![],
             author: AuthorSign {
                 t: "".to_string(),
@@ -61,30 +59,28 @@ impl Commit {
         a
     }
     ///
-    
+
     /// Decode the Metadata.data and convert to `Commit` Class
-    // If there a 
+    // If there a
     pub(crate) fn decode_meta(&mut self) -> Result<(), GitError> {
         let mut data = self.meta.data.clone();
 
         // Find the tree id and remove it from the data
         let tree_begin = data.find_byte(0x20).unwrap();
         let tree_end = data.find_byte(0x0a).unwrap();
-        self.tree_id = ID::from_string(data[tree_begin + 1..tree_end].to_str().unwrap());
+        self.tree_id = Hash::from_bytes(&data[tree_begin + 1..tree_end].to_vec()).unwrap();
         data = data[tree_end + 1..].to_vec();
 
         // Find the parent tree ids and remove them from the data
         let author_begin = data.find("author").unwrap();
         if data.find_iter("parent").count() > 0 {
-            let mut parents: Vec<ID> = Vec::new();
+            let mut parents: Vec<Hash> = Vec::new();
             let mut index = 0;
 
             while index < author_begin {
                 let parent_begin = data.find_byte(0x20).unwrap();
                 let parent_end = data.find_byte(0x0a).unwrap();
-                parents.push(ID::from_string(
-                    data[parent_begin + 1..parent_end].to_str().unwrap(),
-                ));
+                parents.push(Hash::from_bytes(&data[parent_begin + 1..parent_end].to_vec()).unwrap());
                 index = index + parent_end + 1;
             }
 
@@ -122,13 +118,13 @@ impl Commit {
 
         data.extend_from_slice("tree".as_bytes());
         data.extend_from_slice(0x20u8.to_be_bytes().as_ref());
-        data.extend_from_slice(self.tree_id.to_string().as_bytes());
+        data.extend_from_slice(self.tree_id.to_plain_str().as_bytes());
         data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
 
         for parent_tree_id in &self.parent_tree_ids {
             data.extend_from_slice("parent".as_bytes());
             data.extend_from_slice(0x20u8.to_be_bytes().as_ref());
-            data.extend_from_slice(parent_tree_id.to_string().as_bytes());
+            data.extend_from_slice(parent_tree_id.to_plain_str().as_bytes());
             data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
         }
 
@@ -141,16 +137,18 @@ impl Commit {
         Ok(Metadata {
             t: ObjectType::Commit,
             h: HashType::Sha1,
-            id: ID::from_vec(ObjectType::Commit, &mut data),
+            id: Object {
+                object_type: ObjectType::Commit,
+                contents: data.clone(),
+            }
+            .hash(),
             size: data.len(),
             data,
         })
     }
 }
 
-
 impl Display for Commit {
- 
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "Tree: {}", self.tree_id)?;
 
@@ -164,14 +162,14 @@ impl Display for Commit {
     }
 }
 
-///
 #[cfg(test)]
 mod tests {
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
+    use std::str::FromStr;
 
-    use crate::git::id::ID;
+    use crate::git::hash::Hash;
     use crate::git::sign::AuthorSign;
     use crate::git::Metadata;
 
@@ -183,10 +181,7 @@ mod tests {
 
         Commit {
             meta,
-            tree_id: ID {
-                bytes: vec![],
-                hash: "".to_string(),
-            },
+            tree_id: Hash::default(),
             parent_tree_ids: vec![],
             author: AuthorSign {
                 t: "".to_string(),
@@ -213,12 +208,12 @@ mod tests {
         path.push("resources/data/test/commit-1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a");
 
         let mut commit = get_empty_commit(path);
-
+        
         commit.decode_meta().unwrap();
 
         assert_eq!(
-            "1bdbc1e723aa199e83e33ecf1bb19f874a56ebc3",
-            commit.tree_id.hash
+            String::from("1bdbc1e723aa199e83e33ecf1bb19f874a56ebc3"),
+            commit.tree_id.to_plain_str()
         );
     }
 
@@ -234,7 +229,7 @@ mod tests {
 
         assert_eq!(
             "9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20",
-            commit.tree_id.to_string()
+            commit.tree_id.to_plain_str()
         );
     }
 
@@ -245,10 +240,7 @@ mod tests {
             t: super::ObjectType::Commit,
             h: super::HashType::Sha1,
             size: 0,
-            id: super::ID {
-                bytes: vec![],
-                hash: "".to_string(),
-            },
+            id: Hash::default(),
             data: vec![],
         };
 
@@ -270,9 +262,9 @@ mod tests {
 
         let mut commit = super::Commit {
             meta,
-            tree_id: super::ID::from_string("9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20"),
+            tree_id:Hash::from_str("9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20").unwrap(),
             parent_tree_ids: vec![
-                super::ID::from_string("1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a"),
+                Hash::from_str("1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a").unwrap(),
             ],
             author,
             committer,
@@ -283,7 +275,7 @@ mod tests {
 
         assert_eq!(
             "3b8bc1e152af7ed6b69f2acfa8be709d1733e1bb",
-            commit.meta.id.to_string()
+            commit.meta.id.to_plain_str()
         );
 
         commit

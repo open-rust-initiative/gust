@@ -28,19 +28,19 @@ impl ID {
     /// Return the first and second alphanumeric characters of the ID.
     /// In the git object store format, the first two characters is the folder for save the object.
     #[allow(unused)]
-    pub(crate) fn to_folder(&self) -> String {
+    pub(crate) fn to_folder(&self) -> String { //to_folder
         self.hash.as_str()[0..2].to_string()
     }
 
     /// Return the last 18 characters of the ID for the object name.
     #[allow(unused)]
-    pub(crate) fn to_filename(&self) -> String {
+    pub(crate) fn to_filename(&self) -> String {//TODO 
         self.hash.as_str()[2..].to_string()
     }
 
     /// Return the ID in the git object store format form a hex string.
     #[allow(unused)]
-    pub(crate) fn from_string(s: &str) -> Self {
+    pub(crate) fn from_string(s: &str) -> Self {//from_str
         ID {
             bytes: hex::decode(s).unwrap(),
             hash: s.to_string(),
@@ -49,7 +49,7 @@ impl ID {
 
     /// Return the ID in the git object store format from a byte array.
     #[allow(unused)]
-    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {//hex_to_hash
         ID {
             bytes: bytes.to_vec(),
             hash: hex::encode(bytes),
@@ -57,7 +57,7 @@ impl ID {
     }
 
     #[allow(unused)]
-    pub(crate) fn from_vec(t: ObjectType, data: &mut [u8]) -> Self {
+    pub(crate) fn from_vec(t: ObjectType, data: &mut [u8]) -> Self {//new
         let mut hash = Sha1::new();
 
         let object: &[u8] = &[
@@ -124,5 +124,16 @@ mod tests {
 
         let id = ID::from_vec(super::ObjectType::Blob, &mut buffer);
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", id.to_string());
+    }
+
+    #[test]
+    fn tsethex(){
+        let strs = "08fd2deaaf152c7f1222c52fb2673f6192b37500";
+        //let test_hash = Hash::from_str("08fd2deaaf152c7f1222c52fb2673f6192b37500").unwrap();
+        let result_hash: [u8; 20] = [
+            8, 253, 45, 234, 175, 21, 44, 127, 18, 34, 197, 47, 178, 103, 63, 97, 146, 179, 117, 0
+        ];
+        print!("{:?}",hex::decode(strs).unwrap());
+        
     }
 }

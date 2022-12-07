@@ -77,8 +77,9 @@ mod tests {
     use std::path::{Path, PathBuf};
 
 
+    use crate::git::hash::Hash;
     use crate::git::hash::HashType;
-    use crate::git::id::ID;
+    use crate::git::object::Object;
     use crate::git::object::types::ObjectType;
     
     use crate::git::Metadata;
@@ -98,7 +99,12 @@ mod tests {
         //     buffer = buffer.replace(b"\r\n", b"\n");
         // }
 
-        let id = ID::from_vec(ObjectType::Blob, &mut buffer);
+
+        let id =  Object{
+            object_type: ObjectType::Blob,
+            contents:buffer.clone()
+        }.hash();
+       
         let size = buffer.len();
         let data = buffer;
 
@@ -135,12 +141,18 @@ mod tests {
 
         assert_eq!(
             "82352c3a6a7a8bd32011751699c7a3648d1b5d3c",
-            blob.meta.id.to_string()
+            blob.meta.id.to_plain_str()
         );
+
+
+        
         assert_eq!(16, blob.meta.size);
         assert_eq!(
             "# Hello Gitmega\n",
             String::from_utf8(blob.data).unwrap().as_str()
         );
     }
+
+
+
 }

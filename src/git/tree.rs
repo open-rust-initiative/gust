@@ -11,11 +11,10 @@ use std::fmt::Display;
 use bstr::ByteSlice;
 
 use crate::errors::GitError;
-use crate::git::id::ID;
 use crate::git::Metadata;
 use crate::git::object::types::ObjectType;
 use crate::git::hash::HashType;
-
+use crate::git::Hash;
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum TreeItemType {
@@ -27,8 +26,9 @@ pub enum TreeItemType {
 }
 
 use colored::Colorize;
+
+use super::object::Object;
 impl Display for TreeItemType {
-    ///
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let _print = match *self {
             TreeItemType::Blob => "blob",
@@ -76,7 +76,7 @@ impl TreeItemType {
 pub struct TreeItem {
     pub mode: Vec<u8>,
     pub item_type: TreeItemType,
-    pub id: ID,
+    pub id: Hash,
     pub filename: String,
 }
 
@@ -126,7 +126,7 @@ impl Tree {
                 .to_vec())
                 .unwrap();
 
-            let id = ID::from_bytes(&self.meta.data[index + filename_index + 1..index + filename_index + 21]);
+            let id = Hash::from_row(&self.meta.data[index + filename_index + 1..index + filename_index + 21].to_vec());
 
             self.tree_items.push(TreeItem {
                 mode: mode.to_vec(),
@@ -150,14 +150,17 @@ impl Tree {
             data.extend_from_slice(0x20u8.to_be_bytes().as_ref());
             data.extend_from_slice(item.filename.as_bytes());
             data.extend_from_slice(0x00u8.to_be_bytes().as_ref());
-            data.extend_from_slice(&item.id.bytes);
+            data.extend_from_slice(&item.id.0.to_vec());
         }
 
         Ok(
             Metadata {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
-                id: ID::from_vec(ObjectType::Tree, &mut data),
+                id:Object{
+                    object_type: ObjectType::Tree,
+                    contents:data.clone()
+                }.hash(),
                 size: data.len(),
                 data,
             },
@@ -181,8 +184,8 @@ mod tests {
     use super::ObjectType;
     use crate::git::Metadata;
     use crate::git::blob::Blob;
+    use crate::git::hash::Hash;
     use crate::git::hash::HashType;
-    use crate::git::id::ID;
 
     use super::Tree;
     use super::TreeItemType;
@@ -198,7 +201,7 @@ mod tests {
                 .expect("Read error!");
 
         assert_eq!(meta.t, ObjectType::Blob);
-        assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", meta.id.to_string());
+        assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", meta.id.to_plain_str());
         assert_eq!(16, meta.size);
 
         let blob = Blob {
@@ -218,10 +221,7 @@ mod tests {
             meta: Metadata {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
-                id: ID {
-                    bytes: vec![],
-                    hash: String::new(),
-                },
+                id: Hash::default(),
                 size: 0,
                 data: vec![]
             },
@@ -272,10 +272,7 @@ mod tests {
             meta: Metadata {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
-                id: ID {
-                    bytes: vec![],
-                    hash: String::new(),
-                },
+                id: Hash::default(),
                 size: 0,
                 data: vec![]
             },
@@ -315,7 +312,7 @@ mod tests {
         );
         assert_eq!(
             "82352c3a6a7a8bd32011751699c7a3648d1b5d3c",
-            tree.tree_items[0].id.to_string()
+            tree.tree_items[0].id.to_plain_str()
         );
         assert_eq!(
             "100644",
@@ -354,7 +351,7 @@ mod tests {
 
         assert_eq!(
             "fc1a505ac94f98cc5f29100a2d9aef97027a32fb",
-            tree.tree_items[0].id.to_string()
+            tree.tree_items[0].id.to_plain_str()
         );
 
         assert_eq!(
@@ -371,7 +368,7 @@ mod tests {
 
         assert_eq!(
             "a3b55a2ce16d2429dae2d690d2c15bcf26fbe33c",
-            tree.tree_items[1].id.to_string()
+            tree.tree_items[1].id.to_plain_str()
         );
 
         assert_eq!(
