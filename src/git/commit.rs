@@ -1,18 +1,11 @@
 //!
-//!Commit 结构体
+//!Commit 对象结构体
 //!
-//!
-//!
-//!
-//!
+
 
 use std::fmt::Display;
-use std::str::FromStr;
-
 use bstr::ByteSlice;
-
 use crate::errors::GitError;
-
 use super::hash::{Hash, HashType};
 use super::object::types::ObjectType;
 use super::object::Object;

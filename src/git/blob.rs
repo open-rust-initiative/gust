@@ -1,16 +1,12 @@
 //!
 //!Blob 文件对象结构体
 //!
-//!
-//!
-//!
-//!
 
 use std::fmt::Display;
-
 use crate::errors::GitError;
 use crate::git::Metadata;
 use crate::git::tree::{TreeItem, TreeItemType};
+
 /// Git Object: blob
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Blob {
@@ -77,7 +73,6 @@ mod tests {
     use std::path::{Path, PathBuf};
 
 
-    use crate::git::hash::Hash;
     use crate::git::hash::HashType;
     use crate::git::object::Object;
     use crate::git::object::types::ObjectType;

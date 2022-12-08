@@ -1,3 +1,5 @@
+//!Encode and Decode The Pack File ,which is in the dir:`.git/object/pack/*.pack`
+//! 
 use std::convert::TryInto;
 use std::io::Read;
 use std::path::Path;
@@ -33,7 +35,8 @@ pub mod encode;
 ///  `head`: always = "PACK" <br>
 /// `version`: version code <br>
 /// `number_of_objects` : Total mount of objects <br>
-/// `signature`:Hash
+/// `signature`:Hash <br>
+/// `result`: decoded cache,
 #[allow(unused)]
 #[derive(Default)]
 pub struct Pack {

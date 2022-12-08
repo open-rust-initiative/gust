@@ -1,37 +1,33 @@
-//!
-//!
-//!
 //!Hash值结构体 20位u8数组
 //! > Attention to the Display function
-//!
-//!
 
 use std::fmt::Display;
 use crate::errors::GitError;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use sha1::{Digest, Sha1};
+
 ///Hash值的位数 - sha1
 pub const HASH_BYTES: usize = 20;
 const COMMIT_OBJECT_TYPE: &[u8] = b"commit";
 const TREE_OBJECT_TYPE: &[u8] = b"tree";
 const BLOB_OBJECT_TYPE: &[u8] = b"blob";
 const TAG_OBJECT_TYPE: &[u8] = b"tag";
+
 /// Git Object hash type. only support SHA1 for now.
-///
-///
 #[allow(unused)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum HashType {
     Sha1,
 }
+/// Hash struct ,only contain the u8 array :`[u8;20]`
 #[allow(unused)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord,Default)]
 pub struct Hash(pub [u8; HASH_BYTES]);
 
 /// Display trait for Hash type
 use colored::Colorize;
-use super::{id::ID, object::{Object, types::ObjectType}};
+use super::object::{Object, types::ObjectType};
 impl Display for Hash {
     // Hash 值打印的彩色与16进制格式
     /// # !Attention 
@@ -119,11 +115,6 @@ impl Hash {
     pub fn to_plain_str(&self) -> String{      
         hex::encode(self.0)
     }
- 
-    pub fn from_id(id:& ID) -> Hash{
-        Hash::new(&id.bytes)
-    }
-
 
     #[allow(unused)]
     pub(crate) fn to_folder(&self) -> String {

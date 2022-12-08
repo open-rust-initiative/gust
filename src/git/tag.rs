@@ -1,21 +1,16 @@
+//!	Tag  对象结构体
 //!
 //!
 //!
-//!
-//!
-//!
-//!
+
 
 use bstr:: ByteSlice;
-
 use crate::errors::GitError;
-
 use crate::git::hash::{HashType,Hash};
 use crate::git::object::types::ObjectType;
 use crate::git::sign::AuthorSign;
 use crate::git::Metadata;
 use std::fmt::{Display};
-
 use super::object::Object;
 
 /// Git Object: tag

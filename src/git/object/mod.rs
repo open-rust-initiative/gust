@@ -1,3 +1,5 @@
+//!Object struct , contain the raw info cut from the pack file or other file
+//! 
 
 use types::ObjectType;
 use super::hash::Hash;

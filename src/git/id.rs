@@ -1,10 +1,7 @@
-//!
-//!
-//!
-//!
-//!
-//!
-//!
+//!  # Deprecated 
+//! It was used to the Hash value
+//! ID .
+
 
 use std::fmt::Display;
 
@@ -126,14 +123,4 @@ mod tests {
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", id.to_string());
     }
 
-    #[test]
-    fn tsethex(){
-        let strs = "08fd2deaaf152c7f1222c52fb2673f6192b37500";
-        //let test_hash = Hash::from_str("08fd2deaaf152c7f1222c52fb2673f6192b37500").unwrap();
-        let result_hash: [u8; 20] = [
-            8, 253, 45, 234, 175, 21, 44, 127, 18, 34, 197, 47, 178, 103, 63, 97, 146, 179, 117, 0
-        ];
-        print!("{:?}",hex::decode(strs).unwrap());
-        
-    }
 }
