@@ -47,6 +47,7 @@ impl Display for Hash {
 }
 
 impl Hash {
+    /// Create Hash by the long information , the all data .
     pub fn new(data:&Vec<u8>) -> Hash{
         let mut new_hash = Sha1::new();
         new_hash.update(data);
@@ -72,16 +73,19 @@ impl Hash {
         let result = <[u8; HASH_BYTES]>::from(hash_re);
       Hash(result)
     }
+    
     ///解析出16进制数字0-f
     fn hex_char_value(hex_char: u8) -> Option<u8> {
         match hex_char {
             b'0'..=b'9' => Some(hex_char - b'0'),
             b'a'..=b'f' => Some(hex_char - b'a' + 10),
-            b'A'..=b'F' => Some(hex_char - b'A' + 10),
+            b'A'..=b'F' => Some(hex_char - b'A' + 10),//Add The Support for the Big Char 
             _ => None ,
         }
     }
-    ///将u8数组转化为hash
+    
+    ///Change the u8 array to the Hash ,which should be the 40 length,
+    /// every bit is a char value of the string 
     pub fn from_bytes(hex_hash: &[u8]) -> Option<Hash> {
         const BITS_PER_CHAR: usize = 4;
         const CHARS_PER_BYTE: usize = 8 / BITS_PER_CHAR;
@@ -102,11 +106,12 @@ impl Hash {
         Some(Hash(bytes))
     }
 
-
+    //Create a Hash value by the row value 
+    // It's shout be a `&[u8;20]`
     pub fn from_row(hex_hash: &[u8]) -> Hash{
         Hash(<[u8; HASH_BYTES]>::try_from(hex_hash).unwrap())
     }
-    
+    // Get tht first u8 (0x00~0xff) from the Hash
     pub fn get_first(&self)->u8{
         return self.0[0];
     }
