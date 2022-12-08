@@ -1,3 +1,4 @@
+//! encode pack file ,and create file 
 use std::io::Write;
 use std::str::FromStr;
 use bstr::ByteSlice;
@@ -87,7 +88,7 @@ impl Pack {
     }
     /// Pack the loose object in a dir ,such as the `.git/object/pack`<br>
     /// It can auto find the loose object follow the position like below:
-    /// ```
+    /// ```plaintext
     /// ./in：loose_root/aa/bbbbbbbbbbbbbbbbbb
     /// ```
     /// ,The object Hash is `aabbbbbbbbbbbbbbbbbb`

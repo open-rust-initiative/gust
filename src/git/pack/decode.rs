@@ -1,3 +1,4 @@
+//!	Decode pack file by the `ObjDecodedMap`
 use std::fmt::{Display, self};
 use std::{collections::HashMap, rc::Rc};
 use crate::git::Metadata;

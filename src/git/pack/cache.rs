@@ -1,3 +1,4 @@
+//!	Build Cache Info for the decode packed object
 use std::collections::BTreeMap;
 use super::super::hash::Hash;
 
