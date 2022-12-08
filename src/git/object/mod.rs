@@ -1,14 +1,9 @@
+//!Object struct , contain the raw info cut from the pack file or other file
+//! 
 
 use types::ObjectType;
-use super::{hash::Hash, id::ID};
-use sha1::{Digest, Sha1};
-use std::{convert::TryFrom};
+use super::hash::Hash;
 use super::Metadata;
-const COMMIT_OBJECT_TYPE: &[u8] = b"commit";
-const TREE_OBJECT_TYPE: &[u8] = b"tree";
-const BLOB_OBJECT_TYPE: &[u8] = b"blob";
-const TAG_OBJECT_TYPE: &[u8] = b"tag";
-use super::hash::HASH_BYTES;
 pub mod types;
 pub mod delta;
 //Object内存存储类型 
@@ -20,29 +15,32 @@ pub struct Object {
 impl Object {
     /// object 的 hash转化函数
     pub fn hash(&self) -> Hash {
-      let new_hash = Sha1::new()
-        .chain(match self.object_type {
-          ObjectType::Commit => COMMIT_OBJECT_TYPE,
-          ObjectType::Tree => TREE_OBJECT_TYPE,
-          ObjectType::Blob => BLOB_OBJECT_TYPE,
-          ObjectType::Tag => TAG_OBJECT_TYPE,
-        })
-        .chain(b" ")
-        .chain(self.contents.len().to_string())
-        .chain(b"\0")
-        .chain(&self.contents)
-        .finalize();
-      Hash(<[u8; HASH_BYTES]>::try_from(new_hash.as_slice()).unwrap())
+      Hash::from_obj(&self)
     }
    // pub fn GetObjectFromPack()
     pub fn to_metadata(&self) -> Metadata{
       Metadata{
         t: self.object_type,
         h: super::hash::HashType::Sha1,
-        id: ID::from_bytes(&self.hash().0),
+        id: self.hash(),
         size: self.contents.len(),
         data: self.contents.clone(),
     }
     }
   }
 
+//TODO: 测试object的hash生成
+#[cfg(test)]
+mod tests{
+    use super::Object;
+
+  #[test] 
+  fn test_obj_hash(){
+    let _obj=Object{
+      object_type:super::types::ObjectType::Blob,
+      contents : String::from("hellosss").into_bytes(),
+    };
+    print!("{}",_obj.hash())  ;//602091219933865cace5ab8cd78b424735c82e6c
+
+  }
+}

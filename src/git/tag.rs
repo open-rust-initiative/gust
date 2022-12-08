@@ -1,27 +1,24 @@
+//!	Tag  对象结构体
 //!
 //!
 //!
-//!
-//!
-//!
-//!
+
 
 use bstr:: ByteSlice;
-
 use crate::errors::GitError;
-
-use crate::git::hash::HashType;
-use crate::git::id::ID;
+use crate::git::hash::{HashType,Hash};
 use crate::git::object::types::ObjectType;
 use crate::git::sign::AuthorSign;
 use crate::git::Metadata;
 use std::fmt::{Display};
+use super::object::Object;
+
 /// Git Object: tag
 #[allow(unused)]
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Tag {
     pub meta: Metadata,
-    pub object: ID,
+    pub object: Hash,
     pub t: ObjectType,
     pub tag: String,
     pub tagger: AuthorSign,
@@ -59,7 +56,7 @@ impl Tag {
 
         let object_begin = data.find_byte(0x20).unwrap();
         let object_end = data.find_byte(0x0a).unwrap();
-        self.object = ID::from_string(data[object_begin + 1..object_end].to_str().unwrap());
+        self.object = Hash::from_bytes(&data[object_begin + 1..object_end].to_vec()).unwrap();
         data = data[object_end + 1..].to_vec();
 
         let type_begin = data.find_byte(0x20).unwrap();
@@ -99,7 +96,7 @@ impl Tag {
 
         data.extend_from_slice("object".as_bytes());
         data.extend_from_slice(0x20u8.to_be_bytes().as_ref());
-        data.extend_from_slice(self.object.to_string().as_bytes());
+        data.extend_from_slice(self.object.to_plain_str().as_bytes());
         data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
 
         data.extend_from_slice("type".as_bytes());
@@ -119,7 +116,12 @@ impl Tag {
         Ok(Metadata {
             t: ObjectType::Tag,
             h: HashType::Sha1,
-            id: ID::from_vec(ObjectType::Tag, &mut data),
+            
+            id: Object{
+                object_type: ObjectType::Tag,
+                contents:data.clone()
+            }.hash(),
+        
             size: data.len(),
             data,
         })
@@ -145,7 +147,8 @@ mod tests {
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
-    use crate::git::id::ID;
+    use std::str::FromStr;
+    use crate::git::hash::Hash;
     use crate::git::sign::AuthorSign;
     use crate::git::Metadata;
     use crate::git::ObjectType;
@@ -165,15 +168,12 @@ mod tests {
         assert_eq!(976, meta.size);
         assert_eq!(
             "e5c324b03b72b26f11557c4955c6d17c68dc8595",
-            meta.id.to_string()
+            meta.id.to_plain_str()
         );
 
         let mut tag = Tag {
             meta,
-            object: ID {
-                bytes: vec![],
-                hash: "".to_string(),
-            },
+            object: Hash::default(),
             t: ObjectType::Commit,
             tag: "".to_string(),
             tagger: AuthorSign {
@@ -190,7 +190,7 @@ mod tests {
         
         assert_eq!(
             "6414e45babf0bdd043ba40d31123053cfebef26c",
-            tag.object.to_string()
+            tag.object.to_plain_str()
         );
         assert_eq!("commit", tag.t.to_string());
         assert_eq!("v1.1.0", tag.tag);
@@ -203,7 +203,7 @@ mod tests {
         let meta = Metadata {
             t: ObjectType::Tag,
             h: crate::git::HashType::Sha1,
-            id: ID::from_string("df1087c478c8d337cb587b897e86f2455e2687ed"),
+            id: Hash::from_str("df1087c478c8d337cb587b897e86f2455e2687ed").unwrap() ,
             size: 155,
             data: vec![
                 111, 98, 106, 101, 99, 116, 32, 51, 55, 50, 49, 51, 101, 55, 98, 98, 51, 99, 51,
@@ -231,10 +231,7 @@ mod tests {
             t: ObjectType::Tag,
             h: HashType::Sha1,
             size: 0,
-            id: super::ID {
-                bytes: vec![],
-                hash: "".to_string(),
-            },
+            id: Hash::default(),
             data: vec![],
         };
 
@@ -248,7 +245,7 @@ mod tests {
 
         let mut tag = Tag {
             meta,
-            object: ID::from_string("6414e45babf0bdd043ba40d31123053cfebef26c"),
+            object: Hash::from_str("6414e45babf0bdd043ba40d31123053cfebef26c").unwrap(),
             t: ObjectType::Commit,
             tag: "v1.1.0".to_string(),
             tagger,
@@ -258,7 +255,7 @@ mod tests {
         tag.meta = tag.encode_metadata().unwrap();
         assert_eq!(
             "e5c324b03b72b26f11557c4955c6d17c68dc8595",
-            tag.meta.id.to_string()
+            tag.meta.id.to_plain_str()
         );
 
         tag.write_to_file("/tmp".to_string()).expect("Write error!");

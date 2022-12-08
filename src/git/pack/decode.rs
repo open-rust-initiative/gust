@@ -1,6 +1,7 @@
+//!	Decode pack file by the `ObjDecodedMap`
+use std::fmt::{Display, self};
 use std::{collections::HashMap, rc::Rc};
 use crate::git::Metadata;
-use super::ID;
 use crate::git::hash::{Hash,HashType};
 
 use crate::git::object::types::ObjectType;
@@ -8,6 +9,7 @@ use crate::git::object::types::ObjectType;
 use crate::git::ObjClass;
 use super::super::{blob,commit,tag,tree};
 use super::cache::PackObjectCache;
+use colored::Colorize;
 ///!对取出的object字段进行进一步解码与包装
 /// 用于存储解析出的object抽象对象的hashmap
 #[derive(Default)]
@@ -24,7 +26,7 @@ impl ObjDecodedMap {
                 Metadata {
                     t: value.object_type ,  
                     h: HashType::Sha1,
-                    id: ID::from_bytes(&value.hash().0),
+                    id: value.hash(),
                     size: value.contents.len(),
                     data:value.contents.to_vec(),
                 };
@@ -39,14 +41,27 @@ impl ObjDecodedMap {
         }
         
     }
+
 }
 
-
+impl Display for ObjDecodedMap{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        
+        for (key, value) in self._map_hash.iter(){
+            writeln!(f,"*********************").unwrap();
+            writeln!(f,"Hash: {}", key).unwrap();
+            writeln!(f,"{}", value).unwrap();
+        }
+        writeln!(f,"{}",String::from("Finish Printf for ObjDecodedMap").blue())
+    }
+}
 #[cfg(test)]
 mod tests {
+    use super::ObjDecodedMap;
+
     
     #[test]
     pub fn test_map_new(){
-//TODO 写map的测试
+        let mut _map = ObjDecodedMap::default();
     }
 }

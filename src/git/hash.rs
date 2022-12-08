@@ -1,64 +1,88 @@
-//!
-//!
-//!
 //!Hash值结构体 20位u8数组
-//!
-//!
-//!
+//! > Attention to the Display function
 
 use std::fmt::Display;
 use crate::errors::GitError;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use sha1::{Digest, Sha1};
+
 ///Hash值的位数 - sha1
 pub const HASH_BYTES: usize = 20;
+const COMMIT_OBJECT_TYPE: &[u8] = b"commit";
+const TREE_OBJECT_TYPE: &[u8] = b"tree";
+const BLOB_OBJECT_TYPE: &[u8] = b"blob";
+const TAG_OBJECT_TYPE: &[u8] = b"tag";
+
 /// Git Object hash type. only support SHA1 for now.
-///
-///
 #[allow(unused)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum HashType {
     Sha1,
 }
-
+/// Hash struct ,only contain the u8 array :`[u8;20]`
 #[allow(unused)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord,Default)]
 pub struct Hash(pub [u8; HASH_BYTES]);
 
 /// Display trait for Hash type
 use colored::Colorize;
-
-use super::id::ID;
+use super::object::{Object, types::ObjectType};
 impl Display for Hash {
+    // Hash 值打印的彩色与16进制格式
+    /// # !Attention 
+    /// cause of the color chars for ,if you want to use the string with out color ,
+    /// please call the func:`to_plain_str()` rather than the func:`to_string()`
+    /// ### For example :
+    ///  the hash value `18fd2deaaf152c7f1222c52fb2673f6192b375f0`<br>
+    ///  will be the `1;31m8d2deaaf152c7f1222c52fb2673f6192b375f00m`
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut hash_str = String::new();
-        for i in self.0 {
-            
-            hash_str += format!("{:1x}", i>>4 & 0x0f).as_str();
-            hash_str += format!("{:1x}", i & 0x0f).as_str();
-        }
-        write!(f, "{}", hash_str.red().bold())
+        //
+        write!(f, "{}", self.to_plain_str().red().bold())
     }
 }
 
 impl Hash {
+    /// Create Hash by the long information , the all data .
     pub fn new(data:&Vec<u8>) -> Hash{
-        let new_hash = Sha1::new()
-        .chain(data)
-        .finalize();
-      Hash(<[u8; HASH_BYTES]>::try_from(new_hash.as_slice()).unwrap())
+        let mut new_hash = Sha1::new();
+        new_hash.update(data);
+        let hash_re = new_hash.finalize();
+        let result = <[u8; 20]>::from(hash_re);
+      Hash(result)
     }
+
+    /// Create Hash from the Object 
+    pub fn from_obj(obj:&Object) -> Hash{
+        let mut h = Sha1::new();
+        h.update(match obj.object_type {
+          ObjectType::Commit => COMMIT_OBJECT_TYPE,
+          ObjectType::Tree => TREE_OBJECT_TYPE,
+          ObjectType::Blob => BLOB_OBJECT_TYPE,
+          ObjectType::Tag => TAG_OBJECT_TYPE,
+        });
+        h.update(b" ");
+        h.update(obj.contents.len().to_string());
+        h.update(b"\0");
+        h.update(&obj.contents);
+        let hash_re = h.finalize();
+        let result = <[u8; HASH_BYTES]>::from(hash_re);
+      Hash(result)
+    }
+    
     ///解析出16进制数字0-f
     fn hex_char_value(hex_char: u8) -> Option<u8> {
         match hex_char {
             b'0'..=b'9' => Some(hex_char - b'0'),
             b'a'..=b'f' => Some(hex_char - b'a' + 10),
-            _ => None,
+            b'A'..=b'F' => Some(hex_char - b'A' + 10),//Add The Support for the Big Char 
+            _ => None ,
         }
     }
-    ///将u8数组转化为hash
-    fn hex_to_hash(hex_hash: &[u8]) -> Option<Hash> {
+    
+    ///Change the u8 array to the Hash ,which should be the 40 length,
+    /// every bit is a char value of the string 
+    pub fn from_bytes(hex_hash: &[u8]) -> Option<Hash> {
         const BITS_PER_CHAR: usize = 4;
         const CHARS_PER_BYTE: usize = 8 / BITS_PER_CHAR;
         // 将切片以chunks_size的切片
@@ -78,26 +102,52 @@ impl Hash {
         Some(Hash(bytes))
     }
 
+    //Create a Hash value by the row value 
+    // It's shout be a `&[u8;20]`
+    pub fn from_row(hex_hash: &[u8]) -> Hash{
+        Hash(<[u8; HASH_BYTES]>::try_from(hex_hash).unwrap())
+    }
+    // Get tht first u8 (0x00~0xff) from the Hash
     pub fn get_first(&self)->u8{
         return self.0[0];
     }
-    pub fn from_id(id:& ID) -> Hash{
-        Hash::new(&id.bytes)
+    /// Create plain String without the color chars 
+    pub fn to_plain_str(&self) -> String{      
+        hex::encode(self.0)
     }
+
+    #[allow(unused)]
+    pub(crate) fn to_folder(&self) -> String {
+        
+        let  str = self.to_plain_str();
+        let str = str[0..2].to_string().clone();
+        str
+    }
+
+    
+    #[allow(unused)]
+    pub(crate) fn to_filename(&self) -> String {
+        
+        let  str = self.to_plain_str();
+        let str = str[2..].to_string().clone();
+        str
+    }
+
+
 }
 
 impl FromStr for Hash {
     type Err = GitError;
     fn from_str(hex_hash: &str) -> Result<Self, GitError> {
-        Hash::hex_to_hash(hex_hash.as_bytes())
+        Hash::from_bytes(hex_hash.as_bytes())
             .ok_or_else(|| GitError::InvalidHashValue(hex_hash.to_string()))
     }
 }
 
 mod tests {
+
+
    
-
-
     /// The Right Hash decode
     #[test]
     fn test_hash() {
@@ -109,7 +159,11 @@ mod tests {
             240,
         ];
         assert_eq!(test_hash.0, result_hash);
-        println!("{}",test_hash);
+        
+        println!("{}",test_hash.to_string());
+        println!("{}",test_hash.to_folder());
+        assert_eq!(String::from("18"),test_hash.to_folder());
+        assert_eq!(String::from("fd2deaaf152c7f1222c52fb2673f6192b375f0"),test_hash.to_filename());
     }
 
 
@@ -154,4 +208,5 @@ mod tests {
        }
 
     }
+
 }

@@ -1,16 +1,12 @@
 //!
 //!Blob 文件对象结构体
 //!
-//!
-//!
-//!
-//!
 
 use std::fmt::Display;
-
 use crate::errors::GitError;
 use crate::git::Metadata;
 use crate::git::tree::{TreeItem, TreeItemType};
+
 /// Git Object: blob
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Blob {
@@ -78,7 +74,7 @@ mod tests {
 
 
     use crate::git::hash::HashType;
-    use crate::git::id::ID;
+    use crate::git::object::Object;
     use crate::git::object::types::ObjectType;
     
     use crate::git::Metadata;
@@ -98,7 +94,12 @@ mod tests {
         //     buffer = buffer.replace(b"\r\n", b"\n");
         // }
 
-        let id = ID::from_vec(ObjectType::Blob, &mut buffer);
+
+        let id =  Object{
+            object_type: ObjectType::Blob,
+            contents:buffer.clone()
+        }.hash();
+       
         let size = buffer.len();
         let data = buffer;
 
@@ -135,12 +136,18 @@ mod tests {
 
         assert_eq!(
             "82352c3a6a7a8bd32011751699c7a3648d1b5d3c",
-            blob.meta.id.to_string()
+            blob.meta.id.to_plain_str()
         );
+
+
+        
         assert_eq!(16, blob.meta.size);
         assert_eq!(
             "# Hello Gitmega\n",
             String::from_utf8(blob.data).unwrap().as_str()
         );
     }
+
+
+
 }

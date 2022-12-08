@@ -29,9 +29,8 @@ use deflate::write::ZlibEncoder;
 use deflate::Compression;
 use flate2::read::ZlibDecoder;
 
-use self::id::ID;
-
-use self::hash::HashType;
+use self::hash::{HashType, Hash};
+use self::object::Object;
 use self::object::types::ObjectType;
 
 use super::errors::GitError;
@@ -46,6 +45,11 @@ pub const NL: &[u8] = &[0x00];
 
 /// In the git object store format, 0x0a is the line feed character in the commit object.
 // pub const LF: &[u8] = &[0x0A];
+
+
+
+/// **The Object Class Enum**<br>
+/// Merge the four basic classes into an enumeration structure for easy saving
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub enum ObjClass {
     BLOB(blob::Blob),
@@ -69,7 +73,7 @@ impl Display for ObjClass {
 pub struct Metadata {
     pub t: ObjectType,
     pub h: HashType,
-    pub id: ID,
+    pub id:Hash,
     pub size: usize,
     pub data: Vec<u8>,
 }
@@ -163,28 +167,46 @@ impl Metadata {
             "blob" => Ok(Metadata {
                 t: ObjectType::Blob,
                 h: HashType::Sha1,
-                id: ID::from_vec(ObjectType::Blob, &mut data),
+                id: Object {
+                    object_type: ObjectType::Blob,
+                    contents: data.clone(),
+                }
+                .hash(),
                 size,
                 data,
             }),
             "tree" => Ok(Metadata {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
-                id: ID::from_vec(ObjectType::Tree, &mut data),
+
+                id: Object {
+                    object_type: ObjectType::Tree,
+                    contents: data.clone(),
+                }
+                .hash(),
+
                 size,
                 data,
             }),
             "commit" => Ok(Metadata {
                 t: ObjectType::Commit,
                 h: HashType::Sha1,
-                id: ID::from_vec(ObjectType::Commit, &mut data),
+                id: Object {
+                    object_type: ObjectType::Commit,
+                    contents: data.clone(),
+                }
+                .hash(),
                 size,
                 data,
             }),
             "tag" => Ok(Metadata {
                 t: ObjectType::Tag,
                 h: HashType::Sha1,
-                id: ID::from_vec(ObjectType::Tag, &mut data),
+                id: Object {
+                    object_type: ObjectType::Tag,
+                    contents: data.clone(),
+                }
+                .hash(),
                 size,
                 data,
             }),
@@ -193,6 +215,8 @@ impl Metadata {
             )),
         }
     }
+
+
 }
 
 ///
