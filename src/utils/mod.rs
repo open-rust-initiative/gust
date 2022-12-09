@@ -128,6 +128,9 @@ pub fn get_offset(file: &mut File) -> io::Result<u64> {
     file.seek(SeekFrom::Current(0))
 }
 
+pub fn get_singnature(file: &mut File) -> io::Result<u64> {
+    file.seek(SeekFrom::End(0))
+}
 
 // Call reader() to process a zlib stream from a file.
 // Reset the file offset afterwards to the end of the zlib stream,
@@ -150,5 +153,12 @@ pub fn u32_vec(value: u32)->Vec<u8>{
     result.push((value >> 16 & 0xff) as u8  );
     result.push((value >> 8  & 0xff) as u8  );
     result.push((value       & 0xff) as u8  );
+    result
+}
+
+pub fn get_pack_raw_data(data:Vec<u8>) -> Vec<u8>{
+
+    let result = &data[12..data.len()-20];
+    let result =  result.to_vec();
     result
 }

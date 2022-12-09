@@ -19,6 +19,7 @@ use std::fs::File;
 use std::rc::Rc;
 
 mod cache;
+mod diff;
 pub mod decode;
 pub mod encode;
 //TODO:
@@ -42,7 +43,7 @@ pub mod encode;
 pub struct Pack {
     head: [u8; 4],
     version: u32,
-    number_of_objects: u32,
+    number_of_objects: usize,
     signature: Hash, 
     result: PackObjectCache,
 }
@@ -109,7 +110,7 @@ impl Pack {
         _pack.version = version;
 
         let object_num = utils::read_u32(pack_file).unwrap();
-        _pack.number_of_objects = object_num;
+        _pack.number_of_objects = object_num as usize;
 
         Ok(_pack)
     }
@@ -120,7 +121,7 @@ impl Pack {
         let object_num = idx.number_of_objects;
         _pack.number_of_objects = u32::try_from(object_num)
             .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
-            .unwrap();
+            .unwrap() as usize;
         let mut cache = PackObjectCache::default();
 
         for idx_item in idx.idx_items.iter() {
@@ -132,6 +133,15 @@ impl Pack {
         Ok(_pack)
     }
 
+    pub fn decode_raw_data(pack_file: &mut File) -> (Self,Vec<u8>){
+        let mut  raw_pack = Self::check_header(pack_file).unwrap();
+        let mut _raw:Vec<u8> =Vec::new();
+        pack_file.read_to_end(&mut _raw).unwrap();
+        let raw_info = _raw[.._raw.len()-20].to_vec();
+        let _hash = Hash::from_row(&_raw[_raw.len()-20..]);
+        raw_pack.signature = _hash;
+        (raw_pack,raw_info)
+    }
     /// Get the Object from File by the Give Offset<br>
     /// By the way , the cache can hold the fount object
     pub fn next_object(
@@ -280,9 +290,23 @@ mod tests {
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             decoded_pack.signature.to_plain_str()
         );
+        print!("{}",decoded_pack.get_object_number());
     }
     //"./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
 
+
+    #[test] 
+    fn test_read_raw_pack(){
+        let mut pack_file = File::open(&Path::new(
+            "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
+        ))
+        .unwrap();
+        let (raw_pack,raw_data) =  Pack::decode_raw_data(&mut pack_file);
+        assert_eq!(
+            "1d0e6c14760c956c173ede71cb28f33d921e232f",
+            raw_pack.signature.to_plain_str()
+        );
+    }
     ///Test the pack decode by the Idx File
     #[test]
     fn test_pack_idx_decode() {
