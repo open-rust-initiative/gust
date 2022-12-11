@@ -35,7 +35,8 @@ impl PackObjectCache{
 
   pub fn offset_object(&mut self,offset :u64) -> Option<&mut Rc<Object>>{
     
-    let _hash = self.offset_hash.get(&offset).unwrap();
+    let _hash = self.offset_hash.get(&offset)?;
+
     self.by_hash.get_mut(_hash)
 
   }
