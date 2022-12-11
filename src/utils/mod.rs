@@ -128,9 +128,6 @@ pub fn get_offset(file: &mut File) -> io::Result<u64> {
     file.seek(SeekFrom::Current(0))
 }
 
-pub fn get_singnature(file: &mut File) -> io::Result<u64> {
-    file.seek(SeekFrom::End(0))
-}
 
 // Call reader() to process a zlib stream from a file.
 // Reset the file offset afterwards to the end of the zlib stream,

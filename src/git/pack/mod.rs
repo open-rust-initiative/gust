@@ -301,7 +301,7 @@ mod tests {
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
         ))
         .unwrap();
-        let (raw_pack,raw_data) =  Pack::decode_raw_data(&mut pack_file);
+        let (raw_pack,_raw_data) =  Pack::decode_raw_data(&mut pack_file);
         assert_eq!(
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             raw_pack.signature.to_plain_str()
