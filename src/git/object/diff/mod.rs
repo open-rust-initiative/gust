@@ -100,7 +100,7 @@ impl Diff for DeltaDiff{
 }
 #[cfg(test)]
 mod tests{
-    use crate::git::pack::diff::DeltaDiff;
+    use super::DeltaDiff;
 
        //diff Test 
        #[test]

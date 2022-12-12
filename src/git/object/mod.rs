@@ -7,6 +7,7 @@ use super::hash::Hash;
 pub mod types;
 pub mod delta;
 pub mod base;
+pub mod diff;
 mod metadata;
 pub use metadata::Metadata;
 

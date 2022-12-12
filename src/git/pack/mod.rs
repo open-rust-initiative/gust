@@ -21,7 +21,7 @@ use std::fs::File;
 use std::rc::Rc;
 
 mod cache;
-mod diff;
+
 pub mod decode;
 pub mod encode;
 //TODO:
