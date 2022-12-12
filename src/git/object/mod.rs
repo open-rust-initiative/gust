@@ -12,11 +12,13 @@ pub use metadata::Metadata;
 
 
 //Object内存存储类型 
+///# Deprecate
 #[derive(Clone, Debug)]
 pub struct Object {
   pub object_type: ObjectType,
   pub contents: Vec<u8>,
 }
+#[allow(dead_code)]
 impl Object {
     /// object 的 hash转化函数
     pub fn hash(&self) -> Hash {

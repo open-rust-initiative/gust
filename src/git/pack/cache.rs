@@ -1,9 +1,8 @@
 //!	Build Cache Info for the decode packed object
 use std::collections::{BTreeMap, HashMap};
+use crate::git::object::Metadata;
+
 use super::super::hash::Hash;
-
-use super::super::object::Object;
-
 use std::rc::Rc;
 
 /// #### Build Cache Info for the decode packed object
@@ -11,7 +10,7 @@ use std::rc::Rc;
 /// the keys is `hash value` of The object 
 #[derive(Default,Clone)]
 pub struct PackObjectCache {
-  pub by_hash: BTreeMap<Hash, Rc<Object>>,
+  pub by_hash: BTreeMap<Hash, Rc<Metadata>>,
   pub by_offset: HashMap<Hash,u64>,
   pub offset_hash : BTreeMap<u64,Hash>,
 }
@@ -19,7 +18,7 @@ pub struct PackObjectCache {
 impl PackObjectCache{
 
   /// update cache by input object:`Rc<Object>` and the offset:`u64`
-  pub fn update(&mut self, object: Rc<Object> , offset : u64 ){
+  pub fn update(&mut self, object: Rc<Metadata> , offset : u64 ){
     let _hash = object.hash();
     self.by_hash.insert(_hash, object.clone());
     self.by_offset.insert(_hash,offset);
@@ -33,7 +32,7 @@ impl PackObjectCache{
   }
   
 
-  pub fn offset_object(&mut self,offset :u64) -> Option<&mut Rc<Object>>{
+  pub fn offset_object(&mut self,offset :u64) -> Option<&mut Rc<Metadata>>{
     
     let _hash = self.offset_hash.get(&offset)?;
 
@@ -41,7 +40,7 @@ impl PackObjectCache{
 
   }
   
-  pub fn hash_object(&mut self,hash :Hash) -> Option<&mut Rc<Object>>{
+  pub fn hash_object(&mut self,hash :Hash) -> Option<&mut Rc<Metadata>>{
     self.by_hash.get_mut(&hash)
   }
 }

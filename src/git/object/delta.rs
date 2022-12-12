@@ -5,8 +5,7 @@ use std::io::{ErrorKind, Read};
 use std::path::Path;
 use std::str::FromStr;
 use flate2::read::ZlibDecoder;
-use super::Hash;
-use super::Object;
+use super::{Hash, Metadata};
 use crate::utils;
 
 const INDEX_FILE_SUFFIX: &str = ".idx";
@@ -16,14 +15,11 @@ const COPY_SIZE_BYTES: u8 = 3;
 const COPY_ZERO_SIZE: usize = 0x10000;
 
 ///使用delta指令
-pub fn apply_delta(pack_file: &mut File, base: &Object) -> Result<Object, GitError> {
-    let Object {
-        object_type,
-        contents: ref base,
-    } = *base;
+pub fn apply_delta(pack_file: &mut File, base: &Metadata) -> Result<Metadata, GitError> {
+
     utils::read_zlib_stream_exact(pack_file, |delta| {
         let base_size = utils::read_size_encoding(delta)?;
-        if base.len() != base_size {
+        if base.size != base_size {
             return Err(GitError::DeltaObjError(
                 String::from_str("Incorrect base object length").unwrap(),
             ));
@@ -31,7 +27,7 @@ pub fn apply_delta(pack_file: &mut File, base: &Object) -> Result<Object, GitErr
 
         let result_size = utils::read_size_encoding(delta)?;
         let mut result = Vec::with_capacity(result_size);
-        while apply_delta_instruction(delta, base, &mut result)? {}
+        while apply_delta_instruction(delta, &base.data, &mut result)? {}
         if result.len() != result_size {
             return Err(GitError::DeltaObjError(
                 String::from_str("Incorrect object length").unwrap(),
@@ -39,10 +35,7 @@ pub fn apply_delta(pack_file: &mut File, base: &Object) -> Result<Object, GitErr
         }
 
         // The object type is the same as the base object
-        Ok(Object {
-            object_type,
-            contents: result,
-        })
+        Ok(Metadata::new(base.t,&result))
     })
 }
 
@@ -98,13 +91,14 @@ fn apply_delta_instruction<R: Read>(
     Ok(true)
 }
 
-pub fn read_object(hash: Hash) -> Result<Object, GitError> {
+pub fn read_object(hash: Hash) -> Result<Metadata, GitError> {
     let object = match read_unpacked_object(hash) {
         // Found in objects directory
         Ok(object) => object,
         // Not found in objects directory; look in packfiles
         Err(_err) => panic!("not found object"),
-    };
+    };  
+    
 
     let object_hash = object.hash();
     if object_hash != hash {
@@ -121,7 +115,7 @@ const OBJECTS_DIRECTORY: &str = ".git/objects";
 
 ///读出unpack 的Object
 #[allow(unused)]
-fn read_unpacked_object(hash: Hash) -> Result<Object, GitError> {
+fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
     use super::ObjectType::*;
 
     let hex_hash = hash.to_string();
@@ -157,10 +151,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Object, GitError> {
         return Err(GitError::DeltaObjError(format!("Incorrect object size")));
     }
 
-    Ok(Object {
-        object_type,
-        contents,
-    })
+    Ok(Metadata::new(object_type,&contents))
 }
 
 ///解析u8数组的十进制

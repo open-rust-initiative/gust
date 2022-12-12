@@ -39,25 +39,25 @@ impl Pack {
     /// ```
     pub fn encode(&mut self,meta_vec :Option<Vec<Metadata>>) -> Vec<u8> {
         use sha1::{Digest, Sha1};
-        let mut obj_vec = vec![];
+
+        let mut result: Vec<u8> = self.encode_header();
+       
         match meta_vec {
             Some(a) => {
-                obj_vec = a;
-                self.number_of_objects = obj_vec.len();
+                
+                self.number_of_objects = a.len();
+                for metadata in a {
+                    result.append(&mut metadata.convert_to_vec().unwrap());
+                }
             },
             None => {
                 for (key, value) in self.result.by_hash.iter() {
-                    obj_vec.push(value.to_metadata());
+                    result.append(&mut value.convert_to_vec().unwrap());
                 }
             },
         }
-        let mut result: Vec<u8> = self.encode_header();
-        for metadata in obj_vec {
-            result.append(&mut metadata.convert_to_vec().unwrap());
-        }
 
         let  checksum = Hash::new(&result);
-        
         self.signature = checksum.clone();
         result.append(&mut checksum.0.to_vec());
         result

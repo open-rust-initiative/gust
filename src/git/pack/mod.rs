@@ -10,8 +10,8 @@ use self::cache::PackObjectCache;
 
 use super::hash::Hash;
 use super::idx::Idx;
+use super::object::Metadata;
 use super::object::delta::*;
-use super::object::Object;
 
 use crate::errors::GitError;
 use crate::git::pack::decode::ObjDecodedMap;
@@ -150,7 +150,7 @@ impl Pack {
         pack_file: &mut File,
         offset: u64,
         cache: &mut PackObjectCache,
-    ) -> Result<Rc<Object>, GitError> {
+    ) -> Result<Rc<Metadata>, GitError> {
         use super::object::types::PackObjectType::{self, *};
         utils::seek(pack_file, offset)?;
         let (object_type, size) = utils::read_type_and_size(pack_file)?;
@@ -167,10 +167,7 @@ impl Pack {
                         "Incorrect object size"
                     )));
                 }
-                Ok(Object {
-                    object_type,
-                    contents,
-                })
+                Ok(Metadata::new(object_type,&contents))
             }),
             // Delta; base object is at an offset in the same packfile
             Some(OffsetDelta) => {

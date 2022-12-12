@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 use crate::errors::GitError;
 use crate::git::hash::HashType;
-use crate::git::object::Object;
 use anyhow::Context;
 use bstr::ByteSlice;
 use deflate::Compression;
@@ -129,52 +128,10 @@ impl Metadata {
         let mut data = decoded[size_index + 1..].to_vec();
 
         match String::from_utf8(t.to_vec()).unwrap().as_str() {
-            "blob" => Ok(Metadata {
-                t: ObjectType::Blob,
-                h: HashType::Sha1,
-                id: Object {
-                    object_type: ObjectType::Blob,
-                    contents: data.clone(),
-                }
-                .hash(),
-                size,
-                data,
-            }),
-            "tree" => Ok(Metadata {
-                t: ObjectType::Tree,
-                h: HashType::Sha1,
-
-                id: Object {
-                    object_type: ObjectType::Tree,
-                    contents: data.clone(),
-                }
-                .hash(),
-
-                size,
-                data,
-            }),
-            "commit" => Ok(Metadata {
-                t: ObjectType::Commit,
-                h: HashType::Sha1,
-                id: Object {
-                    object_type: ObjectType::Commit,
-                    contents: data.clone(),
-                }
-                .hash(),
-                size,
-                data,
-            }),
-            "tag" => Ok(Metadata {
-                t: ObjectType::Tag,
-                h: HashType::Sha1,
-                id: Object {
-                    object_type: ObjectType::Tag,
-                    contents: data.clone(),
-                }
-                .hash(),
-                size,
-                data,
-            }),
+            "blob" => Ok(Metadata::new( ObjectType::Blob, &data)),
+            "tree" => Ok(Metadata::new( ObjectType::Tree, &data)),
+            "commit" => Ok(Metadata::new( ObjectType::Commit, &data)),
+            "tag" => Ok(Metadata::new( ObjectType::Tag, &data)),
             _ => Err(GitError::InvalidObjectType(
                 String::from_utf8(t.to_vec()).unwrap(),
             )),

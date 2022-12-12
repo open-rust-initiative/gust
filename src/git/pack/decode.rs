@@ -5,7 +5,7 @@ use super::super::object as obj;
 use obj::Metadata;
 use obj::base::ObjClass;
 use obj::base::{blob,commit,tag,tree};
-use crate::git::hash::{Hash,HashType};
+use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
 
 use super::cache::PackObjectCache;
@@ -22,16 +22,10 @@ impl ObjDecodedMap {
     #[allow(unused)]
     pub fn update_from_cache(&mut self, cache:& PackObjectCache) {
         for (key, value) in cache.by_hash.iter() {
-            let metadata = 
-                Metadata {
-                    t: value.object_type ,  
-                    h: HashType::Sha1,
-                    id: value.hash(),
-                    size: value.contents.len(),
-                    data:value.contents.to_vec(),
-                };
+            let metadata = Metadata::new(value.t,&value.data);
+
             
-            let _obj:ObjClass=match value.object_type {// 交给各自的new函数,通过metadata来解码
+            let _obj:ObjClass=match value.t {// 交给各自的new函数,通过metadata来解码
                 ObjectType::Blob => ObjClass::BLOB(blob::Blob::new(metadata)),
                 ObjectType::Commit => ObjClass::COMMIT(commit::Commit::new(metadata) ),
                 ObjectType::Tag => ObjClass::TAG(tag::Tag::new(metadata)),
