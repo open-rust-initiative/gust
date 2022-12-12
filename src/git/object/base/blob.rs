@@ -4,23 +4,24 @@
 
 use std::fmt::Display;
 use crate::errors::GitError;
-use crate::git::Metadata;
-use crate::git::tree::{TreeItem, TreeItemType};
+use super::Metadata;
+use super::tree::{*};
 
 /// Git Object: blob
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Blob {
     pub meta: Metadata,
-    pub data: Vec<u8>,
+   
 }
 
 ///
 impl Blob {
+
+
     #[allow(unused)]
     pub fn new(metadata: Metadata) -> Self {
         Self {
             meta: metadata.clone(),
-            data: metadata.data,
         }
     }
 
@@ -49,7 +50,7 @@ impl Display for Blob{
     ///为了节省输出空间 暂时只输出第一行内容
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let mut print_data:Vec<u8> = vec![];
-        for value in self.data.iter(){
+        for value in self.meta.data.iter(){
             if *value != b'\n'{
                 print_data.push(value.clone());
             }else {
@@ -57,7 +58,7 @@ impl Display for Blob{
             }
         }
         
-        writeln!(f,"size:{}",self.data.len()).unwrap();
+        writeln!(f,"size:{}",self.meta.data.len()).unwrap();
         writeln!(f,"meta data size:{}",self.meta.size).unwrap();
         writeln!(f, "Type: Blob\n{}", BString::new(print_data) ).unwrap();
         writeln!(f, "Only Show the first line of the File...")
@@ -73,11 +74,10 @@ mod tests {
     use std::path::{Path, PathBuf};
 
 
-    use crate::git::hash::HashType;
-    use crate::git::object::Object;
-    use crate::git::object::types::ObjectType;
     
-    use crate::git::Metadata;
+    use crate::git::object::Metadata;
+    use crate::git::object::types::ObjectType;
+
 
     use super::Blob;
     ///
@@ -95,21 +95,12 @@ mod tests {
         // }
 
 
-        let id =  Object{
-            object_type: ObjectType::Blob,
-            contents:buffer.clone()
-        }.hash();
+
        
-        let size = buffer.len();
+    
         let data = buffer;
 
-        let meta = crate::git::Metadata {
-            t: ObjectType::Blob,
-            h: HashType::Sha1,
-            id,
-            size,
-            data,
-        };
+        let meta = Metadata::new(ObjectType::Blob,&data);
 
         meta.write_to_file("/tmp".to_string())
             .expect("Write error!");
@@ -131,7 +122,7 @@ mod tests {
 
         let blob = Blob {
             meta: meta.clone(),
-            data: meta.data,
+            
         };
 
         assert_eq!(
@@ -144,7 +135,7 @@ mod tests {
         assert_eq!(16, blob.meta.size);
         assert_eq!(
             "# Hello Gitmega\n",
-            String::from_utf8(blob.data).unwrap().as_str()
+            String::from_utf8(blob.meta.data).unwrap().as_str()
         );
     }
 

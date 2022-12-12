@@ -3,7 +3,8 @@ use std::fs::File;
 use std::io::Write;
 use std::str::FromStr;
 use bstr::ByteSlice;
-use crate::git::{Metadata};
+
+use super::super::object::Metadata;
 use crate::utils;
 use super::super::hash::Hash;
 use super::Pack;
@@ -164,7 +165,7 @@ impl Pack {
         Pack::pack_loose_files(loose_vec,loose_root_path,target_path)
     }
 
-    /// 找到pack文件 //TODO: 目前只支持单个文件
+    /// 找到pack文件 //TODO: 目前只支持单个文件 ,之后将考虑多文件
     fn find_pack_file(object_dir:&str)-> File{
         let mut object_root = std::path::PathBuf::from(object_dir) ;
         let mut pack_file_name = String::new() ;
@@ -245,7 +246,7 @@ mod tests {
     #[test]
     fn test_a_real_pack_de_en() {
         let mut pack_file = File::open(&Path::new(
-            "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
+            "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
         ))
         .unwrap();
         use super::super::Pack;

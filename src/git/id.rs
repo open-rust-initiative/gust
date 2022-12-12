@@ -31,7 +31,7 @@ impl ID {
 
     /// Return the last 18 characters of the ID for the object name.
     #[allow(unused)]
-    pub(crate) fn to_filename(&self) -> String {//TODO 
+    pub(crate) fn to_filename(&self) -> String { 
         self.hash.as_str()[2..].to_string()
     }
 

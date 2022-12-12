@@ -1,3 +1,11 @@
+//!
+//! TODO:
+//!  # 关于diff 的相关讨论
+//! 1. 对于diff算法的选择  在myers与patience对比下明显myers更好
+//! 对于 imara-diff 库， 因为包装归于
+//! 
+//! 
+//! 
 use diffs::Diff;
 #[allow(dead_code)]
 #[derive(Debug,Default)]
@@ -26,7 +34,7 @@ impl DeltaDiff{
 
 #[derive(Debug,Clone, Copy)]
 enum Optype {
-    DATA, //插入的数据
+    DATA, // 插入的数据
     COPY, // 数据复制
 }
 #[allow(dead_code)]

@@ -7,12 +7,11 @@
 use std::fmt::Display;
 
 use bstr::ByteSlice;
-
+use super::super::Hash;
 use crate::errors::GitError;
-use crate::git::Metadata;
+use super::Metadata;
 use crate::git::object::types::ObjectType;
-use crate::git::hash::HashType;
-use crate::git::Hash;
+
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum TreeItemType {
@@ -25,7 +24,6 @@ pub enum TreeItemType {
 
 use colored::Colorize;
 
-use super::object::Object;
 impl Display for TreeItemType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let _print = match *self {
@@ -152,16 +150,7 @@ impl Tree {
         }
 
         Ok(
-            Metadata {
-                t: ObjectType::Tree,
-                h: HashType::Sha1,
-                id:Object{
-                    object_type: ObjectType::Tree,
-                    contents:data.clone()
-                }.hash(),
-                size: data.len(),
-                data,
-            },
+            Metadata::new( ObjectType::Tree, &data)
         )
     }
 
@@ -180,8 +169,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::ObjectType;
-    use crate::git::Metadata;
-    use crate::git::blob::Blob;
+    use super::Metadata;
+    use super::super::blob::Blob;
     use crate::git::hash::Hash;
     use crate::git::hash::HashType;
 
@@ -204,12 +193,11 @@ mod tests {
 
         let blob = Blob {
             meta: meta.clone(),
-            data: meta.data,
         };
 
         assert_eq!(
             "# Hello Gitmega\n",
-            String::from_utf8(blob.clone().data).unwrap().as_str()
+            String::from_utf8(blob.meta.data.clone()).unwrap().as_str()
         );
 
         let item = blob
@@ -244,7 +232,6 @@ mod tests {
 
         let blob_gitmega = Blob {
             meta: meta_gitmega.clone(),
-            data: meta_gitmega.data,
         };
 
         let item_gitmega = blob_gitmega
@@ -259,7 +246,6 @@ mod tests {
 
         let blob_gust = Blob {
             meta: meta_gust.clone(),
-            data: meta_gust.data,
         };
 
         let item_gust = blob_gust

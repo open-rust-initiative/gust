@@ -4,6 +4,8 @@ use std::convert::TryInto;
 use std::io::Read;
 use std::path::Path;
 
+use colored::Colorize;
+
 use self::cache::PackObjectCache;
 
 use super::hash::Hash;
@@ -172,6 +174,7 @@ impl Pack {
             }),
             // Delta; base object is at an offset in the same packfile
             Some(OffsetDelta) => {
+                
                 let delta_offset = utils::read_offset_encoding(pack_file)?;
                 let base_offset = offset.checked_sub(delta_offset).ok_or_else(|| {
                     GitError::InvalidObjectInfo(format!("Invalid OffsetDelta offset"))
@@ -188,7 +191,7 @@ impl Pack {
                 Ok(objs)
             }
             // Delta; base object is given by a hash outside the packfile
-            //TODO : This Type need to be completed
+            //TODO : This Type need to be completed ，对应多文件的todo
             Some(HashDelta) => {
                 let hash = utils::read_hash(pack_file)?;
                 let object;
@@ -292,7 +295,17 @@ mod tests {
         );
         print!("{}",decoded_pack.get_object_number());
     }
-    //"./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
+
+    #[test]
+    fn test_parse_simple_pack2() {
+        let decoded_pack = Pack::decode_file("./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack");
+        assert_eq!(
+            "8c81e90db37ef77494efe4f31daddad8b494e099",
+            decoded_pack.signature.to_plain_str()
+        );
+        print!("{}",decoded_pack.get_object_number());
+    }
+
 
 
     #[test] 

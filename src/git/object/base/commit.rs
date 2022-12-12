@@ -6,11 +6,10 @@
 use std::fmt::Display;
 use bstr::ByteSlice;
 use crate::errors::GitError;
-use super::hash::{Hash, HashType};
-use super::object::types::ObjectType;
-use super::object::Object;
+use crate::git::object::types::ObjectType;
+use super::super::Hash;
 use super::Metadata;
-use crate::git::sign::AuthorSign;
+use super::sign::AuthorSign;
 
 /// Git Object: commit
 #[allow(unused)]
@@ -127,17 +126,7 @@ impl Commit {
         data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
         data.extend_from_slice(self.message.as_bytes());
 
-        Ok(Metadata {
-            t: ObjectType::Commit,
-            h: HashType::Sha1,
-            id: Object {
-                object_type: ObjectType::Commit,
-                contents: data.clone(),
-            }
-            .hash(),
-            size: data.len(),
-            data,
-        })
+        Ok(Metadata::new(ObjectType::Commit, &data))
     }
 }
 
@@ -161,10 +150,11 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
-
+    use super::Metadata;
+    use super::AuthorSign;
     use crate::git::hash::Hash;
-    use crate::git::sign::AuthorSign;
-    use crate::git::Metadata;
+    use crate::git::object::types::ObjectType;
+
 
     use super::Commit;
 
@@ -229,13 +219,7 @@ mod tests {
     ///
     #[test]
     fn test_commit_write_to_file() {
-        let meta = Metadata {
-            t: super::ObjectType::Commit,
-            h: super::HashType::Sha1,
-            size: 0,
-            id: Hash::default(),
-            data: vec![],
-        };
+        let meta = Metadata::new(ObjectType::Commit, &vec![]) ;
 
         let author = AuthorSign {
             t: "author".to_string(),

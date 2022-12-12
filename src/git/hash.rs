@@ -27,7 +27,7 @@ pub struct Hash(pub [u8; HASH_BYTES]);
 
 /// Display trait for Hash type
 use colored::Colorize;
-use super::object::{Object, types::ObjectType};
+use super::object::{ types::ObjectType, Metadata};
 impl Display for Hash {
     // Hash 值打印的彩色与16进制格式
     /// # !Attention 
@@ -53,21 +53,28 @@ impl Hash {
     }
 
     /// Create Hash from the Object 
-    pub fn from_obj(obj:&Object) -> Hash{
-        let mut h = Sha1::new();
-        h.update(match obj.object_type {
-          ObjectType::Commit => COMMIT_OBJECT_TYPE,
-          ObjectType::Tree => TREE_OBJECT_TYPE,
-          ObjectType::Blob => BLOB_OBJECT_TYPE,
-          ObjectType::Tag => TAG_OBJECT_TYPE,
-        });
-        h.update(b" ");
-        h.update(obj.contents.len().to_string());
-        h.update(b"\0");
-        h.update(&obj.contents);
-        let hash_re = h.finalize();
-        let result = <[u8; HASH_BYTES]>::from(hash_re);
-      Hash(result)
+    pub fn from_meta(obj:&Metadata) -> Hash{
+        match obj.h {
+            // 判断是什么hash类型 目前只支持sha1
+            HashType::Sha1 => {
+                let mut h = Sha1::new();
+                h.update(match obj.t {
+                  ObjectType::Commit => COMMIT_OBJECT_TYPE,
+                  ObjectType::Tree => TREE_OBJECT_TYPE,
+                  ObjectType::Blob => BLOB_OBJECT_TYPE,
+                  ObjectType::Tag => TAG_OBJECT_TYPE,
+                });
+                h.update(b" ");
+                h.update(obj.data.len().to_string());
+                h.update(b"\0");
+                h.update(&obj.data);
+                let hash_re = h.finalize();
+                let result = <[u8; HASH_BYTES]>::from(hash_re);
+                Hash(result)
+            },
+        }
+      
+      
     }
     
     ///解析出16进制数字0-f

@@ -3,15 +3,16 @@
 //!
 //!
 
+use bstr::ByteSlice;
 
-use bstr:: ByteSlice;
+use super::Metadata;
+use super::sign::AuthorSign;
 use crate::errors::GitError;
-use crate::git::hash::{HashType,Hash};
+use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
-use crate::git::sign::AuthorSign;
-use crate::git::Metadata;
-use std::fmt::{Display};
-use super::object::Object;
+
+use std::fmt::Display;
+
 
 /// Git Object: tag
 #[allow(unused)]
@@ -113,18 +114,7 @@ impl Tag {
         data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
         data.extend_from_slice(self.message.as_bytes());
 
-        Ok(Metadata {
-            t: ObjectType::Tag,
-            h: HashType::Sha1,
-            
-            id: Object{
-                object_type: ObjectType::Tag,
-                contents:data.clone()
-            }.hash(),
-        
-            size: data.len(),
-            data,
-        })
+        Ok(Metadata::new(ObjectType::Tag, &data))
     }
 
     ///
@@ -149,9 +139,13 @@ mod tests {
     use std::path::PathBuf;
     use std::str::FromStr;
     use crate::git::hash::Hash;
-    use crate::git::sign::AuthorSign;
-    use crate::git::Metadata;
-    use crate::git::ObjectType;
+    use crate::git::hash::HashType;
+    use crate::git::object::types::ObjectType;
+
+    use super::AuthorSign;
+    use super::Metadata;
+
+    
 
     use super::Tag;
 
@@ -202,7 +196,7 @@ mod tests {
     fn test_output_meat() {
         let meta = Metadata {
             t: ObjectType::Tag,
-            h: crate::git::HashType::Sha1,
+            h: HashType::Sha1,
             id: Hash::from_str("df1087c478c8d337cb587b897e86f2455e2687ed").unwrap() ,
             size: 155,
             data: vec![
@@ -226,14 +220,9 @@ mod tests {
     ///
     #[test]
     fn test_tag_write_to_file() {
-        use super::HashType;
-        let meta = Metadata {
-            t: ObjectType::Tag,
-            h: HashType::Sha1,
-            size: 0,
-            id: Hash::default(),
-            data: vec![],
-        };
+
+        let meta = Metadata ::new(ObjectType::Tag, &vec![]);
+
 
         let tagger = AuthorSign {
             t: "tagger".to_string(),

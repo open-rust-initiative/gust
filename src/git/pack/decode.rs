@@ -1,13 +1,13 @@
 //!	Decode pack file by the `ObjDecodedMap`
 use std::fmt::{Display, self};
 use std::{collections::HashMap, rc::Rc};
-use crate::git::Metadata;
+use super::super::object as obj;
+use obj::Metadata;
+use obj::base::ObjClass;
+use obj::base::{blob,commit,tag,tree};
 use crate::git::hash::{Hash,HashType};
-
 use crate::git::object::types::ObjectType;
 
-use crate::git::ObjClass;
-use super::super::{blob,commit,tag,tree};
 use super::cache::PackObjectCache;
 use colored::Colorize;
 ///!对取出的object字段进行进一步解码与包装
