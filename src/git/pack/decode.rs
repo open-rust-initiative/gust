@@ -30,6 +30,7 @@ impl ObjDecodedMap {
                 ObjectType::Commit => ObjClass::COMMIT(commit::Commit::new(metadata) ),
                 ObjectType::Tag => ObjClass::TAG(tag::Tag::new(metadata)),
                 ObjectType::Tree =>  ObjClass::TREE(tree::Tree::new(metadata)),
+                _ => panic!("src/git/pack/decode.rs: 33 invalid type in encoded metadata"),
             }; 
             self._map_hash.insert(key.clone(),Rc::new(_obj));
         }

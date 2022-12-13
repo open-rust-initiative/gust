@@ -18,7 +18,7 @@ const COPY_ZERO_SIZE: usize = 0x10000;
 pub fn apply_delta(pack_file: &mut File, base: &Metadata) -> Result<Metadata, GitError> {
 
     utils::read_zlib_stream_exact(pack_file, |delta| {
-        let base_size = utils::read_size_encoding(delta)?;
+        let base_size = utils::read_size_encoding(delta).unwrap();
         if base.size != base_size {
             return Err(GitError::DeltaObjError(
                 String::from_str("Incorrect base object length").unwrap(),

@@ -167,6 +167,7 @@ mod tests {
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
+    use std::vec;
 
     use super::ObjectType;
     use super::Metadata;
@@ -209,7 +210,8 @@ mod tests {
                 h: HashType::Sha1,
                 id: Hash::default(),
                 size: 0,
-                data: vec![]
+                data: vec![],
+                delta_header:vec![],
             },
             tree_items: vec![item],
         };
@@ -258,7 +260,8 @@ mod tests {
                 h: HashType::Sha1,
                 id: Hash::default(),
                 size: 0,
-                data: vec![]
+                data: vec![],
+                delta_header: vec![],
             },
             tree_items: vec![item_gitmega, item_gust],
         };

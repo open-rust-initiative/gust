@@ -138,6 +138,7 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
+    use std::vec;
     use crate::git::hash::Hash;
     use crate::git::hash::HashType;
     use crate::git::object::types::ObjectType;
@@ -210,6 +211,7 @@ mod tests {
                 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 32, 111, 102, 32, 116,
                 104, 101, 32, 99, 108, 105, 10,
             ],
+            delta_header:vec![],
         };
 
         let tag = Tag::new(meta);

@@ -61,7 +61,7 @@ pub fn read_size_encoding<R: Read>(stream: &mut R) -> io::Result<usize> {
     let mut value = 0;
     let mut length = 0;
     loop {
-        let (byte_value, more_bytes) = read_var_int_byte(stream)?;
+        let (byte_value, more_bytes) = read_var_int_byte(stream).unwrap();
         value |= (byte_value as usize) << length;
         if !more_bytes {
             return Ok(value);
@@ -70,6 +70,24 @@ pub fn read_size_encoding<R: Read>(stream: &mut R) -> io::Result<usize> {
         length += VAR_INT_ENCODING_BITS;
     }
 }
+pub fn write_size_encoding(number:usize) -> Vec<u8>{
+    let mut num = vec![];
+    let mut number = number ;
+
+    loop{
+        if number >>7 >0{
+            num.push((number & 0x7f)  as u8 | 0x80 ) ;
+        }else{
+            num.push((number & 0x7f)  as u8 ) ;
+            break;
+        }
+        
+        number >>= 7;
+    }
+
+    num
+}
+
 ///读取Object的前几个字段并解析出
 pub fn read_type_and_size<R: Read>(stream: &mut R) -> io::Result<(u8, usize)> {
     // Object type and uncompressed pack data size
@@ -92,16 +110,40 @@ pub fn read_offset_encoding<R: Read>(stream: &mut R) -> io::Result<u64> {
     // And just for kicks, the bytes are ordered from *most* to *least* significant.
     let mut value = 0;
     loop {
+        
         let (byte_value, more_bytes) = read_var_int_byte(stream)?;
+       
         value = (value << VAR_INT_ENCODING_BITS) | byte_value as u64;
         if !more_bytes {
+            
             return Ok(value);
         }
 
         value += 1;
     }
 }
+///
+/// # Example
+/// 
+/// ```
+/// let ns :u64 = 0x4af;
+/// let re = write_offset_encoding(ns);
+/// println!("{:?}",re);
+/// ```
+/// 
+pub fn write_offset_encoding(number :u64) ->Vec<u8>{    
+    let mut num = vec![];
+    let mut number = number ;
+    num.push((number & 0x7f) as u8);
+    number >>=7;
+    while number >0{
+        num.push(((number & 0x7f) - 1)  as u8 | 0x80 ) ;
+        number >>= 7;
+    }
 
+    num.reverse();
+    num
+}
 pub fn read_partial_int<R: Read>(
     stream: &mut R,
     bytes: u8,
@@ -117,6 +159,8 @@ pub fn read_partial_int<R: Read>(
     }
     Ok(value)
 }
+
+
 
 /// 返回文件偏移后的指针
 pub fn seek(file: &mut File, offset: u64) -> io::Result<()> {
@@ -158,4 +202,16 @@ pub fn get_pack_raw_data(data:Vec<u8>) -> Vec<u8>{
     let result = &data[12..data.len()-20];
     let result =  result.to_vec();
     result
+}
+
+#[cfg(test)]
+mod test{
+    #[test]
+    fn test_write_encode_size(){
+     let ns :u64 = 966;
+     // 0 1e
+     let re = super::write_offset_encoding(ns);
+     println!("{:?}",re);
+    }
+    
 }

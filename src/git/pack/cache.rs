@@ -19,7 +19,7 @@ impl PackObjectCache{
 
   /// update cache by input object:`Rc<Object>` and the offset:`u64`
   pub fn update(&mut self, object: Rc<Metadata> , offset : u64 ){
-    let _hash = object.hash();
+    let _hash = object.id;
     self.by_hash.insert(_hash, object.clone());
     self.by_offset.insert(_hash,offset);
     self.offset_hash.insert(offset, _hash);

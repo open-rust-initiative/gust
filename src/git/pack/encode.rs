@@ -1,6 +1,7 @@
 //! encode pack file ,and create file 
 use std::fs::File;
 use std::io::Write;
+use std::rc::Rc;
 use std::str::FromStr;
 use bstr::ByteSlice;
 
@@ -40,17 +41,23 @@ impl Pack {
     pub fn encode(&mut self,meta_vec :Option<Vec<Metadata>>) -> Vec<u8> {
         use sha1::{Digest, Sha1};
 
-        let mut result: Vec<u8> = self.encode_header();
-       
+        let mut result: Vec<u8>;
+        let mut offset = 12;
         match meta_vec {
+            // 有metadata的情况下
             Some(a) => {
                 
                 self.number_of_objects = a.len();
+                result = self.encode_header();
                 for metadata in a {
                     result.append(&mut metadata.convert_to_vec().unwrap());
+                    self.result.update(Rc::new(metadata), offset);
+                    println!("Decode offset:{}",offset);
+                    offset  = result.len() as u64;
                 }
             },
             None => {
+                result = self.encode_header();
                 for (key, value) in self.result.by_hash.iter() {
                     result.append(&mut value.convert_to_vec().unwrap());
                 }

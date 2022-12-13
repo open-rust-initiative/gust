@@ -63,6 +63,7 @@ impl Hash {
                   ObjectType::Tree => TREE_OBJECT_TYPE,
                   ObjectType::Blob => BLOB_OBJECT_TYPE,
                   ObjectType::Tag => TAG_OBJECT_TYPE,
+                  _ => panic!("can put compute the delta hash value"),
                 });
                 h.update(b" ");
                 h.update(obj.data.len().to_string());

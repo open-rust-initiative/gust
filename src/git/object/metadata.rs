@@ -23,6 +23,7 @@ pub struct Metadata {
     pub id:Hash,
     pub size: usize,
     pub data: Vec<u8>,
+    pub delta_header :Vec<u8>,
 }
 
 /// Implement function for Metadata
@@ -39,6 +40,7 @@ impl Metadata {
             id:Hash::default(),
             size: data.len(),
             data: data.to_vec(),
+            delta_header:vec![],
         };
         // compute hash value
         _metadata.id = _metadata.hash();
@@ -93,7 +95,16 @@ impl Metadata {
         } else {
             compressed_data.push(0);
         }
+        match self.t {
 
+            ObjectType::OffsetDelta => {
+                compressed_data.append(&mut self.delta_header.clone());
+            },
+            ObjectType::HashDelta => {
+                compressed_data.append(&mut self.delta_header.clone());
+            }
+            _ =>{}
+        }
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
         encoder.write_all(&self.data).expect("Write error!");
         compressed_data.append(&mut encoder.finish().expect("Failed to finish compression!"));
@@ -139,4 +150,10 @@ impl Metadata {
     }
 
 
+    pub fn change_to_delta(&mut self ,types:ObjectType, changed:Vec<u8>,header:Vec<u8>) {
+        self.t = types;
+        self.data = changed;
+        self.size = self.data.len();
+        self.delta_header  =header;
+    }
 }

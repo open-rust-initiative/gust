@@ -3,9 +3,6 @@
 use std::convert::TryInto;
 use std::io::Read;
 use std::path::Path;
-
-use colored::Colorize;
-
 use self::cache::PackObjectCache;
 
 use super::hash::Hash;
@@ -151,15 +148,14 @@ impl Pack {
         offset: u64,
         cache: &mut PackObjectCache,
     ) -> Result<Rc<Metadata>, GitError> {
-        use super::object::types::PackObjectType::{self, *};
+        use super::object::types::ObjectType;
         utils::seek(pack_file, offset)?;
-        let (object_type, size) = utils::read_type_and_size(pack_file)?;
-        let object_types = PackObjectType::type_number2_type(object_type);
+        let (type_num, size) = utils::read_type_and_size(pack_file)?;
 
         //Get the Object according to the Types Enum
-        let object = match object_types {
+        let object = match type_num {
             // Undelta representation
-            Some(Base(object_type)) => utils::read_zlib_stream_exact(pack_file, |decompressed| {
+            1..=4  => utils::read_zlib_stream_exact(pack_file, |decompressed| {
                 let mut contents = Vec::with_capacity(size);
                 decompressed.read_to_end(&mut contents)?;
                 if contents.len() != size {
@@ -167,10 +163,10 @@ impl Pack {
                         "Incorrect object size"
                     )));
                 }
-                Ok(Metadata::new(object_type,&contents))
+                Ok(Metadata::new(ObjectType::number_type(type_num),&contents))
             }),
             // Delta; base object is at an offset in the same packfile
-            Some(OffsetDelta) => {
+            6 => {
                 
                 let delta_offset = utils::read_offset_encoding(pack_file)?;
                 let base_offset = offset.checked_sub(delta_offset).ok_or_else(|| {
@@ -184,12 +180,13 @@ impl Pack {
                     Pack::next_object(pack_file, base_offset, cache)?
                 };
                 utils::seek(pack_file, offset)?;
-                let objs = apply_delta(pack_file, &base_object)?;
+                let base_obj = base_object.as_ref();
+                let objs = apply_delta(pack_file, base_obj)?;
                 Ok(objs)
             }
             // Delta; base object is given by a hash outside the packfile
             //TODO : This Type need to be completed ，对应多文件的todo
-            Some(HashDelta) => {
+            7 => {
                 let hash = utils::read_hash(pack_file)?;
                 let object;
                 let base_object = if let Some(object) = cache.hash_object(hash) {
@@ -200,7 +197,7 @@ impl Pack {
                 };
                 apply_delta(pack_file, &base_object)
             }
-            None => return Err(GitError::InvalidObjectType(object_type.to_string())),
+            _ => return Err(GitError::InvalidObjectType(ObjectType::number_type(type_num).to_string())),
         }?;
 
         // //Debug Code: Print the hash & type of the parsed object
@@ -210,7 +207,7 @@ impl Pack {
         // }
 
         let obj = Rc::new(object);
-        cache.update(obj.clone(), offset);
+        cache.update(Rc::clone(&obj), offset);
         Ok(obj)
     }
 
