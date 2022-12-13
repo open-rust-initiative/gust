@@ -193,9 +193,9 @@ mod tests{
             let mut _pack = Pack::default();
             let pack_file_data =_pack.encode( Some(meta_vec));
             //_pack
-            let mut file = std::fs::File::create("delta.pack").expect("create failed");
+            let mut file = std::fs::File::create("delta_ofs.pack").expect("create failed");
             file.write_all(pack_file_data.as_bytes()).expect("write failed");
-            let a = Pack::decode_file("delta.pack");
+            let a = Pack::decode_file("delta_ofs.pack");
 
 
         }
@@ -225,9 +225,9 @@ mod tests{
             let mut _pack = Pack::default();
             let pack_file_data =_pack.encode( Some(meta_vec));
             //_pack
-            let mut file = std::fs::File::create("delta.pack").expect("create failed");
+            let mut file = std::fs::File::create("delta_ref.pack").expect("create failed");
             file.write_all(pack_file_data.as_bytes()).expect("write failed");
-            let a = Pack::decode_file("delta.pack");
+            let a = Pack::decode_file("delta_ref.pack");
 
             let mut result = ObjDecodedMap::default();
             result.update_from_cache(&a.get_cache());
