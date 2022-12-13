@@ -1,20 +1,15 @@
-use std::fs::File;
-use std::fs::create_dir_all;
-use std::io::BufReader;
-use std::io::Read;
-use std::io::Write;
+use std::fs::{File,create_dir_all};
+use std::io::{BufReader,Read,Write};
 use std::path::PathBuf;
-
-use crate::errors::GitError;
-use crate::git::hash::HashType;
 use anyhow::Context;
 use bstr::ByteSlice;
-use deflate::Compression;
-use deflate::write::ZlibEncoder;
+use deflate::{Compression,write::ZlibEncoder};
 use flate2::read::ZlibDecoder;
+
 use super::Hash;
 use super::ObjectType;
-
+use crate::errors::GitError;
+use crate::git::hash::HashType;
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {
@@ -149,7 +144,8 @@ impl Metadata {
         }
     }
 
-
+    /// Change the base object to the delta object , 
+    /// including : ref-object ofs-object
     pub fn change_to_delta(&mut self ,types:ObjectType, changed:Vec<u8>,header:Vec<u8>) {
         self.t = types;
         self.data = changed;

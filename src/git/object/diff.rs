@@ -6,16 +6,12 @@
 //! 
 //! 每次的复制 字节大小为u8 *4 ,size 为u8*3
 //! 
-
 use std::vec;
-
 use crate::utils;
-
 use super::Metadata;
-use super::types::ObjectType;
-
 use diffs::Diff;
 use diffs::myers;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 struct DeltaDiff{
@@ -27,10 +23,10 @@ struct DeltaDiff{
    ssam:usize,
    ssam_r:f64,
  
-
 }
 
 impl DeltaDiff{
+    /// Diff the two Metadata , Type should be same. 
     pub fn new (old:Metadata,new:Metadata) -> Self{
         assert_eq!(old.t,new.t);
         let mut _new = DeltaDiff{
@@ -59,14 +55,13 @@ impl DeltaDiff{
 
         // 编码格式
         for op in &self.ops {
-           result.append(&mut self.decode_OP(op)) ;
+           result.append(&mut self.decode_op(op)) ;
         }
         result
 
     }
 
-
-    fn decode_OP(&self,op:&DeltaOp) -> Vec<u8>{
+    fn decode_op(&self,op:&DeltaOp) -> Vec<u8>{
         let mut  op_data=vec![];
         match op.ins {
             Optype::DATA => {
@@ -107,7 +102,35 @@ impl DeltaDiff{
     }
 
 }
+impl Diff for DeltaDiff{
+    type Error = ();
+    /// offset < 2^32
+    /// len < 2^24
+    fn equal(&mut self, _old: usize, _new: usize, _len: usize) -> Result<(), Self::Error> {
 
+        // 暂时未支持长度过大时的拆分情况
+        assert!( _old < (1<<33) );
+        assert!( _len < (1<<25) );
+        self.ssam+=_len;
+        self.ops.push(DeltaOp{ins:Optype::COPY,begin:_old,len:_len,});
+        Ok(())
+    }
+
+    ///  insert  _len < 2 ^ 7
+    fn insert(&mut self, _old: usize, _new: usize, _len: usize) -> Result<(), ()> {
+        // 暂时未支持长度过大时的拆分情况
+        assert!(_len < (1<<8));
+        self.ops.push(DeltaOp{ins:Optype::DATA,begin:_new,len:_len,});
+        Ok(())
+    }
+
+
+    fn finish(&mut self) -> Result<(), Self::Error> {
+        // compute the ssam rate when finish the diff process. 
+        self.ssam_r = self.ssam as f64 / self.new_data.data.len() as f64 ;
+        Ok(())
+    }
+}
 
 
 #[derive(Debug,Clone, Copy)]
@@ -115,7 +138,7 @@ enum Optype {
     DATA, // 插入的数据
     COPY, // 数据复制
 }
-#[allow(dead_code)]
+
 #[derive(Debug,Clone, Copy)]
 struct DeltaOp{
     /// instruction type
@@ -127,117 +150,84 @@ struct DeltaOp{
 
 }
 
-impl DeltaDiff {
-    fn conver_to_delta(&self)-> Vec<u8>{
-        todo!();
-        // let mut result  =  Vec::new();
-        // for op in &self.ops {
-        //     todo!()
-        // }
-        // vec![];
-    }
-}
-impl Diff for DeltaDiff{
-    type Error = ();
-    /// offset < 2^32
-    /// len < 2^24
-    fn equal(&mut self, _old: usize, _new: usize, _len: usize) -> Result<(), Self::Error> {
-        //println!("equal {:?} {:?} {:?}", _old, _new, _len);
-        self.ssam+=_len;
-        self.ops.push(DeltaOp{ins:Optype::COPY,begin:_old,len:_len,});
-        Ok(())
-    }
-
-    ///  insert  _len < 2 ^ 7
-    fn insert(&mut self, _old: usize, _new: usize, _len: usize) -> Result<(), ()> {
-        //println!("insert {:?} {:?} {:?}", _o, _n, _len);
-        self.ops.push(DeltaOp{ins:Optype::DATA,begin:_new,len:_len,});
-        Ok(())
-    }
 
 
-    fn finish(&mut self) -> Result<(), Self::Error> {
-        self.ssam_r = self.ssam as f64 / self.new_data.data.len() as f64 ;
-        Ok(())
-    }
-}
 #[cfg(test)]
 mod tests{
     use std::io::Write;
 
-    use crate::{git::{object::{Metadata, types::ObjectType}, pack::{Pack, decode::ObjDecodedMap}}, utils};
+    use crate::{git::{object::{Metadata, types::ObjectType}, pack::Pack}, utils};
     use bstr::ByteSlice;
-    use diffs::myers;
     use super::DeltaDiff;
 
-        #[test]
-        fn test_metadata_diff_ofs_delta(){
-            let m1 = Metadata::read_object_from_file
-            ("./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string()).unwrap();
-            let mut m2 = Metadata::read_object_from_file
-            ("./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string()).unwrap();
-            let mut diff = DeltaDiff::new(m1.clone(),m2.clone());
-            println!("{:?}",diff);
-            let meta_vec1 = m1.convert_to_vec().unwrap();
+    /// 通过两个metadata 来进行对后者No.2的压缩
+    /// 首先，需要两个是相同的类型(ObjectType)
+    /// 先确定要进行什么类型的压缩，
+    ///    1. ofs-object 将以No.1为base压缩为ofs-object,offset 来标识负距离上的object开头
+    ///    2. ref-objbct 将以No.1为base， 以hash值作为标识
+    /// 两种delta的共性：都需要未压缩的header编码。ofs 是sized编码的开头。ref是hash的20位u8
+    /// 1，
+    /// 
+    #[test]
+    fn test_metadata_diff_ofs_delta(){
+        let m1 = Metadata::read_object_from_file
+        ("./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string()).unwrap();
+        let mut m2 = Metadata::read_object_from_file
+        ("./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string()).unwrap();
+        let mut diff = DeltaDiff::new(m1.clone(),m2.clone());
+        println!("{:?}",diff);
+        let meta_vec1 = m1.convert_to_vec().unwrap();
+
+        // 对于offset的
+        // 不需要压缩的size
+        let offset_head = utils::write_offset_encoding(meta_vec1.len() as u64);
+    
+        // 需要压缩的指令data
+        let  zlib_data = diff.get_delta_metadata();
+        m2.change_to_delta(ObjectType::OffsetDelta,zlib_data,offset_head);
+
+        
+        // 排好序后直接把metadata按顺序放入Vec就行了
+        let meta_vec = vec![m1,m2];
+        let mut _pack = Pack::default();
+        let pack_file_data =_pack.encode( Some(meta_vec));
+        //_pack
+        let mut file = std::fs::File::create("delta_ofs.pack").expect("create failed");
+        file.write_all(pack_file_data.as_bytes()).expect("write failed");
+        Pack::decode_file("delta_ofs.pack");
 
 
-            //不需要压缩
-            let offset_head = utils::write_offset_encoding(meta_vec1.len() as u64);
-            // 166  - 12 = 154
-            //不需要压缩
-            let mut yasuo = diff.get_delta_metadata();
-            m2.change_to_delta(ObjectType::OffsetDelta,yasuo,offset_head);
-
-            
-            let meta_vec = vec![m1,m2];
-            let mut _pack = Pack::default();
-            let pack_file_data =_pack.encode( Some(meta_vec));
-            //_pack
-            let mut file = std::fs::File::create("delta_ofs.pack").expect("create failed");
-            file.write_all(pack_file_data.as_bytes()).expect("write failed");
-            let a = Pack::decode_file("delta_ofs.pack");
+    }
 
 
-        }
+    #[test]
+    fn test_metadata_diff_ref_delta(){
+        let m1 = Metadata::read_object_from_file
+        ("./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string()).unwrap();
+        let mut m2 = Metadata::read_object_from_file
+        ("./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string()).unwrap();
+        let mut diff = DeltaDiff::new(m1.clone(),m2.clone());
+        println!("{:?}",diff);
+        
 
+        //不需要压缩
+        let offset_head =m1.id.0.to_vec();
+        assert!(offset_head.len() ==20);
 
-        #[test]
-        fn test_metadata_diff_ref_delta(){
-            let m1 = Metadata::read_object_from_file
-            ("./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string()).unwrap();
-            let mut m2 = Metadata::read_object_from_file
-            ("./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string()).unwrap();
-            let mut diff = DeltaDiff::new(m1.clone(),m2.clone());
-            println!("{:?}",diff);
-            let meta_vec1 = m1.convert_to_vec().unwrap();
-            
+        //需要压缩
+        let zlib_data = diff.get_delta_metadata();
+        m2.change_to_delta(ObjectType::HashDelta,zlib_data,offset_head);
 
-            //不需要压缩
-            let offset_head =m1.id.0.to_vec();
-            assert!(offset_head.len() ==20);
-            // 166  - 12 = 154
-            //不需要压缩
-            let mut yasuo = diff.get_delta_metadata();
-            m2.change_to_delta(ObjectType::HashDelta,yasuo,offset_head);
+        
+        let meta_vec = vec![m1,m2];
+        let mut _pack = Pack::default();
+        let pack_file_data =_pack.encode( Some(meta_vec));
+        //_pack
+        let mut file = std::fs::File::create("delta_ref.pack").expect("create failed");
+        file.write_all(pack_file_data.as_bytes()).expect("write failed");
+        Pack::decode_file("delta_ref.pack");
 
-            
-            let meta_vec = vec![m1,m2];
-            let mut _pack = Pack::default();
-            let pack_file_data =_pack.encode( Some(meta_vec));
-            //_pack
-            let mut file = std::fs::File::create("delta_ref.pack").expect("create failed");
-            file.write_all(pack_file_data.as_bytes()).expect("write failed");
-            let a = Pack::decode_file("delta_ref.pack");
-
-            let mut result = ObjDecodedMap::default();
-            result.update_from_cache(&a.get_cache());
-            
-            for (key, value) in result._map_hash.iter() {
-                println!("*********************");
-                println!("Hash :{}", key);
-                println!("{}", value);
-            }
-        }
+    }
 
 
 }

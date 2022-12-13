@@ -5,6 +5,7 @@
 //! 
 use std::{ fmt::Display, vec};
 use crate::errors::GitError;
+
 /// Four abstract Object Types:
 /// - Blob
 /// - Tree
