@@ -3,6 +3,7 @@
 //!
 
 
+use std::cmp::Ordering;
 use std::fmt::Display;
 use bstr::ByteSlice;
 use crate::errors::GitError;
@@ -13,7 +14,7 @@ use super::sign::AuthorSign;
 
 /// Git Object: commit
 #[allow(unused)]
-#[derive(PartialEq, Eq, Debug, Hash,Ord, PartialOrd, Clone)]
+#[derive( Eq, Debug,Hash,Clone)]
 pub struct Commit {
     pub meta: Metadata,
     pub tree_id: Hash,
@@ -22,7 +23,23 @@ pub struct Commit {
     pub committer: AuthorSign,
     pub message: String,
 }
+impl Ord for Commit {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.meta.size.cmp(&self.meta.size)
+    }
+}
 
+impl PartialOrd for Commit {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.meta.size.cmp(&self.meta.size))  
+    }
+}
+
+impl PartialEq for Commit {
+    fn eq(&self, other: &Self) -> bool {
+        self.meta.size == other.meta.size
+    }
+}
 ///
 impl Commit {
     ///

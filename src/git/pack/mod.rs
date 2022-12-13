@@ -152,6 +152,7 @@ impl Pack {
         utils::seek(pack_file, offset)?;
         let (type_num, size) = utils::read_type_and_size(pack_file)?;
 
+        println!("type is :{}",ObjectType::number_type(type_num));
         //Get the Object according to the Types Enum
         let object = match type_num {
             // Undelta representation

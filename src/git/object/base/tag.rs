@@ -15,8 +15,9 @@ use std::fmt::Display;
 
 
 /// Git Object: tag
+ use std::cmp::Ordering;
 #[allow(unused)]
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[derive(Eq, Debug, Hash, Clone)]
 pub struct Tag {
     pub meta: Metadata,
     pub object: Hash,
@@ -25,7 +26,23 @@ pub struct Tag {
     pub tagger: AuthorSign,
     pub message: String,
 }
+impl Ord for Tag {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.meta.size.cmp(&self.meta.size)
+    }
+}
 
+impl PartialOrd for Tag {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(other.meta.size.cmp(&self.meta.size))  
+    }
+}
+
+impl PartialEq for Tag {
+    fn eq(&self, other: &Self) -> bool {
+        self.meta.size == other.meta.size
+    }
+}
 ///
 impl Tag {
     /// Tag 的构造函数 接收一个@param meta::Metadata

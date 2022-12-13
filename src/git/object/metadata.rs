@@ -15,7 +15,7 @@ use crate::git::hash::HashType;
 pub struct Metadata {
     pub t: ObjectType,
     pub h: HashType,
-    pub id:Hash,
+    pub id: Hash,
     pub size: usize,
     pub data: Vec<u8>,
     pub delta_header :Vec<u8>,

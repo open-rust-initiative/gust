@@ -77,12 +77,45 @@ pub struct TreeItem {
 }
 
 /// Git Object: tree
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+use std::cmp::Ordering;
+#[derive( Eq, Debug, Hash, Clone)]
 pub struct Tree {
     pub meta: Metadata,
     pub tree_items: Vec<TreeItem>,
+    pub tree_name: String,
+}
+impl Ord for Tree {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let o = other.tree_name.cmp(&self.tree_name);
+        match o {
+            Ordering::Equal => {
+                other.meta.size.cmp(&self.meta.size)
+            },
+            _ => o,
+        }
+    }
 }
 
+impl PartialOrd for Tree {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let o = other.tree_name.cmp(&self.tree_name);
+        match o {
+            Ordering::Equal => {
+                Some(other.meta.size.cmp(&self.meta.size))
+            },
+            _ =>  Some(o),
+        }
+    }
+}
+
+impl PartialEq for Tree {
+    fn eq(&self, other: &Self) -> bool {
+        if (self.tree_name.eq(&other.tree_name)){
+            return true;
+        }
+        false
+    }
+}
 
 impl Display for Tree {
     #[allow(unused)]
@@ -93,7 +126,7 @@ impl Display for Tree {
                      String::from_utf8(item.mode.to_vec()).unwrap(),
                      item.item_type, item.id, item.filename);
         }
-
+        writeln!(f,"Tree Name: {}",self.tree_name);
         Ok(())
     }
 }
@@ -105,6 +138,7 @@ impl Tree {
         let mut  a = Self{
             meta:metadata,
             tree_items:vec![],
+            tree_name:String::new(),
         };
         a.decode_metadata().unwrap();
         a
@@ -194,6 +228,7 @@ mod tests {
 
         let blob = Blob {
             meta: meta.clone(),
+            filename: String::new(),
         };
 
         assert_eq!(
@@ -205,6 +240,7 @@ mod tests {
             .to_tree_item(String::from("gitmega.md")).unwrap();
 
         let mut tree = Tree {
+            tree_name:String::new(),
             meta: Metadata {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
@@ -234,6 +270,7 @@ mod tests {
 
         let blob_gitmega = Blob {
             meta: meta_gitmega.clone(),
+            filename: String::new(),
         };
 
         let item_gitmega = blob_gitmega
@@ -248,6 +285,7 @@ mod tests {
 
         let blob_gust = Blob {
             meta: meta_gust.clone(),
+            filename: String::new(),
         };
 
         let item_gust = blob_gust
@@ -255,6 +293,7 @@ mod tests {
 
 
         let mut tree = Tree {
+            tree_name:String::new(),
             meta: Metadata {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
@@ -288,6 +327,7 @@ mod tests {
         let mut tree = Tree {
             meta,
             tree_items: Vec::new(),
+            tree_name:String::new(),
         };
 
         tree.decode_metadata().unwrap();
@@ -325,6 +365,7 @@ mod tests {
         let mut tree = Tree {
             meta,
             tree_items: Vec::new(),
+            tree_name:String::new(),
         };
 
         tree.decode_metadata().unwrap();

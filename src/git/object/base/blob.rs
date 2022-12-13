@@ -1,19 +1,51 @@
 //!
 //!Blob 文件对象结构体
 //!
-
+use std::cmp::Ordering;
 use std::fmt::Display;
 use crate::errors::GitError;
 use super::Metadata;
 use super::tree::{*};
 
 /// Git Object: blob
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[derive( Eq, Debug, Hash, Clone)]
 pub struct Blob {
+    pub filename:String,
     pub meta: Metadata,
-   
+    
+}
+impl Ord for Blob {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let o = other.filename.cmp(&self.filename);
+        match o {
+            Ordering::Equal => {
+                other.meta.size.cmp(&self.meta.size)
+            },
+            _ => o,
+        }
+    }
 }
 
+impl PartialOrd for Blob {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let o = other.filename.cmp(&self.filename);
+        match o {
+            Ordering::Equal => {
+                Some(other.meta.size.cmp(&self.meta.size))
+            },
+            _ =>  Some(o),
+        }
+    }
+}
+
+impl PartialEq for Blob {
+    fn eq(&self, other: &Self) -> bool {
+        if (self.filename.eq(&other.filename)){
+            return true;
+        }
+        false
+    }
+}
 ///
 impl Blob {
 
@@ -22,6 +54,7 @@ impl Blob {
     pub fn new(metadata: Metadata) -> Self {
         Self {
             meta: metadata.clone(),
+            filename: String::new(),
         }
     }
 
@@ -60,6 +93,7 @@ impl Display for Blob{
         
         writeln!(f,"size:{}",self.meta.data.len()).unwrap();
         writeln!(f,"meta data size:{}",self.meta.size).unwrap();
+        writeln!(f, "File Name: {}", self.filename ).unwrap();
         writeln!(f, "Type: Blob\n{}", BString::new(print_data) ).unwrap();
         writeln!(f, "Only Show the first line of the File...")
     }   
@@ -122,7 +156,7 @@ mod tests {
 
         let blob = Blob {
             meta: meta.clone(),
-            
+            filename: String::new(),
         };
 
         assert_eq!(
