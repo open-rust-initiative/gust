@@ -6,15 +6,21 @@ use std::str::FromStr;
 use bstr::ByteSlice;
 
 use super::super::object::Metadata;
+use crate::git::object::delta;
+use crate::git::object::diff::DeltaDiff;
+use crate::git::object::types::ObjectType;
 use crate::utils;
 use super::super::hash::Hash;
 use super::Pack;
+const SLIDING_WINDOW: i32 = 10;
 ///
 /// Pack类的encode函数，将解析出的pack或其他途径生成的pack生成对应的文件
 impl Pack {
 
     /// 对pack文件的头文件进行编码,除了size大小 这部分都是基本固定的 ： PACK |  version | size
     fn encode_header(&mut self) ->Vec<u8>{
+        self.head = *b"PACK";
+        self.version = 2;
         let mut result: Vec<u8> = 
         vec![b'P', b'A', b'C', b'K',  // The logotype of the Pack File
              0   , 0   , 0   , 2   ,];// THe Version  of the Pack File 
@@ -27,6 +33,13 @@ impl Pack {
         result.push((all_num) as u8);
         result
     }
+
+    fn append_hash_signature(&mut self, data: &Vec<u8>)->Vec<u8>{
+        let  checksum = Hash::new(&data);
+        self.signature = checksum.clone();
+        checksum.0.to_vec()
+    }
+
     #[allow(unused)]
     /// Pack 结构体的`encode`函数
     ///  > 若输出的meta_vec ==None 则需要pack结构体是完整有效的，或者至少其中的PackObjectCache不为空
@@ -68,6 +81,62 @@ impl Pack {
         self.signature = checksum.clone();
         result.append(&mut checksum.0.to_vec());
         result
+    }
+    
+    /// 仅支持offset delta
+    /// 一次通过metadata的完整data输出
+    /// 从decode的 `vec_sliding_window` 来
+    pub fn encode_delta(meta_vec :Vec<Metadata>) -> (Self,Vec<u8>){
+        let mut _pack = Pack::default();
+        _pack.number_of_objects = meta_vec.len();
+        let mut result = _pack.encode_header();
+        let mut code_meta = vec![];
+        assert_eq!(result.len(),12);
+
+        let mut offset:Vec<u64> = vec![];//记录已完成的metadata的offset
+
+        for i in 0.._pack.number_of_objects as i32{
+            let mut new_meta = meta_vec[i as usize].clone();
+            let mut bestj:i32 = 11;
+            let mut best_ssam_rate:f64 =0.0;
+            for j in 1..SLIDING_WINDOW{
+                if i-j< 0 {break;}
+                let _base = meta_vec[(i-j)as usize ].clone();
+                // 若两个对象类型不相同则不进行delta
+                if new_meta.t != _base.t {
+                    break
+                }
+                let diff  = DeltaDiff::new(_base.clone(),new_meta.clone());
+                let _rate = diff.get_ssam_rate();
+                if (_rate > best_ssam_rate)  && _rate >0.5 {
+                    best_ssam_rate = _rate;
+                    bestj = j ;
+                }
+            }
+
+            let mut final_meta = new_meta.clone();
+            if bestj !=11{
+                let _base = meta_vec[(i-bestj) as usize].clone();
+                let diff  = DeltaDiff::new(_base.clone(),new_meta.clone());
+                let zlib_data = diff.get_delta_metadata();
+                let offset_head = utils::write_offset_encoding(
+                    result.len() as u64 - offset[(i-bestj) as usize] 
+                );
+                final_meta.change_to_delta(ObjectType::OffsetDelta,zlib_data,offset_head);
+            }
+            code_meta.push(final_meta.clone());
+            // TODO:update the offset and write
+            offset.push(result.len() as u64);
+            result.append(&mut final_meta.convert_to_vec().unwrap());
+            println!();
+            println!("Hash :{}",final_meta.id);
+            println!("type: {}",final_meta.t);
+            println!("Offset: {}",offset.last().unwrap());
+            
+        }
+        let mut _hash = _pack.append_hash_signature(&result);
+        result.append(&mut _hash);
+        (_pack,result)
     }
     /// Pack the loose object from the Given string .
     /// `obj_path`: the vector of the Hash value of the loose object 
@@ -222,8 +291,6 @@ impl Pack {
         let mut file = std::fs::File::create(format!("{}/pack-{}.pack",target_dir,new_pack.signature.to_plain_str())).expect("create failed");
         file.write_all(result.as_bytes()).expect("write failed");
 
-
-
         new_pack
     }
 }
@@ -327,4 +394,30 @@ mod tests {
         Pack::decode_file(&format!("{}/pack-{}.pack",target_path,pack.signature.to_plain_str()));
     }
 
+    #[test]
+    fn test_delta_pack_ok(){
+        let mut _map = ObjDecodedMap::default();
+        let decoded_pack = Pack::decode_file("./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack");
+        assert_eq!(
+            "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
+            decoded_pack.signature.to_plain_str()
+        );
+        let mut result = ObjDecodedMap::default();
+        result.update_from_cache(&decoded_pack.result);
+        result.check_completeness().unwrap();
+        let meta_vec = result.vec_sliding_window();
+        let (_pack ,data_write) =Pack::encode_delta(meta_vec);
+
+        let file_name = format!("pack-{}.pack",_pack.signature.to_plain_str());
+        let mut file = std::fs::File::create(file_name).expect("create failed");
+        file.write_all(data_write.as_bytes()).expect("write failed");
+
+
+        let mut _map = ObjDecodedMap::default();
+        let decoded_pack = Pack::decode_file("./pack-delta_test.pack");
+        // assert_eq!(
+        //     "8581ced9a0685bc6c644f964a77ddb6e6bb0255c",
+        //     decoded_pack.signature.to_plain_str()
+        // );
+    }
 }

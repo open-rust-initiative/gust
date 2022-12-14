@@ -12,9 +12,10 @@ use super::Metadata;
 use diffs::Diff;
 use diffs::myers;
 
+const DATA_INS_LEN :usize = 0x7f;
 #[allow(dead_code)]
-#[derive(Debug)]
-struct DeltaDiff{
+#[derive(Debug )]
+pub struct DeltaDiff{
    /// keep all instruction
    ops:Vec<DeltaOp>,
    old_data:Metadata,
@@ -44,7 +45,7 @@ impl DeltaDiff{
         _new
     }
 
-    pub fn get_delta_metadata(&mut self) -> Vec<u8>{
+    pub fn get_delta_metadata(& self) -> Vec<u8>{
         
         let mut result:Vec<u8>=vec![];
         
@@ -101,6 +102,9 @@ impl DeltaDiff{
         op_data
     }
 
+    pub fn get_ssam_rate(&self) -> f64{
+        self.ssam_r
+    }
 }
 impl Diff for DeltaDiff{
     type Error = ();
@@ -119,8 +123,21 @@ impl Diff for DeltaDiff{
     ///  insert  _len < 2 ^ 7
     fn insert(&mut self, _old: usize, _new: usize, _len: usize) -> Result<(), ()> {
         // 暂时未支持长度过大时的拆分情况
-        assert!(_len < (1<<8));
-        self.ops.push(DeltaOp{ins:Optype::DATA,begin:_new,len:_len,});
+       
+        // // | 0xxxxxxx | |data| |
+        let mut len = _len;
+        let mut new = _new;
+        if _len > DATA_INS_LEN {
+            while len > DATA_INS_LEN {
+                self.ops.push(DeltaOp{ins:Optype::DATA,begin:new,len:DATA_INS_LEN,});
+                len -= DATA_INS_LEN;
+                new += DATA_INS_LEN;
+            }
+            self.ops.push(DeltaOp{ins:Optype::DATA,begin:new,len:len,});
+        }else{
+            self.ops.push(DeltaOp{ins:Optype::DATA,begin:_new,len:_len,});
+        }
+        
         Ok(())
     }
 

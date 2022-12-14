@@ -61,12 +61,20 @@ impl Pack {
         // Init the cache for follow object parse
         let mut cache = PackObjectCache::default();
 
+        ///Debug
+        
+
+        let mut Metadata_list = vec![];
+        /// 
+        /// 
+
         for _ in 0.._pack.number_of_objects {
             //update offset of the Object
             let offset = utils::get_offset(pack_file).unwrap();
             //Get the next Object by the Pack::next_object() func
             let object = Pack::next_object(pack_file, offset, &mut cache).unwrap();
             // Larger offsets would require a version-2 pack index
+            Metadata_list.push(Rc::clone(&object)) ;
             let offset = u32::try_from(offset)
                 .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
                 .unwrap();
@@ -151,8 +159,7 @@ impl Pack {
         use super::object::types::ObjectType;
         utils::seek(pack_file, offset)?;
         let (type_num, size) = utils::read_type_and_size(pack_file)?;
-
-        println!("type is :{}",ObjectType::number_type(type_num));
+        println!("decode type:{}",ObjectType::number_type(type_num));
         //Get the Object according to the Types Enum
         let object = match type_num {
             // Undelta representation
@@ -174,6 +181,8 @@ impl Pack {
                     GitError::InvalidObjectInfo(format!("Invalid OffsetDelta offset"))
                 })?;
                 let offset = utils::get_offset(pack_file)?;
+                
+                
                 let base_object = if let Some(object) = cache.offset_object(base_offset) {
                     Rc::clone(object)
                 } else {
@@ -182,6 +191,8 @@ impl Pack {
                 };
                 utils::seek(pack_file, offset)?;
                 let base_obj = base_object.as_ref();
+                println!("The delta offset:{}",offset);
+                println!("The base size :{} , composed size :{}",base_obj.size,base_obj.data.len());
                 let objs = apply_delta(pack_file, base_obj)?;
                 Ok(objs)
             }

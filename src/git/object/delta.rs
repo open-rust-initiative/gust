@@ -91,6 +91,8 @@ fn apply_delta_instruction<R: Read>(
     Ok(true)
 }
 
+
+
 pub fn read_object(hash: Hash) -> Result<Metadata, GitError> {
     let object = match read_unpacked_object(hash) {
         // Found in objects directory

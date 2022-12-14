@@ -75,14 +75,14 @@ pub fn write_size_encoding(number:usize) -> Vec<u8>{
     let mut number = number ;
 
     loop{
-        if number >>7 >0{
+        if number >>VAR_INT_ENCODING_BITS >0{
             num.push((number & 0x7f)  as u8 | 0x80 ) ;
         }else{
             num.push((number & 0x7f)  as u8 ) ;
             break;
         }
         
-        number >>= 7;
+        number >>= VAR_INT_ENCODING_BITS;
     }
 
     num
@@ -213,5 +213,33 @@ mod test{
      let re = super::write_offset_encoding(ns);
      println!("{:?}",re);
     }
-    
+    #[test]
+    fn test_write_size_encoding(){
+        let size = 233;
+        let re = super::write_size_encoding(size);
+        print!("{:?}",re);
+        print!("");
+    }
+
+    #[test]
+    fn test_read_size_encodings(){
+        let a = vec![233,1];
+        print!("{}",read_size_encoding(a));
+    }
+    fn read_size_encoding(a :Vec<u8>) ->usize {
+        let mut value = 0;
+        let mut length = 0;
+        
+        for i in a{
+            let byte_value = i & 0x7f;
+            let more_bytes = (i & 0x8f)!=0 ;
+            value |= (byte_value as usize) << length;
+            if !more_bytes {
+                return value;
+            }
+            length += 7;
+        }
+        value
+    }
 }
+    
