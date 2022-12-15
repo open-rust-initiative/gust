@@ -6,7 +6,6 @@ use std::str::FromStr;
 use bstr::ByteSlice;
 
 use super::super::object::Metadata;
-use crate::git::object::delta;
 use crate::git::object::diff::DeltaDiff;
 use crate::git::object::types::ObjectType;
 use crate::utils;
@@ -41,6 +40,7 @@ impl Pack {
     }
 
     #[allow(unused)]
+    #[deprecated = "see the func :`encode_delta`"]
     /// Pack 结构体的`encode`函数
     ///  > 若输出的meta_vec ==None 则需要pack结构体是完整有效的，或者至少其中的PackObjectCache不为空
     ///  > 若输入的meta_vec不为None 则按照该vec进行encode
@@ -51,15 +51,14 @@ impl Pack {
     ///   let metadata_vec :Vec<Metadata> = ...;// Get a list of metadata
     ///   let result:Vec<u8> = Pack::default().encode(metadata_vec);  
     /// ```
+    /// 
     pub fn encode(&mut self,meta_vec :Option<Vec<Metadata>>) -> Vec<u8> {
         use sha1::{Digest, Sha1};
-
         let mut result: Vec<u8>;
         let mut offset = 12;
         match meta_vec {
             // 有metadata的情况下
             Some(a) => {
-                
                 self.number_of_objects = a.len();
                 result = self.encode_header();
                 for metadata in a {
@@ -76,16 +75,15 @@ impl Pack {
                 }
             },
         }
-
-        let  checksum = Hash::new(&result);
-        self.signature = checksum.clone();
-        result.append(&mut checksum.0.to_vec());
+        // compute pack hash signature and append to the result 
+        result.append(&mut self.append_hash_signature(&result));
         result
     }
     
     /// 仅支持offset delta
     /// 一次通过metadata的完整data输出
     /// 从decode的 `vec_sliding_window` 来
+    #[allow(unused)]
     pub fn encode_delta(meta_vec :Vec<Metadata>) -> (Self,Vec<u8>){
         let mut _pack = Pack::default();
         _pack.number_of_objects = meta_vec.len();
@@ -97,7 +95,7 @@ impl Pack {
 
         for i in 0.._pack.number_of_objects as i32{
             let mut new_meta = meta_vec[i as usize].clone();
-            let mut bestj:i32 = 11;
+            let mut best_j:i32 = 11;
             let mut best_ssam_rate:f64 =0.0;
             for j in 1..SLIDING_WINDOW{
                 if i-j< 0 {break;}
@@ -110,17 +108,17 @@ impl Pack {
                 let _rate = diff.get_ssam_rate();
                 if (_rate > best_ssam_rate)  && _rate >0.5 {
                     best_ssam_rate = _rate;
-                    bestj = j ;
+                    best_j = j ;
                 }
             }
 
             let mut final_meta = new_meta.clone();
-            if bestj !=11{
-                let _base = meta_vec[(i-bestj) as usize].clone();
+            if best_j !=11{
+                let _base = meta_vec[(i-best_j) as usize].clone();
                 let diff  = DeltaDiff::new(_base.clone(),new_meta.clone());
                 let zlib_data = diff.get_delta_metadata();
                 let offset_head = utils::write_offset_encoding(
-                    result.len() as u64 - offset[(i-bestj) as usize] 
+                    result.len() as u64 - offset[(i-best_j) as usize] 
                 );
                 final_meta.change_to_delta(ObjectType::OffsetDelta,zlib_data,offset_head);
             }
@@ -414,10 +412,10 @@ mod tests {
 
 
         let mut _map = ObjDecodedMap::default();
-        let decoded_pack = Pack::decode_file("./pack-delta_test.pack");
-        // assert_eq!(
-        //     "8581ced9a0685bc6c644f964a77ddb6e6bb0255c",
-        //     decoded_pack.signature.to_plain_str()
-        // );
+        let decoded_pack = Pack::decode_file(&format!("pack-{}.pack",_pack.signature.to_plain_str()));
+        assert_eq!(
+            "7687ecf38763edf06b1895128b7b6ce611ba5f90",
+            decoded_pack.signature.to_plain_str()
+        );
     }
 }

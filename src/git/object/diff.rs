@@ -181,7 +181,7 @@ mod tests{
     /// 首先，需要两个是相同的类型(ObjectType)
     /// 先确定要进行什么类型的压缩，
     ///    1. ofs-object 将以No.1为base压缩为ofs-object,offset 来标识负距离上的object开头
-    ///    2. ref-objbct 将以No.1为base， 以hash值作为标识
+    ///    2. ref-object 将以No.1为base， 以hash值作为标识
     /// 两种delta的共性：都需要未压缩的header编码。ofs 是sized编码的开头。ref是hash的20位u8
     /// 1，
     /// 
@@ -191,7 +191,7 @@ mod tests{
         ("./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string()).unwrap();
         let mut m2 = Metadata::read_object_from_file
         ("./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string()).unwrap();
-        let mut diff = DeltaDiff::new(m1.clone(),m2.clone());
+        let  diff = DeltaDiff::new(m1.clone(),m2.clone());
         println!("{:?}",diff);
         let meta_vec1 = m1.convert_to_vec().unwrap();
 
@@ -223,7 +223,7 @@ mod tests{
         ("./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string()).unwrap();
         let mut m2 = Metadata::read_object_from_file
         ("./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string()).unwrap();
-        let mut diff = DeltaDiff::new(m1.clone(),m2.clone());
+        let  diff = DeltaDiff::new(m1.clone(),m2.clone());
         println!("{:?}",diff);
         
 

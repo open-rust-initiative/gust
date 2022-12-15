@@ -61,12 +61,6 @@ impl Pack {
         // Init the cache for follow object parse
         let mut cache = PackObjectCache::default();
 
-        ///Debug
-        
-
-        let mut Metadata_list = vec![];
-        /// 
-        /// 
 
         for _ in 0.._pack.number_of_objects {
             //update offset of the Object
@@ -74,7 +68,6 @@ impl Pack {
             //Get the next Object by the Pack::next_object() func
             let object = Pack::next_object(pack_file, offset, &mut cache).unwrap();
             // Larger offsets would require a version-2 pack index
-            Metadata_list.push(Rc::clone(&object)) ;
             let offset = u32::try_from(offset)
                 .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
                 .unwrap();

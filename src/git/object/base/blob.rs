@@ -40,7 +40,7 @@ impl PartialOrd for Blob {
 
 impl PartialEq for Blob {
     fn eq(&self, other: &Self) -> bool {
-        if (self.filename.eq(&other.filename)){
+        if self.filename.eq(&other.filename){
             return true;
         }
         false

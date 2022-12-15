@@ -21,8 +21,8 @@ pub struct ObjDecodedMap {
     tags: Vec<tag::Tag>,
     commits: Vec<commit::Commit>,
     name_map :HashMap<Hash,String>,
-} //
-  //在解析完object后执行的进一步的解码过程
+} 
+//在解析完object后执行的进一步的解码过程
 impl ObjDecodedMap {
     /// 通过cache对不同结构进行进一步解析
     #[allow(unused)]
@@ -61,19 +61,19 @@ impl ObjDecodedMap {
     /// this func should be called after the `fn update_from_cache`
     /// 这个函数做了tree种hash对象存在的校验，
     /// 对四种对象的排序 "Magic" Sort
+    #[allow(unused)]
     pub fn check_completeness(&mut self) -> Result<(), GitError> {
+        //验证对象树 tree object的完整性 确保tree item下的hash值有对应的object
         for _tree in self.trees.iter(){
             for item in &_tree.tree_items {
+                // 保存对象名与hash值的对应
                 self.name_map.insert(item.id.clone(), item.filename.clone());
-                let t = self._map_hash.get(&item.id);
-                match t {
-                    Some(_) => {}
-                    None => {
-                        return Err(GitError::UnCompletedPackObject(format!(
-                            "can't find hash value:{}",
-                            &_tree.meta.id
-                        )))
-                    }
+                // 检查是否存在对应hash
+                if  self._map_hash.get(&item.id) == None{
+                    return Err(GitError::UnCompletedPackObject(format!(
+                        "can't find hash value:{}",
+                        &_tree.meta.id
+                    )))
                 }
             }
         }
@@ -103,6 +103,8 @@ impl ObjDecodedMap {
         Ok(())
     }
 
+    /// 将 `check_completeness` 函数解析后的放入
+    #[allow(unused)]
     pub fn vec_sliding_window(&self) -> Vec<Metadata>{
         let mut list = vec![];
         for c in self.commits.iter(){
@@ -120,7 +122,9 @@ impl ObjDecodedMap {
 
         list
     }
-    pub fn print_vecs(&self){
+
+    #[allow(unused)]
+    pub fn print_vec(&self){
 
 
         for c in self.commits.iter(){
@@ -167,6 +171,6 @@ mod tests {
         let mut result = ObjDecodedMap::default();
         result.update_from_cache(&decoded_pack.result);
         result.check_completeness().unwrap();
-        result.print_vecs();
+        result.print_vec();
     }
 }

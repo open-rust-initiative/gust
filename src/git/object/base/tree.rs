@@ -110,7 +110,7 @@ impl PartialOrd for Tree {
 
 impl PartialEq for Tree {
     fn eq(&self, other: &Self) -> bool {
-        if (self.tree_name.eq(&other.tree_name)){
+        if  self.tree_name.eq(&other.tree_name) {
             return true;
         }
         false
