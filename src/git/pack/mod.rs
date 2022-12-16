@@ -3,22 +3,20 @@
 use std::convert::TryInto;
 use std::io::Read;
 use std::path::Path;
-use self::cache::PackObjectCache;
-
-use super::hash::Hash;
-use super::idx::Idx;
-use super::object::Metadata;
-use super::object::delta::*;
-
-use crate::errors::GitError;
-use crate::git::pack::decode::ObjDecodedMap;
-use crate::utils;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::rc::Rc;
 
-mod cache;
+use self::cache::PackObjectCache;
+use super::hash::Hash;
+use super::idx::Idx;
+use super::object::Metadata;
+use super::object::delta::*;
+use crate::errors::GitError;
+use crate::git::pack::decode::ObjDecodedMap;
+use crate::utils;
 
+mod cache;
 pub mod decode;
 pub mod encode;
 //TODO:

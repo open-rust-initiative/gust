@@ -1,5 +1,4 @@
 use crate::errors::GitError;
-use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{ErrorKind, Read};
 use std::path::Path;
@@ -8,7 +7,6 @@ use flate2::read::ZlibDecoder;
 use super::{Hash, Metadata};
 use crate::utils;
 
-const INDEX_FILE_SUFFIX: &str = ".idx";
 const COPY_INSTRUCTION_FLAG: u8 = 1 << 7;
 const COPY_OFFSET_BYTES: u8 = 4;
 const COPY_SIZE_BYTES: u8 = 3;
@@ -92,7 +90,7 @@ fn apply_delta_instruction<R: Read>(
 }
 
 
-
+// 这里默认的是若是pack里面没有，则只能从loose里面找了
 pub fn read_object(hash: Hash) -> Result<Metadata, GitError> {
     let object = match read_unpacked_object(hash) {
         // Found in objects directory
@@ -175,9 +173,3 @@ fn decimal_char_value(decimal_char: u8) -> Option<u8> {
     }
 }
 
-///获取idx文件的文件名
-#[allow(unused)]
-fn strip_index_file_name(file_name: &OsStr) -> Option<&str> {
-    let file_name = file_name.to_str()?;
-    file_name.strip_suffix(INDEX_FILE_SUFFIX)
-}

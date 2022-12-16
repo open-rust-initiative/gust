@@ -16,7 +16,13 @@ const SLIDING_WINDOW: i32 = 10;
 /// Pack类的encode函数，将解析出的pack或其他途径生成的pack生成对应的文件
 impl Pack {
 
-    /// 对pack文件的头文件进行编码,除了size大小 这部分都是基本固定的 ： PACK |  version | size
+    /// 对pack文件的头文件进行编码,除了size大小 这部分都是基本固定的 ： 
+    /// ```plaintext
+    ///         -> |'P' 'A' 'C' 'K'  |4b
+    /// version -> | 0   0   0   2   |4b
+    ///   size  -> | size[ 31 --- 0 ]|4b
+    /// ```
+    /// Pack对象应先携带有效的 `self.number_of_objects` 字段
     fn encode_header(&mut self) ->Vec<u8>{
         self.head = *b"PACK";
         self.version = 2;
@@ -24,15 +30,13 @@ impl Pack {
         vec![b'P', b'A', b'C', b'K',  // The logotype of the Pack File
              0   , 0   , 0   , 2   ,];// THe Version  of the Pack File 
         let  all_num = self.get_object_number();
-        assert!(all_num < (1 << 32)); //TODO: GitError < 4G
+        assert!(all_num!=0);  // guarantee self.number_of_objects!=0
+        assert!(all_num < (1 << 32)); //TODO: GitError:numbers of objects should  < 4G , 
         //Encode the number of object  into file
-        result.push((all_num >> 24) as u8);
-        result.push((all_num >> 16) as u8);
-        result.push((all_num >> 8) as u8);
-        result.push((all_num) as u8);
+        result.append(&mut utils::u32_vec(all_num as u32));
         result
     }
-
+    /// 计算pack文件的hash value，赋予id字段，并将hash转为Vec<u8> 输出
     fn append_hash_signature(&mut self, data: &Vec<u8>)->Vec<u8>{
         let  checksum = Hash::new(&data);
         self.signature = checksum.clone();
@@ -40,7 +44,6 @@ impl Pack {
     }
 
     #[allow(unused)]
-    #[deprecated = "see the func :`encode_delta`"]
     /// Pack 结构体的`encode`函数
     ///  > 若输出的meta_vec ==None 则需要pack结构体是完整有效的，或者至少其中的PackObjectCache不为空
     ///  > 若输入的meta_vec不为None 则按照该vec进行encode
