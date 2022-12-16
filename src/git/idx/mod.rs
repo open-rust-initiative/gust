@@ -183,7 +183,8 @@ impl Idx {
         }
         // Layer 4:
         //   the object offset in the pack file.
-        for offset in cache.by_offset.values(){
+        for _hash in cache.by_hash.keys(){
+            let offset = cache.by_offset.get(_hash).unwrap();
             result.append(&mut utils::u32_vec( *offset as u32));
         }
         
