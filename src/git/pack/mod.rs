@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::Path;
 use std::convert::TryFrom;
 use std::fs::File;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use self::cache::PackObjectCache;
 use super::hash::Hash;
@@ -146,7 +146,7 @@ impl Pack {
         pack_file: &mut File,
         offset: u64,
         cache: &mut PackObjectCache,
-    ) -> Result<Rc<Metadata>, GitError> {
+    ) -> Result<Arc<Metadata>, GitError> {
         use super::object::types::ObjectType;
         utils::seek(pack_file, offset)?;
         let (type_num, size) = utils::read_type_and_size(pack_file)?;
@@ -175,7 +175,7 @@ impl Pack {
                 
                 
                 let base_object = if let Some(object) = cache.offset_object(base_offset) {
-                    Rc::clone(object)
+                    Arc::clone(object)
                 } else {
                     //递归调用 找出base object
                     Pack::next_object(pack_file, base_offset, cache)?
@@ -209,8 +209,8 @@ impl Pack {
         //     None =>{},
         // }
 
-        let obj = Rc::new(object);
-        cache.update(Rc::clone(&obj), offset);
+        let obj = Arc::new(object);
+        cache.update(Arc::clone(&obj), offset);
         Ok(obj)
     }
 

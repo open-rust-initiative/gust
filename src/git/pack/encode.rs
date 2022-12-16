@@ -1,7 +1,7 @@
 //! encode pack file ,and create file 
 use std::fs::File;
 use std::io::Write;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::str::FromStr;
 use bstr::ByteSlice;
 
@@ -66,7 +66,7 @@ impl Pack {
                 result = self.encode_header();
                 for metadata in a {
                     result.append(&mut metadata.convert_to_vec().unwrap());
-                    self.result.update(Rc::new(metadata), offset);
+                    self.result.update(Arc::new(metadata), offset);
                     println!("Decode offset:{}",offset);
                     offset  = result.len() as u64;
                 }

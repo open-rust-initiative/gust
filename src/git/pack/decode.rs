@@ -7,15 +7,15 @@ use obj::base::ObjClass;
 use obj::base::{blob, commit, tag, tree};
 use obj::Metadata;
 use std::fmt::{self, Display};
-use std::{collections::HashMap, rc::Rc};
-
+use std::collections::HashMap;
+use std::sync::Arc;
 use super::cache::PackObjectCache;
 use colored::Colorize;
 ///!对取出的object字段进行进一步解码与包装
 /// 用于存储解析出的object抽象对象的hashmap
 #[derive(Default, Clone)]
 pub struct ObjDecodedMap {
-    pub _map_hash: HashMap<Hash, Rc<ObjClass>>,
+    pub _map_hash: HashMap<Hash, Arc<ObjClass>>,
     blobs: Vec<blob::Blob>,
     trees: Vec<tree::Tree>,
     tags: Vec<tag::Tag>,
@@ -53,7 +53,7 @@ impl ObjDecodedMap {
                 }
                 _ => panic!("src/git/pack/decode.rs: 33 invalid type in encoded metadata"),
             };
-            self._map_hash.insert(key.clone(), Rc::new(_obj));
+            self._map_hash.insert(key.clone(), Arc::new(_obj));
         }
     }
 
