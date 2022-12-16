@@ -41,8 +41,8 @@ pub struct Pack {
     head: [u8; 4],
     version: u32,
     number_of_objects: usize,
-    signature: Hash,
-    result: PackObjectCache,
+    pub signature: Hash,
+    pub result: PackObjectCache,
 }
 
 impl Pack {
@@ -112,6 +112,8 @@ impl Pack {
         Ok(_pack)
     }
 
+
+    /// Decode the pack file helped by the according decoded idx file 
     #[allow(unused)]
     pub fn decode_by_idx(idx: &mut Idx, pack_file: &mut File) -> Result<Self, GitError> {
         let mut _pack = Self::check_header(pack_file)?;
@@ -130,6 +132,10 @@ impl Pack {
         Ok(_pack)
     }
 
+    /// Decode the object info from the pack file, <br>
+    /// but we don't decode the object  further info ,<br>
+    /// Instead, it stores **all un decoded object information** to a `Vec<u8>`. <br>
+    /// This function also return A Pack Struct,which only the Attr cache named `result` is invalid
     pub fn decode_raw_data(pack_file: &mut File) -> (Self, Vec<u8>) {
         let mut raw_pack = Self::check_header(pack_file).unwrap();
         let mut _raw: Vec<u8> = Vec::new();
@@ -141,7 +147,7 @@ impl Pack {
     }
     /// Get the Object from File by the Give Offset<br>
     /// By the way , the cache can hold the fount object
-    pub fn next_object(
+    fn next_object(
         pack_file: &mut File,
         offset: u64,
         cache: &mut PackObjectCache,

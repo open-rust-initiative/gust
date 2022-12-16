@@ -200,7 +200,7 @@ impl Pack {
     /// ,The object Hash is `aabbbbbbbbbbbbbbbbbb`
     /// - in：loose_root  : loose object root dir
     /// - in: target_path : The pack file dir to store
-
+    /// 
     /// 查找到所有的loose文件代表的Hash值
     fn find_all_loose(loose_root_path: &str) -> Vec<String> {
         let loose_root = std::path::PathBuf::from(loose_root_path);
