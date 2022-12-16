@@ -2,12 +2,15 @@
 use bstr::ByteSlice;
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use super::super::hash::Hash;
 use super::super::object::Metadata;
 use super::Pack;
+use super::decode::ObjDecodedMap;
+use crate::errors::GitError;
 use crate::git::object::diff::DeltaDiff;
 use crate::git::object::types::ObjectType;
 use crate::utils;
@@ -308,11 +311,23 @@ impl Pack {
 
         new_pack
     }
-}
 
+    pub fn write(map:&mut ObjDecodedMap,taget_dir:&str)->Result<(),GitError>{
+        map.check_completeness()?;
+        let meta_vec = map.vec_sliding_window();
+        let (_pack, data_write) = Pack::encode_delta(meta_vec);
+        let mut to_path = PathBuf::from(taget_dir);
+        let file_name = format!("pack-{}.pack", _pack.signature.to_plain_str());
+        to_path.push(file_name);
+        let mut file = std::fs::File::create(to_path).expect("create failed");
+        file.write_all(data_write.as_bytes()).expect("write failed");
+        Ok(())
+    } 
+}
 #[cfg(test)]
 mod tests {
 
+    const TEST_DIR:&str = "./test_dir" ;
     use crate::git::pack::{decode::ObjDecodedMap, Pack};
     use bstr::ByteSlice;
     use std::fs::File;
@@ -335,40 +350,13 @@ mod tests {
     //
     #[test]
     fn test_a_real_pack_de_en() {
-        let mut pack_file = File::open(&Path::new(
-            "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
-        ))
-        .unwrap();
-        use super::super::Pack;
-        let mut decoded_pack = match Pack::decode(&mut pack_file) {
-            Ok(f) => f,
-            Err(e) => panic!("{}", e.to_string()),
-        };
-        assert_eq!(*b"PACK", decoded_pack.head);
-        assert_eq!(2, decoded_pack.version);
-
-        let result = decoded_pack.encode(None);
-        let mut file = std::fs::File::create("data.pack").expect("create failed");
-        file.write_all(result.as_bytes()).expect("write failed");
-
-        println!("data written to file");
-        // 将生成的pack文件重新进行一遍解析，以此验证生成文件的正确性
-        let mut pack_file = File::open(&Path::new("./data.pack")).unwrap();
-        let decoded_pack = match Pack::decode(&mut pack_file) {
-            Ok(f) => f,
-            Err(e) => panic!("{}", e.to_string()),
-        };
-        assert_eq!(*b"PACK", decoded_pack.head);
-        assert_eq!(2, decoded_pack.version);
-
-        let mut result = ObjDecodedMap::default();
-        result.update_from_cache(&decoded_pack.result);
-
-        for (key, value) in result._map_hash.iter() {
-            println!("*********************");
-            println!("Hash :{}", key);
-            println!("{}", value);
-        }
+       
+        let  decoded_pack =Pack::decode_file("./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack");
+        let mut map = ObjDecodedMap::default();
+        map.update_from_cache(&decoded_pack.get_cache());
+        Pack::write(&mut map, TEST_DIR).unwrap();
+        let  decoded_pack =Pack::decode_file("./test_dir/pack-c2bb2879540862893a645c24e8376380b377fd61.pack");
+        
     }
 
     #[test]
@@ -433,7 +421,7 @@ mod tests {
         let mut file = std::fs::File::create(file_name).expect("create failed");
         file.write_all(data_write.as_bytes()).expect("write failed");
 
-        let mut _map = ObjDecodedMap::default();
+        
         let decoded_pack =
             Pack::decode_file(&format!("pack-{}.pack", _pack.signature.to_plain_str()));
         assert_eq!(

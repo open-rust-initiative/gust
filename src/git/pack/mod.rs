@@ -186,11 +186,6 @@ impl Pack {
                 utils::seek(pack_file, offset)?;
                 let base_obj = base_object.as_ref();
                 println!("The delta offset:{}", offset);
-                println!(
-                    "The base size :{} , composed size :{}",
-                    base_obj.size,
-                    base_obj.data.len()
-                );
                 let objs = apply_delta(pack_file, base_obj)?;
                 Ok(objs)
             }

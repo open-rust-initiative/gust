@@ -15,3 +15,4 @@ Cargo.lock
 
 # Mac
 .DS_Store
+.VSCodeCounter
