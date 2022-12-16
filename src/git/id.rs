@@ -1,7 +1,6 @@
-//!  # Deprecated 
+//!  # Deprecated
 //! It was used to the Hash value
 //! ID .
-
 
 use std::fmt::Display;
 
@@ -14,7 +13,7 @@ use super::object::types::ObjectType;
 
 /// Git Object ID: a SHA-1 hash for now, and we will support multiple hash algorithms later.
 /// The SHA-1 Hax ID is a 40-byte hexadecimal string.
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone,Default)]
+#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone, Default)]
 pub struct ID {
     pub bytes: Vec<u8>,
     pub hash: String,
@@ -25,19 +24,21 @@ impl ID {
     /// Return the first and second alphanumeric characters of the ID.
     /// In the git object store format, the first two characters is the folder for save the object.
     #[allow(unused)]
-    pub(crate) fn to_folder(&self) -> String { //to_folder
+    pub(crate) fn to_folder(&self) -> String {
+        //to_folder
         self.hash.as_str()[0..2].to_string()
     }
 
     /// Return the last 18 characters of the ID for the object name.
     #[allow(unused)]
-    pub(crate) fn to_filename(&self) -> String { 
+    pub(crate) fn to_filename(&self) -> String {
         self.hash.as_str()[2..].to_string()
     }
 
     /// Return the ID in the git object store format form a hex string.
     #[allow(unused)]
-    pub(crate) fn from_string(s: &str) -> Self {//from_str
+    pub(crate) fn from_string(s: &str) -> Self {
+        //from_str
         ID {
             bytes: hex::decode(s).unwrap(),
             hash: s.to_string(),
@@ -46,7 +47,8 @@ impl ID {
 
     /// Return the ID in the git object store format from a byte array.
     #[allow(unused)]
-    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {//hex_to_hash
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
+        //hex_to_hash
         ID {
             bytes: bytes.to_vec(),
             hash: hex::encode(bytes),
@@ -54,7 +56,8 @@ impl ID {
     }
 
     #[allow(unused)]
-    pub(crate) fn from_vec(t: ObjectType, data: &mut [u8]) -> Self {//new
+    pub(crate) fn from_vec(t: ObjectType, data: &mut [u8]) -> Self {
+        //new
         let mut hash = Sha1::new();
 
         let object: &[u8] = &[
@@ -63,7 +66,8 @@ impl ID {
             data.len().to_string().as_bytes(),
             NL,
             (data),
-        ].concat();
+        ]
+        .concat();
 
         hash.input(object);
         let mut id = [0u8; 20];
@@ -122,5 +126,4 @@ mod tests {
         let id = ID::from_vec(super::ObjectType::Blob, &mut buffer);
         assert_eq!("82352c3a6a7a8bd32011751699c7a3648d1b5d3c", id.to_string());
     }
-
 }

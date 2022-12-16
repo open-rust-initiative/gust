@@ -5,17 +5,16 @@
 
 use bstr::ByteSlice;
 
-use super::Metadata;
 use super::sign::AuthorSign;
+use super::Metadata;
 use crate::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
 
 use std::fmt::Display;
 
-
 /// Git Object: tag
- use std::cmp::Ordering;
+use std::cmp::Ordering;
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tag {
@@ -34,7 +33,7 @@ impl Ord for Tag {
 
 impl PartialOrd for Tag {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(other.meta.size.cmp(&self.meta.size))  
+        Some(other.meta.size.cmp(&self.meta.size))
     }
 }
 
@@ -48,7 +47,6 @@ impl Tag {
     /// Tag 的构造函数 接收一个@param meta::Metadata
     /// 同时执行tag解码 -> `fn decode_metadata`
     pub fn new(meta: Metadata) -> Self {
-        
         let mut a = Self {
             meta: meta.clone(),
             object: meta.id.clone(),
@@ -89,8 +87,7 @@ impl Tag {
             .unwrap()
             .parse()
             .unwrap();
-        data = data[tag_end + 1 ..].to_vec();//Fixed Bug: bug type_end to tag_end 
-       
+        data = data[tag_end + 1..].to_vec(); //Fixed Bug: bug type_end to tag_end
 
         let tagger_begin = data.find("tagger").unwrap();
         let tagger_end = data.find_byte(0x0a).unwrap();
@@ -145,25 +142,23 @@ impl Display for Tag {
         writeln!(f, "Type: Tag").unwrap();
         writeln!(f, "Tag : {}", self.tag).unwrap();
         self.tagger.fmt(f).unwrap();
-        writeln!(f,"{}",self.message)
+        writeln!(f, "{}", self.message)
     }
 }
 ///
 #[cfg(test)]
 mod tests {
+    use crate::git::hash::Hash;
+    use crate::git::hash::HashType;
+    use crate::git::object::types::ObjectType;
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
     use std::vec;
-    use crate::git::hash::Hash;
-    use crate::git::hash::HashType;
-    use crate::git::object::types::ObjectType;
 
     use super::AuthorSign;
     use super::Metadata;
-
-    
 
     use super::Tag;
 
@@ -199,7 +194,7 @@ mod tests {
         };
 
         tag.decode_metadata().unwrap();
-        
+
         assert_eq!(
             "6414e45babf0bdd043ba40d31123053cfebef26c",
             tag.object.to_plain_str()
@@ -207,7 +202,7 @@ mod tests {
         assert_eq!("commit", tag.t.to_string());
         assert_eq!("v1.1.0", tag.tag);
         assert_eq!(1653037847, tag.tagger.timestamp);
-        println!("{}",tag);
+        println!("{}", tag);
     }
 
     #[test]
@@ -215,7 +210,7 @@ mod tests {
         let meta = Metadata {
             t: ObjectType::Tag,
             h: HashType::Sha1,
-            id: Hash::from_str("df1087c478c8d337cb587b897e86f2455e2687ed").unwrap() ,
+            id: Hash::from_str("df1087c478c8d337cb587b897e86f2455e2687ed").unwrap(),
             size: 155,
             data: vec![
                 111, 98, 106, 101, 99, 116, 32, 51, 55, 50, 49, 51, 101, 55, 98, 98, 51, 99, 51,
@@ -228,20 +223,17 @@ mod tests {
                 112, 108, 101, 109, 101, 110, 116, 97, 116, 105, 111, 110, 32, 111, 102, 32, 116,
                 104, 101, 32, 99, 108, 105, 10,
             ],
-            delta_header:vec![],
+            delta_header: vec![],
         };
 
         let tag = Tag::new(meta);
-        
-        
+
         println!("{}", tag);
     }
     ///
     #[test]
     fn test_tag_write_to_file() {
-
-        let meta = Metadata ::new(ObjectType::Tag, &vec![]);
-
+        let meta = Metadata::new(ObjectType::Tag, &vec![]);
 
         let tagger = AuthorSign {
             t: "tagger".to_string(),

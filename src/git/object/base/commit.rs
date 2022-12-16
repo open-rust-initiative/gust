@@ -2,19 +2,18 @@
 //!Commit 对象结构体
 //!
 
-
-use std::cmp::Ordering;
-use std::fmt::Display;
-use bstr::ByteSlice;
+use super::super::Hash;
+use super::sign::AuthorSign;
+use super::Metadata;
 use crate::errors::GitError;
 use crate::git::object::types::ObjectType;
-use super::super::Hash;
-use super::Metadata;
-use super::sign::AuthorSign;
+use bstr::ByteSlice;
+use std::cmp::Ordering;
+use std::fmt::Display;
 
 /// Git Object: commit
 #[allow(unused)]
-#[derive( Eq, Debug,Hash,Clone)]
+#[derive(Eq, Debug, Hash, Clone)]
 pub struct Commit {
     pub meta: Metadata,
     pub tree_id: Hash,
@@ -31,7 +30,7 @@ impl Ord for Commit {
 
 impl PartialOrd for Commit {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(other.meta.size.cmp(&self.meta.size))  
+        Some(other.meta.size.cmp(&self.meta.size))
     }
 }
 
@@ -89,7 +88,8 @@ impl Commit {
             while index < author_begin {
                 let parent_begin = data.find_byte(0x20).unwrap();
                 let parent_end = data.find_byte(0x0a).unwrap();
-                parents.push(Hash::from_bytes(&data[parent_begin + 1..parent_end].to_vec()).unwrap());
+                parents
+                    .push(Hash::from_bytes(&data[parent_begin + 1..parent_end].to_vec()).unwrap());
                 index = index + parent_end + 1;
             }
 
@@ -163,15 +163,14 @@ impl Display for Commit {
 
 #[cfg(test)]
 mod tests {
+    use super::AuthorSign;
+    use super::Metadata;
+    use crate::git::hash::Hash;
+    use crate::git::object::types::ObjectType;
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
-    use super::Metadata;
-    use super::AuthorSign;
-    use crate::git::hash::Hash;
-    use crate::git::object::types::ObjectType;
-
 
     use super::Commit;
 
@@ -208,7 +207,7 @@ mod tests {
         path.push("resources/data/test/commit-1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a");
 
         let mut commit = get_empty_commit(path);
-        
+
         commit.decode_meta().unwrap();
 
         assert_eq!(
@@ -236,7 +235,7 @@ mod tests {
     ///
     #[test]
     fn test_commit_write_to_file() {
-        let meta = Metadata::new(ObjectType::Commit, &vec![]) ;
+        let meta = Metadata::new(ObjectType::Commit, &vec![]);
 
         let author = AuthorSign {
             t: "author".to_string(),

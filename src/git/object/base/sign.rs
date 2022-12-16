@@ -26,7 +26,11 @@ pub struct AuthorSign {
 ///
 impl Display for AuthorSign {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} \n Email:<{}> \n timestamp:{}\n timezone:{}", self.name, self.email, self.timestamp, self.timezone)
+        write!(
+            f,
+            "{} \n Email:<{}> \n timestamp:{}\n timezone:{}",
+            self.name, self.email, self.timestamp, self.timezone
+        )
     }
 }
 
@@ -44,12 +48,22 @@ impl AuthorSign {
         let email_start = data.find_byte(0x3C).unwrap();
         let email_end = data.find_byte(0x3E).unwrap();
 
-        self.name = data[name_start + 1..email_start - 1].to_str().unwrap().to_string();
-        self.email = data[email_start + 1..email_end].to_str().unwrap().to_string();
+        self.name = data[name_start + 1..email_start - 1]
+            .to_str()
+            .unwrap()
+            .to_string();
+        self.email = data[email_start + 1..email_end]
+            .to_str()
+            .unwrap()
+            .to_string();
         data = data[email_end + 2..].to_vec();
 
         let timestamp_split = data.find_byte(0x20).unwrap();
-        self.timestamp = data[0..timestamp_split].to_str().unwrap().parse::<usize>().unwrap();
+        self.timestamp = data[0..timestamp_split]
+            .to_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
         self.timezone = data[timestamp_split + 1..].to_str().unwrap().to_string();
 
         Ok(())
@@ -84,28 +98,36 @@ mod tests {
             name: "Quanyi Ma".to_string(),
             email: "eli@patch.sh".to_string(),
             timestamp: 1649521615,
-            timezone: "+0800".to_string()
+            timezone: "+0800".to_string(),
         };
 
         let data = author.encode_to_data().unwrap();
 
-        let author_data = [97, 117, 116, 104, 111, 114, 32, 81, 117, 97, 110, 121, 105, 32, 77, 97, 32, 60, 101, 108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49, 54, 49, 53, 32, 43, 48, 56, 48, 48]
-            .to_vec();
+        let author_data = [
+            97, 117, 116, 104, 111, 114, 32, 81, 117, 97, 110, 121, 105, 32, 77, 97, 32, 60, 101,
+            108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49,
+            54, 49, 53, 32, 43, 48, 56, 48, 48,
+        ]
+        .to_vec();
 
         assert_eq!(data, author_data);
     }
 
     #[test]
     fn test_author_sign_decode() {
-        let author_data = [97, 117, 116, 104, 111, 114, 32, 81, 117, 97, 110, 121, 105, 32, 77, 97, 32, 60, 101, 108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49, 54, 49, 53, 32, 43, 48, 56, 48, 48]
-            .to_vec();
+        let author_data = [
+            97, 117, 116, 104, 111, 114, 32, 81, 117, 97, 110, 121, 105, 32, 77, 97, 32, 60, 101,
+            108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49,
+            54, 49, 53, 32, 43, 48, 56, 48, 48,
+        ]
+        .to_vec();
 
         let mut author = super::AuthorSign {
             t: "".to_string(),
             name: "".to_string(),
             email: "".to_string(),
             timestamp: 0,
-            timezone: "".to_string()
+            timezone: "".to_string(),
         };
 
         author.decode_from_data(author_data).unwrap();

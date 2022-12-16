@@ -1,15 +1,15 @@
 //! ### Types enums for object types
 //! There are ObjectType
 //! PackObjectType
-//! 
-//! 
-use std::{ fmt::Display, vec};
+//!
+//!
 use crate::errors::GitError;
+use std::{fmt::Display, vec};
 
 /// Four abstract Object Types:
 /// - Blob
 /// - Tree
-/// - Commit 
+/// - Commit
 /// - Tag
 /// - OffsetDelta(6)
 /// - HashDelta(7)
@@ -22,7 +22,6 @@ pub enum ObjectType {
     OffsetDelta,
     HashDelta,
 }
-
 
 /// Display trait for Git objects type
 impl Display for ObjectType {
@@ -63,27 +62,26 @@ impl ObjectType {
             _ => Err(GitError::InvalidObjectType(s.to_string())),
         }
     }
-    pub fn type2_number(&self)->u8{
+    pub fn type2_number(&self) -> u8 {
         match self {
-            ObjectType::Commit=> 1,
-            ObjectType::Tree=> 2,
-            ObjectType::Blob=> 3,
-            ObjectType::Tag=> 4,
+            ObjectType::Commit => 1,
+            ObjectType::Tree => 2,
+            ObjectType::Blob => 3,
+            ObjectType::Tag => 4,
             ObjectType::OffsetDelta => 6,
             ObjectType::HashDelta => 7,
         }
     }
 
-    pub fn number_type(num:u8) -> Self{
+    pub fn number_type(num: u8) -> Self {
         match num {
             1 => ObjectType::Commit,
             2 => ObjectType::Tree,
             3 => ObjectType::Blob,
             4 => ObjectType::Tag,
-            6 => ObjectType::OffsetDelta ,
-            7 => ObjectType::HashDelta ,
+            6 => ObjectType::OffsetDelta,
+            7 => ObjectType::HashDelta,
             _ => panic!("InValid git types"),
         }
     }
 }
-

@@ -7,7 +7,6 @@ use std::fmt::Display;
 
 pub use super::Metadata;
 
-
 /// **The Object Class Enum**<br>
 /// Merge the four basic classes into an enumeration structure for easy saving
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]

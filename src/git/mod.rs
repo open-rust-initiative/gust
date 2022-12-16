@@ -8,12 +8,11 @@
 //!
 
 pub mod hash;
-mod midx;
 mod id;
 mod idx;
+mod midx;
 mod object;
 mod pack;
-
 
 // use std::fmt::Display;
 // use std::fs::{File,create_dir_all};
@@ -42,10 +41,6 @@ pub const NL: &[u8] = &[0x00];
 
 /// In the git object store format, 0x0a is the line feed character in the commit object.
 // pub const LF: &[u8] = &[0x0A];
-
-
-
-
 
 ///
 #[cfg(test)]

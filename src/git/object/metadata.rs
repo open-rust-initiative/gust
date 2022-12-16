@@ -1,10 +1,10 @@
-use std::fs::{File,create_dir_all};
-use std::io::{BufReader,Read,Write};
-use std::path::PathBuf;
 use anyhow::Context;
 use bstr::ByteSlice;
-use deflate::{Compression,write::ZlibEncoder};
+use deflate::{write::ZlibEncoder, Compression};
 use flate2::read::ZlibDecoder;
+use std::fs::{create_dir_all, File};
+use std::io::{BufReader, Read, Write};
+use std::path::PathBuf;
 
 use super::Hash;
 use super::ObjectType;
@@ -18,29 +18,27 @@ pub struct Metadata {
     pub id: Hash,
     pub size: usize,
     pub data: Vec<u8>,
-    pub delta_header :Vec<u8>,
+    pub delta_header: Vec<u8>,
 }
 
 /// Implement function for Metadata
 impl Metadata {
-
-
     pub fn hash(&self) -> Hash {
         Hash::from_meta(&self)
     }
-    pub fn new(obj_type:ObjectType, data:&Vec<u8>) -> Metadata{
-        let mut _metadata = Metadata{
+    pub fn new(obj_type: ObjectType, data: &Vec<u8>) -> Metadata {
+        let mut _metadata = Metadata {
             t: obj_type,
             h: HashType::Sha1,
-            id:Hash::default(),
+            id: Hash::default(),
             size: data.len(),
             data: data.to_vec(),
-            delta_header:vec![],
+            delta_header: vec![],
         };
         // compute hash value
         _metadata.id = _metadata.hash();
         _metadata
-    }   
+    }
 
     /// Write the object to the file system with folder and file.
     /// This function can create a “loose” object format,
@@ -91,14 +89,13 @@ impl Metadata {
             compressed_data.push(0);
         }
         match self.t {
-
             ObjectType::OffsetDelta => {
                 compressed_data.append(&mut self.delta_header.clone());
-            },
+            }
             ObjectType::HashDelta => {
                 compressed_data.append(&mut self.delta_header.clone());
             }
-            _ =>{}
+            _ => {}
         }
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
         encoder.write_all(&self.data).expect("Write error!");
@@ -134,22 +131,22 @@ impl Metadata {
         let mut data = decoded[size_index + 1..].to_vec();
 
         match String::from_utf8(t.to_vec()).unwrap().as_str() {
-            "blob" => Ok(Metadata::new( ObjectType::Blob, &data)),
-            "tree" => Ok(Metadata::new( ObjectType::Tree, &data)),
-            "commit" => Ok(Metadata::new( ObjectType::Commit, &data)),
-            "tag" => Ok(Metadata::new( ObjectType::Tag, &data)),
+            "blob" => Ok(Metadata::new(ObjectType::Blob, &data)),
+            "tree" => Ok(Metadata::new(ObjectType::Tree, &data)),
+            "commit" => Ok(Metadata::new(ObjectType::Commit, &data)),
+            "tag" => Ok(Metadata::new(ObjectType::Tag, &data)),
             _ => Err(GitError::InvalidObjectType(
                 String::from_utf8(t.to_vec()).unwrap(),
             )),
         }
     }
 
-    /// Change the base object to the delta object , 
+    /// Change the base object to the delta object ,
     /// including : ref-object ofs-object
-    pub fn change_to_delta(&mut self ,types:ObjectType, changed:Vec<u8>,header:Vec<u8>) {
+    pub fn change_to_delta(&mut self, types: ObjectType, changed: Vec<u8>, header: Vec<u8>) {
         self.t = types;
         self.data = changed;
         self.size = self.data.len();
-        self.delta_header  =header;
+        self.delta_header = header;
     }
 }

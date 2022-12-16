@@ -1,11 +1,11 @@
+use super::{Hash, Metadata};
 use crate::errors::GitError;
+use crate::utils;
+use flate2::read::ZlibDecoder;
 use std::fs::File;
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 use std::str::FromStr;
-use flate2::read::ZlibDecoder;
-use super::{Hash, Metadata};
-use crate::utils;
 
 const COPY_INSTRUCTION_FLAG: u8 = 1 << 7;
 const COPY_OFFSET_BYTES: u8 = 4;
@@ -14,7 +14,6 @@ const COPY_ZERO_SIZE: usize = 0x10000;
 
 ///使用delta指令
 pub fn apply_delta(pack_file: &mut File, base: &Metadata) -> Result<Metadata, GitError> {
-
     utils::read_zlib_stream_exact(pack_file, |delta| {
         let base_size = utils::read_size_encoding(delta).unwrap();
         if base.size != base_size {
@@ -33,7 +32,7 @@ pub fn apply_delta(pack_file: &mut File, base: &Metadata) -> Result<Metadata, Gi
         }
 
         // The object type is the same as the base object
-        Ok(Metadata::new(base.t,&result))
+        Ok(Metadata::new(base.t, &result))
     })
 }
 
@@ -49,7 +48,8 @@ fn apply_delta_instruction<R: Read>(
         Err(err) if err.kind() == ErrorKind::UnexpectedEof => return Ok(false),
         Err(err) => {
             return Err(GitError::DeltaObjError(format!(
-                "Wrong instruction in delta :{}",err.to_string()
+                "Wrong instruction in delta :{}",
+                err.to_string()
             )))
         }
     };
@@ -83,12 +83,11 @@ fn apply_delta_instruction<R: Read>(
         match base_data {
             Ok(data) => result.extend_from_slice(data),
             Err(e) => return Err(e),
-          }
         }
-        
+    }
+
     Ok(true)
 }
-
 
 // 这里默认的是若是pack里面没有，则只能从loose里面找了
 pub fn read_object(hash: Hash) -> Result<Metadata, GitError> {
@@ -97,8 +96,7 @@ pub fn read_object(hash: Hash) -> Result<Metadata, GitError> {
         Ok(object) => object,
         // Not found in objects directory; look in packfiles
         Err(_err) => panic!("not found object"),
-    };  
-    
+    };
 
     let object_hash = object.hash();
     if object_hash != hash {
@@ -139,19 +137,23 @@ fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
         }
     };
     let size = utils::read_until_delimiter(&mut object_stream, b'\0')?;
-    let size = match parse_decimal(&size){
-      Some(a) => a,
-      None => return Err(GitError::DeltaObjError(format!("Invalid object size: {:?}", size)))
+    let size = match parse_decimal(&size) {
+        Some(a) => a,
+        None => {
+            return Err(GitError::DeltaObjError(format!(
+                "Invalid object size: {:?}",
+                size
+            )))
+        }
     };
 
-    
     let mut contents = Vec::with_capacity(size);
     object_stream.read_to_end(&mut contents)?;
     if contents.len() != size {
         return Err(GitError::DeltaObjError(format!("Incorrect object size")));
     }
 
-    Ok(Metadata::new(object_type,&contents))
+    Ok(Metadata::new(object_type, &contents))
 }
 
 ///解析u8数组的十进制
@@ -172,4 +174,3 @@ fn decimal_char_value(decimal_char: u8) -> Option<u8> {
         _ => None,
     }
 }
-

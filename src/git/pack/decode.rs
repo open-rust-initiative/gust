@@ -1,16 +1,16 @@
 //!	Decode pack file by the `ObjDecodedMap`
 use super::super::object as obj;
+use super::cache::PackObjectCache;
 use crate::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
+use colored::Colorize;
 use obj::base::ObjClass;
 use obj::base::{blob, commit, tag, tree};
 use obj::Metadata;
-use std::fmt::{self, Display};
 use std::collections::HashMap;
+use std::fmt::{self, Display};
 use std::sync::Arc;
-use super::cache::PackObjectCache;
-use colored::Colorize;
 ///!对取出的object字段进行进一步解码与包装
 /// 用于存储解析出的object抽象对象的hashmap
 #[derive(Default, Clone)]
@@ -20,8 +20,8 @@ pub struct ObjDecodedMap {
     trees: Vec<tree::Tree>,
     tags: Vec<tag::Tag>,
     commits: Vec<commit::Commit>,
-    name_map :HashMap<Hash,String>,
-} 
+    name_map: HashMap<Hash, String>,
+}
 //在解析完object后执行的进一步的解码过程
 impl ObjDecodedMap {
     /// 通过cache对不同结构进行进一步解析
@@ -64,34 +64,34 @@ impl ObjDecodedMap {
     #[allow(unused)]
     pub fn check_completeness(&mut self) -> Result<(), GitError> {
         //验证对象树 tree object的完整性 确保tree item下的hash值有对应的object
-        for _tree in self.trees.iter(){
+        for _tree in self.trees.iter() {
             for item in &_tree.tree_items {
                 // 保存对象名与hash值的对应
                 self.name_map.insert(item.id.clone(), item.filename.clone());
                 // 检查是否存在对应hash
-                if  self._map_hash.get(&item.id) == None{
+                if self._map_hash.get(&item.id) == None {
                     return Err(GitError::UnCompletedPackObject(format!(
                         "can't find hash value:{}",
                         &_tree.meta.id
-                    )))
+                    )));
                 }
             }
         }
 
         // For tree & blob object , Get their name
-        for _tree in self.trees.iter_mut(){
-            let name  = self.name_map.get(&_tree.meta.id);
+        for _tree in self.trees.iter_mut() {
+            let name = self.name_map.get(&_tree.meta.id);
             match name {
-                Some(_name ) => _tree.tree_name = _name.clone(),
-                None =>{},
+                Some(_name) => _tree.tree_name = _name.clone(),
+                None => {}
             }
         }
 
-        for _blob in self.blobs.iter_mut(){
-            let name  = self.name_map.get(&_blob.meta.id);
+        for _blob in self.blobs.iter_mut() {
+            let name = self.name_map.get(&_blob.meta.id);
             match name {
-                Some(_name ) => _blob.filename = _name.clone(),
-                None =>{},
+                Some(_name) => _blob.filename = _name.clone(),
+                None => {}
             }
         }
         // sort the four base object
@@ -105,18 +105,18 @@ impl ObjDecodedMap {
 
     /// 将 `check_completeness` 函数解析后的放入
     #[allow(unused)]
-    pub fn vec_sliding_window(&self) -> Vec<Metadata>{
+    pub fn vec_sliding_window(&self) -> Vec<Metadata> {
         let mut list = vec![];
-        for c in self.commits.iter(){
-           list.push(c.meta.clone());
+        for c in self.commits.iter() {
+            list.push(c.meta.clone());
         }
-        for t in self.tags.iter(){
+        for t in self.tags.iter() {
             list.push(t.meta.clone());
         }
-        for tree in self.trees.iter(){
+        for tree in self.trees.iter() {
             list.push(tree.meta.clone());
         }
-        for blob in self.blobs.iter(){
+        for blob in self.blobs.iter() {
             list.push(blob.meta.clone());
         }
 
@@ -124,20 +124,18 @@ impl ObjDecodedMap {
     }
 
     #[allow(unused)]
-    pub fn print_vec(&self){
-
-
-        for c in self.commits.iter(){
-            println!("{}",c);
+    pub fn print_vec(&self) {
+        for c in self.commits.iter() {
+            println!("{}", c);
         }
-        for t in self.tags.iter(){
-            println!("{}",t);
+        for t in self.tags.iter() {
+            println!("{}", t);
         }
-        for tree in self.trees.iter(){
-            println!("{}",tree);
+        for tree in self.trees.iter() {
+            println!("{}", tree);
         }
-        for blob in self.blobs.iter(){
-            println!("{}",blob);
+        for blob in self.blobs.iter() {
+            println!("{}", blob);
         }
     }
 }
@@ -158,12 +156,14 @@ impl Display for ObjDecodedMap {
 }
 #[cfg(test)]
 mod tests {
-    use super::ObjDecodedMap;
     use super::super::Pack;
+    use super::ObjDecodedMap;
     #[test]
     pub fn test_map_new() {
         let mut _map = ObjDecodedMap::default();
-        let decoded_pack = Pack::decode_file("./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack");
+        let decoded_pack = Pack::decode_file(
+            "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
+        );
         assert_eq!(
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_plain_str()

@@ -1,17 +1,17 @@
 //!Encode and Decode The Pack File ,which is in the dir:`.git/object/pack/*.pack`
-//! 
+//!
+use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::convert::TryFrom;
-use std::fs::File;
 use std::sync::Arc;
 
 use self::cache::PackObjectCache;
 use super::hash::Hash;
 use super::idx::Idx;
-use super::object::Metadata;
 use super::object::delta::*;
+use super::object::Metadata;
 use crate::errors::GitError;
 use crate::git::pack::decode::ObjDecodedMap;
 use crate::utils;
@@ -41,7 +41,7 @@ pub struct Pack {
     head: [u8; 4],
     version: u32,
     number_of_objects: usize,
-    signature: Hash, 
+    signature: Hash,
     result: PackObjectCache,
 }
 
@@ -58,7 +58,6 @@ impl Pack {
 
         // Init the cache for follow object parse
         let mut cache = PackObjectCache::default();
-
 
         for _ in 0.._pack.number_of_objects {
             //update offset of the Object
@@ -131,14 +130,14 @@ impl Pack {
         Ok(_pack)
     }
 
-    pub fn decode_raw_data(pack_file: &mut File) -> (Self,Vec<u8>){
-        let mut  raw_pack = Self::check_header(pack_file).unwrap();
-        let mut _raw:Vec<u8> =Vec::new();
+    pub fn decode_raw_data(pack_file: &mut File) -> (Self, Vec<u8>) {
+        let mut raw_pack = Self::check_header(pack_file).unwrap();
+        let mut _raw: Vec<u8> = Vec::new();
         pack_file.read_to_end(&mut _raw).unwrap();
-        let raw_info = _raw[.._raw.len()-20].to_vec();
-        let _hash = Hash::from_row(&_raw[_raw.len()-20..]);
+        let raw_info = _raw[.._raw.len() - 20].to_vec();
+        let _hash = Hash::from_row(&_raw[_raw.len() - 20..]);
         raw_pack.signature = _hash;
-        (raw_pack,raw_info)
+        (raw_pack, raw_info)
     }
     /// Get the Object from File by the Give Offset<br>
     /// By the way , the cache can hold the fount object
@@ -150,11 +149,11 @@ impl Pack {
         use super::object::types::ObjectType;
         utils::seek(pack_file, offset)?;
         let (type_num, size) = utils::read_type_and_size(pack_file)?;
-        println!("decode type:{}",ObjectType::number_type(type_num));
+        println!("decode type:{}", ObjectType::number_type(type_num));
         //Get the Object according to the Types Enum
         let object = match type_num {
             // Undelta representation
-            1..=4  => utils::read_zlib_stream_exact(pack_file, |decompressed| {
+            1..=4 => utils::read_zlib_stream_exact(pack_file, |decompressed| {
                 let mut contents = Vec::with_capacity(size);
                 decompressed.read_to_end(&mut contents)?;
                 if contents.len() != size {
@@ -162,18 +161,16 @@ impl Pack {
                         "Incorrect object size"
                     )));
                 }
-                Ok(Metadata::new(ObjectType::number_type(type_num),&contents))
+                Ok(Metadata::new(ObjectType::number_type(type_num), &contents))
             }),
             // Delta; base object is at an offset in the same packfile
             6 => {
-                
                 let delta_offset = utils::read_offset_encoding(pack_file)?;
                 let base_offset = offset.checked_sub(delta_offset).ok_or_else(|| {
                     GitError::InvalidObjectInfo(format!("Invalid OffsetDelta offset"))
                 })?;
                 let offset = utils::get_offset(pack_file)?;
-                
-                
+
                 let base_object = if let Some(object) = cache.offset_object(base_offset) {
                     Arc::clone(object)
                 } else {
@@ -182,8 +179,12 @@ impl Pack {
                 };
                 utils::seek(pack_file, offset)?;
                 let base_obj = base_object.as_ref();
-                println!("The delta offset:{}",offset);
-                println!("The base size :{} , composed size :{}",base_obj.size,base_obj.data.len());
+                println!("The delta offset:{}", offset);
+                println!(
+                    "The base size :{} , composed size :{}",
+                    base_obj.size,
+                    base_obj.data.len()
+                );
                 let objs = apply_delta(pack_file, base_obj)?;
                 Ok(objs)
             }
@@ -200,7 +201,11 @@ impl Pack {
                 };
                 apply_delta(pack_file, &base_object)
             }
-            _ => return Err(GitError::InvalidObjectType(ObjectType::number_type(type_num).to_string())),
+            _ => {
+                return Err(GitError::InvalidObjectType(
+                    ObjectType::number_type(type_num).to_string(),
+                ))
+            }
         }?;
 
         // //Debug Code: Print the hash & type of the parsed object
@@ -214,18 +219,18 @@ impl Pack {
         Ok(obj)
     }
 
-    pub fn get_object_number(&self)-> usize{
+    pub fn get_object_number(&self) -> usize {
         return self.number_of_objects as usize;
     }
-    pub fn get_cache(&self) -> PackObjectCache{
+    pub fn get_cache(&self) -> PackObjectCache {
         return self.result.clone();
     }
-    pub fn get_hash(&self) -> Hash{
-        return self.signature.clone() ;
+    pub fn get_hash(&self) -> Hash {
+        return self.signature.clone();
     }
-    
-    /// Decode a pack file according to the given pack file path 
-    /// # Examples 
+
+    /// Decode a pack file according to the given pack file path
+    /// # Examples
     /// ```
     ///  let decoded_pack = Pack::decode_file("./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack");
     ///  assert_eq!(
@@ -233,13 +238,10 @@ impl Pack {
     ///    decoded_pack.signature.to_plain_str()
     ///  );
     /// ```
-    /// 
+    ///
     #[allow(unused)]
-    pub fn decode_file(file:&str)->Pack{
-        let mut pack_file = File::open(&Path::new(
-            file,
-        ))
-        .unwrap();
+    pub fn decode_file(file: &str) -> Pack {
+        let mut pack_file = File::open(&Path::new(file)).unwrap();
         let decoded_pack = match Pack::decode(&mut pack_file) {
             Ok(f) => f,
             Err(e) => panic!("{}", e.to_string()),
@@ -248,7 +250,7 @@ impl Pack {
         assert_eq!(2, decoded_pack.version);
         let mut result = ObjDecodedMap::default();
         result.update_from_cache(&decoded_pack.result);
-        print!("{}",result);
+        print!("{}", result);
         decoded_pack
     }
 }
@@ -258,18 +260,19 @@ impl Pack {
 mod tests {
 
     use crate::git::idx::Idx;
-  
+
+    use super::Pack;
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Read;
     use std::path::Path;
-    use super::Pack;
 
-   
     /// Test the pack File decode standalone
     #[test]
     fn test_decode_pack_file1() {
-        let decoded_pack = Pack::decode_file("./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack");
+        let decoded_pack = Pack::decode_file(
+            "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
+        );
         assert_eq!(
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_plain_str()
@@ -277,7 +280,9 @@ mod tests {
     }
     #[test]
     fn test_decode_pack_file_with_print() {
-        let decoded_pack = Pack::decode_file("./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack");
+        let decoded_pack = Pack::decode_file(
+            "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack",
+        );
         assert_eq!(
             "8d36a6464e1f284e5e9d06683689ee751d4b2687",
             decoded_pack.signature.to_plain_str()
@@ -285,33 +290,35 @@ mod tests {
     }
     #[test]
     fn test_parse_simple_pack() {
-        let decoded_pack = Pack::decode_file("./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack");
+        let decoded_pack = Pack::decode_file(
+            "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
+        );
         assert_eq!(
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             decoded_pack.signature.to_plain_str()
         );
-        print!("{}",decoded_pack.get_object_number());
+        print!("{}", decoded_pack.get_object_number());
     }
 
     #[test]
     fn test_parse_simple_pack2() {
-        let decoded_pack = Pack::decode_file("./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack");
+        let decoded_pack = Pack::decode_file(
+            "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
+        );
         assert_eq!(
             "8c81e90db37ef77494efe4f31daddad8b494e099",
             decoded_pack.signature.to_plain_str()
         );
-        print!("{}",decoded_pack.get_object_number());
+        print!("{}", decoded_pack.get_object_number());
     }
 
-
-
-    #[test] 
-    fn test_read_raw_pack(){
+    #[test]
+    fn test_read_raw_pack() {
         let mut pack_file = File::open(&Path::new(
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
         ))
         .unwrap();
-        let (raw_pack,_raw_data) =  Pack::decode_raw_data(&mut pack_file);
+        let (raw_pack, _raw_data) = Pack::decode_raw_data(&mut pack_file);
         assert_eq!(
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             raw_pack.signature.to_plain_str()
