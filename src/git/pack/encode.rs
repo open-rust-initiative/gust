@@ -312,11 +312,11 @@ impl Pack {
         new_pack
     }
     #[allow(unused)]
-    pub fn write(map: &mut ObjDecodedMap, taget_dir: &str) -> Result<(), GitError> {
+    pub fn write(map: &mut ObjDecodedMap, target_dir: &str) -> Result<(), GitError> {
         map.check_completeness()?;
         let meta_vec = map.vec_sliding_window();
         let (_pack, data_write) = Pack::encode_delta(meta_vec);
-        let mut to_path = PathBuf::from(taget_dir);
+        let mut to_path = PathBuf::from(target_dir);
         let file_name = format!("pack-{}.pack", _pack.signature.to_plain_str());
         to_path.push(file_name);
         let mut file = std::fs::File::create(to_path).expect("create failed");
@@ -358,7 +358,7 @@ mod tests {
         Pack::decode_file("./test_dir/pack-83df56e42ca705892f7fd64f96ecb9870b5c5ed8.pack");
     }
     #[test]
-    fn test_mutli_pack_encode() {
+    fn test_multi_pack_encode() {
         let pack_1 = Pack::decode_file(
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
         );
