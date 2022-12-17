@@ -118,11 +118,24 @@ impl Diff for DeltaDiff {
         assert!(_old < (1 << 33));
         assert!(_len < (1 << 25));
         self.ssam += _len;
-        self.ops.push(DeltaOp {
-            ins: Optype::COPY,
-            begin: _old,
-            len: _len,
-        });
+        if let Some(tail) = self.ops.last_mut() {
+            if tail.begin + tail.len == _old && tail.ins == Optype::COPY {
+                tail.len += _len;
+            } else {
+                self.ops.push(DeltaOp {
+                    ins: Optype::COPY,
+                    begin: _old,
+                    len: _len,
+                });
+            }
+        } else {
+            self.ops.push(DeltaOp {
+                ins: Optype::COPY,
+                begin: _old,
+                len: _len,
+            });
+        }
+
         Ok(())
     }
 
@@ -149,11 +162,26 @@ impl Diff for DeltaDiff {
                 len: len,
             });
         } else {
-            self.ops.push(DeltaOp {
-                ins: Optype::DATA,
-                begin: _new,
-                len: _len,
-            });
+            if let Some(tail) = self.ops.last_mut() {
+                if tail.begin + tail.len == _new
+                    && tail.ins == Optype::DATA
+                    && tail.len + _len < DATA_INS_LEN
+                {
+                    tail.len += _len;
+                } else {
+                    self.ops.push(DeltaOp {
+                        ins: Optype::DATA,
+                        begin: new,
+                        len: len,
+                    });
+                }
+            } else {
+                self.ops.push(DeltaOp {
+                    ins: Optype::DATA,
+                    begin: new,
+                    len: len,
+                });
+            }
         }
 
         Ok(())
@@ -166,7 +194,7 @@ impl Diff for DeltaDiff {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Optype {
     DATA, // 插入的数据
     COPY, // 数据复制
@@ -215,7 +243,7 @@ mod tests {
         )
         .unwrap();
         let diff = DeltaDiff::new(m1.clone(), m2.clone());
-        println!("{:?}", diff);
+        println!("{:?}", diff.ops);
         let meta_vec1 = m1.convert_to_vec().unwrap();
 
         // 对于offset的

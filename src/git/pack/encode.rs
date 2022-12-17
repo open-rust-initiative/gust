@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use super::super::hash::Hash;
 use super::super::object::Metadata;
-use super::Pack;
 use super::decode::ObjDecodedMap;
+use super::Pack;
 use crate::errors::GitError;
 use crate::git::object::diff::DeltaDiff;
 use crate::git::object::types::ObjectType;
@@ -203,7 +203,7 @@ impl Pack {
     /// ,The object Hash is `aabbbbbbbbbbbbbbbbbb`
     /// - in：loose_root  : loose object root dir
     /// - in: target_path : The pack file dir to store
-    /// 
+    ///
     /// 查找到所有的loose文件代表的Hash值
     fn find_all_loose(loose_root_path: &str) -> Vec<String> {
         let loose_root = std::path::PathBuf::from(loose_root_path);
@@ -311,8 +311,8 @@ impl Pack {
 
         new_pack
     }
-
-    pub fn write(map:&mut ObjDecodedMap,taget_dir:&str)->Result<(),GitError>{
+    #[allow(unused)]
+    pub fn write(map: &mut ObjDecodedMap, taget_dir: &str) -> Result<(), GitError> {
         map.check_completeness()?;
         let meta_vec = map.vec_sliding_window();
         let (_pack, data_write) = Pack::encode_delta(meta_vec);
@@ -322,17 +322,15 @@ impl Pack {
         let mut file = std::fs::File::create(to_path).expect("create failed");
         file.write_all(data_write.as_bytes()).expect("write failed");
         Ok(())
-    } 
+    }
 }
 #[cfg(test)]
 mod tests {
 
-    const TEST_DIR:&str = "./test_dir" ;
+    const TEST_DIR: &str = "./test_dir";
     use crate::git::pack::{decode::ObjDecodedMap, Pack};
     use bstr::ByteSlice;
-    use std::fs::File;
     use std::io::Write;
-    use std::path::Path;
 
     #[test]
     fn test_object_dir_encode() {
@@ -350,13 +348,31 @@ mod tests {
     //
     #[test]
     fn test_a_real_pack_de_en() {
-       
-        let  decoded_pack =Pack::decode_file("./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack");
+        let decoded_pack = Pack::decode_file(
+            "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
+        );
         let mut map = ObjDecodedMap::default();
         map.update_from_cache(&decoded_pack.get_cache());
         Pack::write(&mut map, TEST_DIR).unwrap();
-        let  decoded_pack =Pack::decode_file("./test_dir/pack-c2bb2879540862893a645c24e8376380b377fd61.pack");
         
+        Pack::decode_file("./test_dir/pack-83df56e42ca705892f7fd64f96ecb9870b5c5ed8.pack");
+    }
+    #[test]
+    fn test_mutli_pack_encode() {
+        let pack_1 = Pack::decode_file(
+            "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
+        );
+        let pack_2 = Pack::decode_file(
+            "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
+        );
+
+        let mut map = ObjDecodedMap::default();
+        map.update_from_cache(&pack_1.get_cache());
+        map.update_from_cache(&pack_2.get_cache());
+
+        Pack::write(&mut map, TEST_DIR).unwrap();
+
+        Pack::decode_file("./test_dir/pack-8e8b79ea20effb78d701fa8ad5a7e386b7d833fa.pack");
     }
 
     #[test]
@@ -421,12 +437,20 @@ mod tests {
         let mut file = std::fs::File::create(file_name).expect("create failed");
         file.write_all(data_write.as_bytes()).expect("write failed");
 
-        
         let decoded_pack =
             Pack::decode_file(&format!("pack-{}.pack", _pack.signature.to_plain_str()));
         assert_eq!(
-            "7687ecf38763edf06b1895128b7b6ce611ba5f90",
+            "aa2ab2eb4e6b37daf6dcadf1b6f0d8520c14dc89",
             decoded_pack.signature.to_plain_str()
         );
     }
+
+
+    // #[test]
+    // fn test_vec(){
+    //     let mut arr = vec! [1,2,3,4,5];
+    //     let ta = arr.last_mut().unwrap();
+    //     *ta += 8;
+    //     print!("{:?}",arr);
+    // }
 }
