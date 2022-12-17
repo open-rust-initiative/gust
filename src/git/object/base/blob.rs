@@ -1,26 +1,53 @@
 //!
 //!Blob 文件对象结构体
 //!
-
-use std::fmt::Display;
+use super::tree::*;
+use super::Metadata;
 use crate::errors::GitError;
-use crate::git::Metadata;
-use crate::git::tree::{TreeItem, TreeItemType};
+use std::cmp::Ordering;
+use std::fmt::Display;
 
 /// Git Object: blob
-#[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
+#[derive(Eq, Debug, Hash, Clone)]
 pub struct Blob {
+    pub filename: String,
     pub meta: Metadata,
-    pub data: Vec<u8>,
+}
+impl Ord for Blob {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let o = other.filename.cmp(&self.filename);
+        match o {
+            Ordering::Equal => other.meta.size.cmp(&self.meta.size),
+            _ => o,
+        }
+    }
 }
 
+impl PartialOrd for Blob {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let o = other.filename.cmp(&self.filename);
+        match o {
+            Ordering::Equal => Some(other.meta.size.cmp(&self.meta.size)),
+            _ => Some(o),
+        }
+    }
+}
+
+impl PartialEq for Blob {
+    fn eq(&self, other: &Self) -> bool {
+        if self.filename.eq(&other.filename) {
+            return true;
+        }
+        false
+    }
+}
 ///
 impl Blob {
     #[allow(unused)]
     pub fn new(metadata: Metadata) -> Self {
         Self {
             meta: metadata.clone(),
-            data: metadata.data,
+            filename: String::new(),
         }
     }
 
@@ -33,35 +60,33 @@ impl Blob {
     ///
     #[allow(unused)]
     pub(crate) fn to_tree_item(&self, filename: String) -> Result<TreeItem, ()> {
-        Ok(
-            TreeItem {
-                mode: TreeItemType::Blob.to_bytes().to_vec(),
-                item_type: TreeItemType::Blob,
-                id: self.meta.id.clone(),
-                filename,
-            }
-        )
-
+        Ok(TreeItem {
+            mode: TreeItemType::Blob.to_bytes().to_vec(),
+            item_type: TreeItemType::Blob,
+            id: self.meta.id.clone(),
+            filename,
+        })
     }
 }
 use bstr::BString;
-impl Display for Blob{
+impl Display for Blob {
     ///为了节省输出空间 暂时只输出第一行内容
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut print_data:Vec<u8> = vec![];
-        for value in self.data.iter(){
-            if *value != b'\n'{
+        let mut print_data: Vec<u8> = vec![];
+        for value in self.meta.data.iter() {
+            if *value != b'\n' {
                 print_data.push(value.clone());
-            }else {
+            } else {
                 break;
             }
         }
-        
-        writeln!(f,"size:{}",self.data.len()).unwrap();
-        writeln!(f,"meta data size:{}",self.meta.size).unwrap();
-        writeln!(f, "Type: Blob\n{}", BString::new(print_data) ).unwrap();
+
+        writeln!(f, "size:{}", self.meta.data.len()).unwrap();
+        writeln!(f, "meta data size:{}", self.meta.size).unwrap();
+        writeln!(f, "File Name: {}", self.filename).unwrap();
+        writeln!(f, "Type: Blob\n{}", BString::new(print_data)).unwrap();
         writeln!(f, "Only Show the first line of the File...")
-    }   
+    }
 }
 ///
 #[cfg(test)]
@@ -72,12 +97,8 @@ mod tests {
     use std::io::Read;
     use std::path::{Path, PathBuf};
 
-
-    use crate::git::hash::HashType;
-    use crate::git::object::Object;
     use crate::git::object::types::ObjectType;
-    
-    use crate::git::Metadata;
+    use crate::git::object::Metadata;
 
     use super::Blob;
     ///
@@ -94,27 +115,13 @@ mod tests {
         //     buffer = buffer.replace(b"\r\n", b"\n");
         // }
 
-
-        let id =  Object{
-            object_type: ObjectType::Blob,
-            contents:buffer.clone()
-        }.hash();
-       
-        let size = buffer.len();
         let data = buffer;
 
-        let meta = crate::git::Metadata {
-            t: ObjectType::Blob,
-            h: HashType::Sha1,
-            id,
-            size,
-            data,
-        };
+        let meta = Metadata::new(ObjectType::Blob, &data);
 
         meta.write_to_file("/tmp".to_string())
             .expect("Write error!");
         assert!(Path::new("/tmp/82/352c3a6a7a8bd32011751699c7a3648d1b5d3c").exists());
-
     }
 
     ///
@@ -123,15 +130,14 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-82352c3a6a7a8bd32011751699c7a3648d1b5d3c-gitmega.md");
 
-        let meta =
-            Metadata::read_object_from_file(path.to_str().unwrap().to_string())
-                .expect("Read error!");
+        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+            .expect("Read error!");
 
         assert_eq!(meta.t, crate::git::object::types::ObjectType::Blob);
 
         let blob = Blob {
             meta: meta.clone(),
-            data: meta.data,
+            filename: String::new(),
         };
 
         assert_eq!(
@@ -139,15 +145,10 @@ mod tests {
             blob.meta.id.to_plain_str()
         );
 
-
-        
         assert_eq!(16, blob.meta.size);
         assert_eq!(
             "# Hello Gitmega\n",
-            String::from_utf8(blob.data).unwrap().as_str()
+            String::from_utf8(blob.meta.data).unwrap().as_str()
         );
     }
-
-
-
 }

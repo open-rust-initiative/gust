@@ -1,10 +1,5 @@
-# 基于Rust的Git-pack文件解析
-
-本项目为openEuler开源实习OSCourse SIG任务
-[Link](https://gitee.com/openeuler/opensource-intern/issues/I62B08#)
-
-
-## Gust - Monorepo Platform for DevOps and Open Source Supply Chain
+# Gust 
+##  Monorepo Platform for DevOps and Open Source Supply Chain
 
 Git is a content-addressable filesystem and a distributed collaboration system. All files of a single repository persisted on the disk of the machine. It brings a lot of benefits to performance and maintenance. But it also has challenges for monorepo. It is hard to manage a vast code repository like a repo has 20 TB, which is typical in a middle size enterprise.
 

@@ -24,10 +24,14 @@ pub enum GitError {
     #[error("Delta Object Error Info:{0}")]
     DeltaObjError(String),
 
+    #[error("The object to be packed is incomplete ,{0}")]
+    UnCompletedPackObject(String),
+
     #[error("Error decode in the Object ,info:{0}")]
     InvalidObjectInfo(String),
 
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+
 
 }

@@ -1,0 +1,7 @@
+The delta data starts with the size of the base object and the size of the object to be reconstructed. 
+These sizes are encoded using the size encoding from above. 
+The remainder of the delta data is a sequence of instructions to reconstruct the object from the base object. 
+If the base object is deltified, it must be converted to canonical form first. 
+Each instruction appends more and more data to the target object until it’s complete. 
+There are two supported instructions so far: 
+one for copy a byte range from the source object and one for inserting new data embedded in the instruction itself.
