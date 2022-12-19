@@ -18,6 +18,7 @@ use super::pack::Pack;
 
 ///
 #[allow(unused)]
+#[derive(Debug)]
 pub struct IdxItem {
     pub id: Hash,
     pub crc32: String,
@@ -33,11 +34,12 @@ impl Display for IdxItem {
 
 ///
 #[allow(unused)]
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct Idx {
     pub version: u32,
     pub number_of_objects: usize,
     pub map_of_prefix: HashMap<String, usize>,
+    pub item_hash:HashMap<Hash,usize>,
     pub idx_items: Vec<IdxItem>,
     pub pack_signature: Hash,
     pub idx_signature: Hash,
@@ -139,6 +141,12 @@ impl Idx {
         offset += 20;
         self.idx_signature = Hash::from_row(&data[offset..].to_vec());
 
+
+
+        /// fill the item_hash map.
+        for (index,item) in self.idx_items.iter().enumerate() {
+            self.item_hash.insert(item.id, index);
+        }
         Ok(())
     }
 
@@ -240,6 +248,7 @@ mod tests {
             "92d07408a070a5fbea3c1f2d00e696293b78e7c6",
             idx.idx_signature.to_plain_str()
         );
+        println!("{:?}",idx);
     }
 
     ///测试写入idx文件

@@ -117,7 +117,7 @@ impl ObjDecodedMap {
             list.push(tree.meta.clone());
         }
         for blob in self.blobs.iter() {
-            list.push(blob.meta.clone());
+            list.push(blob.meta.as_ref().clone());
         }
 
         list
@@ -138,6 +138,11 @@ impl ObjDecodedMap {
             println!("{}", blob);
         }
     }
+
+
+
+
+
 }
 
 impl Display for ObjDecodedMap {
@@ -145,7 +150,7 @@ impl Display for ObjDecodedMap {
         for (key, value) in self._map_hash.iter() {
             writeln!(f, "*********************").unwrap();
             writeln!(f, "Hash: {}", key).unwrap();
-            writeln!(f, "{}", value).unwrap();
+            writeln!(f, "Type: {}", value).unwrap();
         }
         writeln!(
             f,
@@ -173,4 +178,18 @@ mod tests {
         result.check_completeness().unwrap();
         result.print_vec();
     }
+
+    
+    
+    // #[test]
+    // fn test_object_dir_encod_temp() {
+    //     let decoded_pack = Pack::decode_file(
+    //         "./resources/friger/pack-6cf1ec1a89de3757f7ba776e4dc108b88367c460.pack",
+    //     );
+    //     println!("{}", decoded_pack.get_object_number());
+    //     assert_eq!(
+    //         "6cf1ec1a89de3757f7ba776e4dc108b88367c460",
+    //         decoded_pack.signature.to_plain_str()
+    //     );
+    // }
 }

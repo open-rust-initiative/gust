@@ -206,6 +206,7 @@ mod tests {
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use std::vec;
 
     use super::super::blob::Blob;
@@ -234,7 +235,7 @@ mod tests {
         assert_eq!(16, meta.size);
 
         let blob = Blob {
-            meta: meta.clone(),
+            meta: Arc::new(meta),
             filename: String::new(),
         };
 
@@ -275,7 +276,7 @@ mod tests {
             .expect("Read error!");
 
         let blob_gitmega = Blob {
-            meta: meta_gitmega.clone(),
+            meta:Arc::new(meta_gitmega) ,
             filename: String::new(),
         };
 
@@ -290,7 +291,7 @@ mod tests {
             .expect("Read error!");
 
         let blob_gust = Blob {
-            meta: meta_gust.clone(),
+            meta:Arc::new(meta_gust) ,
             filename: String::new(),
         };
 

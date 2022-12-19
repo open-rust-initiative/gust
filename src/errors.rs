@@ -1,5 +1,5 @@
 use thiserror::Error;
-
+use crate::git::hash::Hash;
 
 #[derive(Error, Debug)]
 pub enum GitError {
@@ -30,8 +30,12 @@ pub enum GitError {
     #[error("Error decode in the Object ,info:{0}")]
     InvalidObjectInfo(String),
 
+    #[error("Can't found Hash value :{0} from current file")]
+    NotFountHashValue(Hash),
+
     #[error(transparent)]
     IOError(#[from] std::io::Error),
+    
 
 
 }

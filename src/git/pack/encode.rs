@@ -4,7 +4,6 @@ use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use super::super::hash::Hash;
 use super::super::object::Metadata;
@@ -69,7 +68,7 @@ impl Pack {
                 result = self.encode_header();
                 for metadata in a {
                     result.append(&mut metadata.convert_to_vec().unwrap());
-                    self.result.update(Arc::new(metadata), offset);
+                    //self.result.update(Arc::new(metadata), offset);
                     println!("Decode offset:{}", offset);
                     offset = result.len() as u64;
                 }

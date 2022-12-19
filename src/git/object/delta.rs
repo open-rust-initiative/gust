@@ -90,6 +90,7 @@ fn apply_delta_instruction<R: Read>(
 }
 
 // 这里默认的是若是pack里面没有，则只能从loose里面找了
+#[allow(unused)]
 pub fn read_object(hash: Hash) -> Result<Metadata, GitError> {
     let object = match read_unpacked_object(hash) {
         // Found in objects directory
