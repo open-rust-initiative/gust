@@ -10,6 +10,7 @@ use super::Hash;
 use super::ObjectType;
 use crate::errors::GitError;
 use crate::git::hash::HashType;
+use crate::git::pack::encode;
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {
@@ -49,6 +50,10 @@ impl Metadata {
     #[allow(unused)]
     pub(crate) fn write_to_file(&self, root_path: String) -> Result<String, GitError> {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
+        encoder.write_all(&self.t.to_bytes());
+        encoder.write(&[b' ']);
+        encoder.write(self.data.len().to_string().as_bytes());
+        encoder.write(&[b'\0']);
         encoder.write_all(&self.data).expect("Write error!");
         let compressed_data = encoder.finish().expect("Failed to finish compression!");
 

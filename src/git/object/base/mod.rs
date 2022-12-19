@@ -19,10 +19,10 @@ pub enum ObjClass {
 impl Display for ObjClass {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ObjClass::BLOB(a) => a.fmt(f),
-            ObjClass::COMMIT(b) => b.fmt(f),
-            ObjClass::TREE(c) => c.fmt(f),
-            ObjClass::TAG(d) => d.fmt(f),
+            ObjClass::BLOB(_) => write!(f,"BLOB"),
+            ObjClass::COMMIT(_) =>write!(f,"COMMIT"),
+            ObjClass::TREE(_) =>write!(f,"TREE"),
+            ObjClass::TAG(_) => write!(f,"TAG"),
         }
     }
 }

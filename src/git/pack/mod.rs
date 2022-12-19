@@ -5,6 +5,7 @@ use std::convert::TryInto;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use self::cache::PackObjectCache;
@@ -13,22 +14,12 @@ use super::idx::Idx;
 use super::object::delta::*;
 use super::object::Metadata;
 use crate::errors::GitError;
-use crate::git::pack::decode::ObjDecodedMap;
 use crate::utils;
 
 mod cache;
 pub mod decode;
 pub mod encode;
-//TODO:
-
-// These two line can used to the idx write
-//let mut first_byte_objects = [0u32; 1 << u8::BITS];
-//first_byte_objects[_hash.0[0] as usize] += 1;
-
-// A mind to simplify the hashmap
-//let mut object_offsets = Vec::with_capacity(object_num as usize);
-// object_offsets.push((_hash, offset));
-
+pub mod multidecode;
 /// ### Pack文件结构<br>
 ///  `head`: always = "PACK" <br>
 /// `version`: version code <br>
@@ -42,7 +33,8 @@ pub struct Pack {
     version: u32,
     number_of_objects: usize,
     pub signature: Hash,
-    pub result: PackObjectCache,
+    pub result: Arc<PackObjectCache>,
+    pack_file :PathBuf,
 }
 
 impl Pack {
@@ -63,13 +55,13 @@ impl Pack {
             //update offset of the Object
             let offset = utils::get_offset(pack_file).unwrap();
             //Get the next Object by the Pack::next_object() func
-            let object = Pack::next_object(pack_file, offset, &mut cache).unwrap();
+            let object = Pack::next_object(pack_file, offset, &mut cache)?;
             // Larger offsets would require a version-2 pack index
             let offset = u32::try_from(offset)
                 .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
                 .unwrap();
         }
-        _pack.result = cache;
+        _pack.result = Arc::new(cache);
         // CheckSum sha-1
         let _id: [u8; 20] = utils::read_bytes(pack_file).unwrap();
         _pack.signature = Hash::from_row(&_id[..]);
@@ -86,7 +78,8 @@ impl Pack {
             version: 0,
             number_of_objects: 0,
             signature: Hash::default(),
-            result: PackObjectCache::default(),
+            result: Arc::new(PackObjectCache::default()),
+            pack_file:PathBuf::new(),
         };
 
         // Get the Pack Head 4 b ,which should be the "PACK"
@@ -155,7 +148,6 @@ impl Pack {
         use super::object::types::ObjectType;
         utils::seek(pack_file, offset)?;
         let (type_num, size) = utils::read_type_and_size(pack_file)?;
-        println!("decode type:{}", ObjectType::number_type(type_num));
         //Get the Object according to the Types Enum
         let object = match type_num {
             // Undelta representation
@@ -185,7 +177,6 @@ impl Pack {
                 };
                 utils::seek(pack_file, offset)?;
                 let base_obj = base_object.as_ref();
-                println!("The delta offset:{}", offset);
                 let objs = apply_delta(pack_file, base_obj)?;
                 Ok(objs)
             }
@@ -193,12 +184,14 @@ impl Pack {
             //TODO : This Type need to be completed ，对应多文件的todo
             7 => {
                 let hash = utils::read_hash(pack_file)?;
-                let object;
+                //let object;
                 let base_object = if let Some(object) = cache.hash_object(hash) {
                     object
                 } else {
-                    object = read_object(hash)?;
-                    &object
+                    // object = read_object(hash)?;
+                    // &object
+                    return Err(GitError::NotFountHashValue(hash) );
+                    
                 };
                 apply_delta(pack_file, &base_object)
             }
@@ -224,7 +217,7 @@ impl Pack {
         return self.number_of_objects as usize;
     }
     pub fn get_cache(&self) -> PackObjectCache {
-        return self.result.clone();
+        return self.result.as_ref().clone();
     }
     pub fn get_hash(&self) -> Hash {
         return self.signature.clone();
@@ -245,13 +238,13 @@ impl Pack {
         let mut pack_file = File::open(&Path::new(file)).unwrap();
         let decoded_pack = match Pack::decode(&mut pack_file) {
             Ok(f) => f,
-            Err(e) => panic!("{}", e.to_string()),
+            Err(e) => match e {
+                GitError::NotFountHashValue(a) => panic!("{}",a),
+                _ => panic!("unknow error"),
+            },
         };
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
-        let mut result = ObjDecodedMap::default();
-        result.update_from_cache(&decoded_pack.result);
-        print!("{}", result);
         decoded_pack
     }
 }
@@ -349,5 +342,22 @@ mod tests {
             "8d36a6464e1f284e5e9d06683689ee751d4b2687",
             decoded_pack.signature.to_plain_str()
         );
+    }
+
+    #[test]
+    pub fn test_create_time() {
+        let  pack_file = File::open(&Path::new(
+            "./resources/friger/pack-6cf1ec1a89de3757f7ba776e4dc108b88367c460.pack",
+        ))
+        .unwrap();
+        let metadata = pack_file.metadata().unwrap();
+        print!("{:?}",metadata.created().unwrap());
+
+        let  pack_file = File::open(&Path::new(
+            "./resources/friger/pack-040de05aef75a0d847bff37f8cacab22dae377c9.pack",
+        ))
+        .unwrap();
+        let metadata = pack_file.metadata().unwrap();
+        print!("{:?}",metadata.created().unwrap());
     }
 }

@@ -45,9 +45,6 @@ pub const NL: &[u8] = &[0x00];
 ///
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn test_a_single_blob() {
-        // let metadata = Metadata::
-        // blob::Blob::new(metadata);
-    }
+ 
+
 }

@@ -7,7 +7,7 @@ const TYPE_BYTE_SIZE_BITS: u8 = VAR_INT_ENCODING_BITS - TYPE_BITS;
 const VAR_INT_CONTINUE_FLAG: u8 = 1 << VAR_INT_ENCODING_BITS;
 
 
-use std::{io::{self,Read,SeekFrom,Seek}, fs::File, vec};
+use std::{io::{self,Read,SeekFrom,Seek}, fs::File, vec, path::PathBuf, str::FromStr};
 use flate2::read::ZlibDecoder;
 
 use crate::errors::GitError;
@@ -204,8 +204,48 @@ pub fn get_pack_raw_data(data:Vec<u8>) -> Vec<u8>{
     result
 }
 
+
+fn get_hash_form_filename(filename:&str) -> String{
+    let a = String::from(&filename[5..45]);
+    assert!(a.len()==40);
+    a
+}
+/// 从pack目录中找到所有的pack文件
+pub fn find_all_pack_file(pack_dir : &str) ->(Vec<PathBuf>,Vec<Hash>) {
+    let mut file_path =vec![];
+    let mut hash_list = vec![];
+    let mut object_root = std::path::PathBuf::from(pack_dir);
+   
+
+    let paths = std::fs::read_dir(&object_root).unwrap();
+    for path in paths {
+        if let Ok(pack_file) = path {
+            let _file_name = pack_file.file_name();
+            let _file_name = _file_name.to_str().unwrap();
+            assert!(_file_name.len()>25);
+            // only find the .pack file, and find the .idx file
+            if &_file_name[_file_name.len() - 4..] == "pack" {
+                let hash_string = get_hash_form_filename(&_file_name);
+                let _hash = Hash::from_str(&hash_string).unwrap();
+                hash_list.push(_hash);
+
+                object_root.push(&_file_name.to_string());
+                file_path.push(object_root.clone());
+                object_root.pop();
+
+            }
+        }
+    }
+    (file_path,hash_list)
+}
+
+
 #[cfg(test)]
 mod test{
+    use std::{thread::sleep, time::Duration};
+
+    use crate::git::hash;
+
     #[test]
     fn test_write_encode_size(){
      let ns :u64 = 966;
@@ -240,6 +280,18 @@ mod test{
             length += 7;
         }
         value
+    }
+
+    #[test]
+    fn test_pack_hash() {
+          let root ="./resources/friger";
+          let (file_path,hash_list) = super::find_all_pack_file(root);
+            println!("{:?}",file_path);
+           
+            for _hash in hash_list{
+                println!("{}",_hash);
+            }
+    
     }
 }
     
