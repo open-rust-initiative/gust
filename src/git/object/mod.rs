@@ -7,7 +7,7 @@ use types::ObjectType;
 pub mod base;
 pub mod delta;
 pub mod diff;
-mod metadata;
+pub mod metadata;
 pub mod types;
 pub use metadata::Metadata;
 

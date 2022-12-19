@@ -11,8 +11,8 @@ pub mod hash;
 mod id;
 mod idx;
 mod midx;
-mod object;
-mod pack;
+pub mod object;
+pub mod pack;
 
 // use std::fmt::Display;
 // use std::fs::{File,create_dir_all};
