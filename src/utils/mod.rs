@@ -282,6 +282,7 @@ mod test{
         value
     }
 
+    #[ignore]
     #[test]
     fn test_pack_hash() {
           let root ="./resources/friger";

@@ -84,6 +84,7 @@ impl Pack{
 pub mod test{
     use crate::git::pack::Pack;
 
+    #[ignore]
     #[test]
     fn test_multi_pack_decode(){
         let pack = Pack::multi_decode("./resources./friger").unwrap();
