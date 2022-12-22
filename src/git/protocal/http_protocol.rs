@@ -1,13 +1,15 @@
 use anyhow::Result;
 use axum::body::Body;
-use axum::extract::{BodyStream, Query};
+use axum::extract::{BodyStream};
 use axum::http::{Response, StatusCode};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures::StreamExt;
+use futures::{StreamExt};
 use git::pack::Pack;
 use hyper::body::Sender;
+use hyper::Request;
 
+use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::{
     fs::File,
     io::{AsyncReadExt, BufReader},
@@ -24,7 +26,10 @@ use crate::git;
 use super::HttpProtocol;
 
 impl HttpProtocol {
-    pub async fn git_info_refs(work_dir: PathBuf, service:String) -> Result<Response<Body>, (StatusCode, String)> {
+    pub async fn git_info_refs(
+        work_dir: PathBuf,
+        service: String,
+    ) -> Result<Response<Body>, (StatusCode, String)> {
         let work_dir = PathBuf::from("~/").join("freighter");
 
         let mut headers = HashMap::new();
@@ -50,12 +55,12 @@ impl HttpProtocol {
 
         let mut buf = BytesMut::new();
 
-        let start = format!("# service={}\n", service);
-        let start_length = start.len() + 4;
+        let first_pkt_line = format!("# service={}\n", service);
+        let start_length = first_pkt_line.len() + 4;
         buf.put(Bytes::from(format!("{start_length:04x}")));
-        buf.put(start.as_bytes());
+        buf.put(first_pkt_line.as_bytes());
         buf.put(&b"0000"[..]);
-        
+
         for (commit_id, param) in commit_ids {
             let length = commit_id.len() + param.len() + 4;
             buf.put(Bytes::from(format!("{length:04x}")));
@@ -157,11 +162,41 @@ impl HttpProtocol {
 
     pub async fn git_receive_pack(
         work_dir: PathBuf,
-        mut stream: BodyStream,
+        req: Request<Body>,
     ) -> Result<Response<Body>, (StatusCode, String)> {
+        // not in memory
+        let (_parts, mut body) = req.into_parts();
+        let mut read_pkt_line = false;
+        let file = File::create("./temp.pack").await.unwrap();
+        let mut buffer = BufWriter::new(file);
+        while let Some(chunk) = body.next().await {
+            let mut bytes = chunk.unwrap();
+            if read_pkt_line {
+                let res = buffer.write(&mut bytes).await;
+                tracing::info!("write to PAKC: {:?}", res);
+            } else {
+                let pkt_length = bytes.copy_to_bytes(4);
+                let pkt_length =
+                    usize::from_str_radix(&String::from_utf8(pkt_length.to_vec()).unwrap(), 16)
+                        .unwrap();
+                let mut pkt_line = bytes.copy_to_bytes(pkt_length - 4);
 
-        // TOOD: update pack file ?
+                //for example
+                //ffcb773734b46607d070ba4ad0559aac9496d9db
+                let from_id = pkt_line.copy_to_bytes(40);
+                //0662f64166cc65d5d51152aebebd6b0bc010253c
+                pkt_line.copy_to_bytes(1);
+                let to_id = pkt_line.copy_to_bytes(40);
+                tracing::info!("from_id: {:?}, to_id: {:?}", from_id, to_id);
 
+                if bytes.copy_to_bytes(4).to_vec() == b"0000" {
+                    let res = buffer.write(&mut bytes).await;
+                    tracing::info!("write to PAKC: {:?}", res);
+                }
+                read_pkt_line = true;
+            }
+        }
+        buffer.flush().await.unwrap();
         let mut resp = Response::builder();
         let resp = resp.body(Body::empty()).unwrap();
         Ok(resp)
