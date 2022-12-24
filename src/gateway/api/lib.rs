@@ -23,7 +23,7 @@ use crate::git::protocal::HttpProtocol;
 
 #[tokio::main]
 pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env::set_var("RUST_LOG", "debug");
+    env::set_var("RUST_LOG", "info");
     tracing_subscriber::fmt::init();
 
     dotenvy::dotenv().ok();
@@ -59,7 +59,7 @@ struct Params {
 async fn git_info_refs(
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
-    body: Request<Body>,
+    req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     // tracing::info!("service: {:?}, ", service);
     tracing::info!("{:?}", params.repo);
@@ -80,10 +80,11 @@ async fn git_info_refs(
 
 async fn git_upload_pack(
     Path(params): Path<Params>,
-    mut stream: BodyStream,
+    // mut stream: BodyStream,
+    req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("{:?}", params.repo);
-    HttpProtocol::git_upload_pack(stream).await
+    HttpProtocol::git_upload_pack(req).await
 }
 async fn git_receive_pack(
     Path(params): Path<Params>,
@@ -92,7 +93,7 @@ async fn git_receive_pack(
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("req: {:?}", req);
 
-    let work_dir = PathBuf::from("~/").join(params.repo);
+    let work_dir = PathBuf::from("~/").join("Downloads/crates.io-index");
 
     HttpProtocol::git_receive_pack(work_dir, req).await
 }
