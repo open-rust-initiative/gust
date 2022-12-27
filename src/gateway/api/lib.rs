@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use axum::body::Body;
-use axum::extract::{BodyStream, Path, Query};
+use axum::extract::{Path, Query};
 use axum::http::{Response, StatusCode};
 use axum::routing::{get, post};
 use axum::{Router, Server};
@@ -59,20 +59,18 @@ struct Params {
 async fn git_info_refs(
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
-    req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
-    // tracing::info!("service: {:?}, ", service);
     tracing::info!("{:?}", params.repo);
-    let work_dir = PathBuf::from("~/").join(params.repo);
+    let work_dir =dirs::home_dir().unwrap().join("freighter").join(params.repo.replace(".git", "")).join(".git/refs");
+
+    let http_protocol = HttpProtocol::default();
 
     let service_name = service.service;
-    if service_name == "git-upload-pack" {
-        HttpProtocol::git_info_refs(work_dir, service_name).await
-    } else if service_name == "git-receive-pack" {
-        HttpProtocol::git_info_refs(work_dir, service_name).await
+    if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
+        http_protocol.git_info_refs(work_dir, service_name).await
     } else {
         return Err((
-            StatusCode::NOT_FOUND,
+            StatusCode::FORBIDDEN,
             String::from("Operation not supported"),
         ));
     }
@@ -80,20 +78,21 @@ async fn git_info_refs(
 
 async fn git_upload_pack(
     Path(params): Path<Params>,
-    // mut stream: BodyStream,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("{:?}", params.repo);
-    HttpProtocol::git_upload_pack(req).await
+    let http_protocol = HttpProtocol::default();
+
+    http_protocol.git_upload_pack(req).await
 }
 async fn git_receive_pack(
     Path(params): Path<Params>,
-    // mut stream: BodyStream,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("req: {:?}", req);
 
     let work_dir = PathBuf::from("~/").join("Downloads/crates.io-index");
+    let http_protocol = HttpProtocol::default();
 
-    HttpProtocol::git_receive_pack(work_dir, req).await
+    http_protocol.git_receive_pack(work_dir, req).await
 }

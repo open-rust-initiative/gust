@@ -17,11 +17,11 @@ use tokio::{
 
 use std::collections::HashMap;
 use std::env;
-use std::fs::{self};
-use std::io::{self};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use crate::git;
+use crate::git::hash::Hash;
 
 use super::HttpProtocol;
 
@@ -33,12 +33,29 @@ pub struct RefResult {
     pub result: String,
 }
 
+impl RefResult {
+    // TODO: according to the ref handle result, returns ok if pack file parsed success
+    pub fn get_result(&mut self) {
+        self.result = "ok".to_owned();
+    }
+}
+
 impl HttpProtocol {
+    const PKT_LINE_END_MARKER: &[u8; 4] = b"0000";
+
+    const CAP_LIST: &str  = "report-status report-status-v2 thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done object-format=sha1";
+
+    const LF: char = '\n';
+
+    const SP: char = ' ';
+
+    const NUL: char = '\0';
+
     pub async fn git_info_refs(
+        &self,
         work_dir: PathBuf,
         service: String,
     ) -> Result<Response<Body>, (StatusCode, String)> {
-        let work_dir = PathBuf::from("~/").join("freighter");
 
         let mut headers = HashMap::new();
         headers.insert(
@@ -55,35 +72,67 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
 
-        // TODO: get HEAD commmit_id of the current working directory
-        let head_commit = "b2a1b00f1662679ac82272feaf8d08638e74f0eb";
-        let mut ref_vec: Vec<(String, String)> = vec![];
-        ref_vec.push((head_commit.to_string(), " refs/heads/master\0report-status report-status-v2 thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done object-format=sha1 agent=git/2.38.1\n".to_string()));
-        ref_vec.push((
-            head_commit.to_string(),
-            " refs/remotes/origin/master\n".to_string(),
-        ));
+        let heads = work_dir.join("heads");
+        let mut ref_list = vec![];
+        Self::build_ref_list(heads, &mut ref_list, String::from("refs/heads/"));
+        let pkt_line_stream = Self::build_smart_reply(&ref_list, service);
 
-        let mut buf = BytesMut::new();
-
-        let first_pkt_line = format!("# service={}\n", service);
-        add_to_pkt_line(&mut buf, first_pkt_line);
-        buf.put(&b"0000"[..]);
-
-        for (commit_id, ref_name) in ref_vec {
-            let refs_line = format!("{}{}", commit_id, ref_name);
-            add_to_pkt_line(&mut buf, refs_line);
-        }
-        buf.put(&b"0000"[..]);
-
-        tracing::info!("git_info_refs response: {:?}", buf);
-        let body = Body::from(buf.freeze());
+        tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
+        let body = Body::from(pkt_line_stream.freeze());
         let resp = resp.body(body).unwrap();
         Ok(resp)
     }
 
+    fn build_ref_list(path: PathBuf, ref_list: &mut Vec<String>, mut name: String) {
+        let paths = std::fs::read_dir(&path).unwrap();
+        for path in paths {
+            if let Ok(ref_file) = path {
+                name.push_str(ref_file.file_name().to_str().unwrap());
+                let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
+                let object_id = object_id.strip_suffix('\n').unwrap();
+                let pkt_line;
+                // The stream MUST include capability declarations behind a NUL on the first ref.
+                if ref_list.is_empty() {
+                    pkt_line = format!(
+                        "{}{}{}{}{}{}",
+                        object_id,
+                        HttpProtocol::SP,
+                        name,
+                        HttpProtocol::NUL,
+                        HttpProtocol::CAP_LIST,
+                        HttpProtocol::LF
+                    );
+                } else {
+                    pkt_line = format!(
+                        "{}{}{}{}{}",
+                        object_id,
+                        HttpProtocol::SP,
+                        name,
+                        HttpProtocol::NUL,
+                        HttpProtocol::LF
+                    );
+                }
+                ref_list.push(pkt_line);
+            }
+        }
+    }
+
+    fn build_smart_reply(ref_list: &Vec<String>, service: String) -> BytesMut {
+        let mut pkt_line_stream = BytesMut::new();
+
+        let first_pkt_line = format!("# service={}\n", service);
+        add_to_pkt_line(&mut pkt_line_stream, first_pkt_line);
+        pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+
+        for ref_line in ref_list {
+            add_to_pkt_line(&mut pkt_line_stream, ref_line.to_string());
+        }
+        pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+        pkt_line_stream
+    }
+
     pub async fn git_upload_pack(
-        // work_dir: PathBuf,
+        &self,
         req: Request<Body>,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let (_parts, mut body) = req.into_parts();
@@ -91,7 +140,6 @@ impl HttpProtocol {
         let mut want: Vec<String> = Vec::new();
         let mut have: Vec<String> = Vec::new();
 
-        let mut is_done_command = false;
         while let Some(chunk) = body.next().await {
             tracing::info!("chunk:{:?}", chunk);
             let mut bytes = chunk.unwrap();
@@ -106,15 +154,17 @@ impl HttpProtocol {
                 }
                 tracing::info!("read line: {:?}", pkt_line);
                 let dst = pkt_line.to_vec();
-                let commands = dst[0..4].to_owned();
+                let commands = &dst[0..4];
                 if commands == b"want" {
                     want.push(String::from_utf8(dst[5..45].to_vec()).unwrap());
-                } else if commands == b"done" {
-                    // The done command signals to the server that the client is ready to receive its package file data.
-                    is_done_command = true;
-                    break;
-                } else {
+                } else if commands == b"have" {
                     have.push(String::from_utf8(dst[5..45].to_vec()).unwrap());
+                } else {
+                    println!(
+                        "unsupported command: {:?}",
+                        String::from_utf8(commands.to_vec())
+                    );
+                    continue;
                 }
             }
         }
@@ -139,6 +189,12 @@ impl HttpProtocol {
         //         tracing::info!("res:{:?}", res);
         //     }
         // }
+
+        // let pack_path = object_root.join("pack/pack-db444c5a50d3ff97f514825f419bc8b02f18fc7f.pack");
+        // let mut origin_pack_file = std::fs::File::open(pack_path).unwrap();
+        // let mut decoded_pack =
+            // Pack::decodev2(&mut origin_pack_file, Hash::from_str(&have[0]).unwrap()).unwrap();
+
         // TODO: pack target object to pack file
         // let final_pack = Pack::pack_object_dir(object_root.to_str().unwrap(), "./");
         let mut headers = HashMap::new();
@@ -155,28 +211,29 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
 
+        let mode = &self.mode;
+        let str = HttpProtocol::value_in_ack_mode(mode);
+
+        // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
+        // following its first "ACK obj-id ready" message.
+
         let mut buf = BytesMut::new();
         let (mut sender, body) = Body::channel();
-        if is_done_command {
-            add_to_pkt_line(
-                &mut buf,
-                "ACK b2a1b00f1662679ac82272feaf8d08638e74f0eb\n".to_string(),
-            );
-        } else {
-            // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
-            // it is ready to send data with ACK obj-id ready lines,
-            // and signals the identified common commits with ACK obj-id common lines
-            for commit in &have {
-                add_to_pkt_line(&mut buf, format!("ACK {} common\n", commit));
-            }
-            add_to_pkt_line(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
 
-            // TODO: determine which commit id to use in ACK line
-            add_to_pkt_line(
-                &mut buf,
-                format!("ACK {} \n", "b2a1b00f1662679ac82272feaf8d08638e74f0eb"),
-            );
+        // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
+        // it is ready to send data with ACK obj-id ready lines,
+        // and signals the identified common commits with ACK obj-id common lines
+        for commit in &have {
+            add_to_pkt_line(&mut buf, format!("ACK {} common\n", commit));
         }
+        add_to_pkt_line(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
+
+        // TODO: determine which commit id to use in ACK line
+        add_to_pkt_line(
+            &mut buf,
+            format!("ACK {} \n", "b2a1b00f1662679ac82272feaf8d08638e74f0eb"),
+        );
+
         tracing::info!("send buf: {:?}", buf);
         sender.send_data(buf.freeze()).await.unwrap();
 
@@ -186,6 +243,7 @@ impl HttpProtocol {
         ))
         .await
         .unwrap();
+        // let result: Vec<u8> = decoded_pack.encode(None);
         let reader = BufReader::new(pack_file);
         tokio::spawn(send_pack(sender, reader));
         let resp = resp.body(body).unwrap();
@@ -193,6 +251,7 @@ impl HttpProtocol {
     }
 
     pub async fn git_receive_pack(
+        &self,
         work_dir: PathBuf,
         req: Request<Body>,
     ) -> Result<Response<Body>, (StatusCode, String)> {
@@ -201,7 +260,7 @@ impl HttpProtocol {
         let mut pkt_line_parsed = false;
         let file = File::create("./temp.pack").await.unwrap();
         let mut buffer = BufWriter::new(file);
-        let mut ref_result: Vec<RefResult> = vec![];
+        let mut ref_results: Vec<RefResult> = vec![];
         while let Some(chunk) = body.next().await {
             let mut bytes = chunk.unwrap();
             if pkt_line_parsed {
@@ -211,13 +270,15 @@ impl HttpProtocol {
                 tracing::info!("{:?}", bytes);
                 let (_pkt_length, pkt_line) = read_pkt_line(&mut bytes);
                 let pkt_vec: Vec<_> = pkt_line.to_str().unwrap().split(" ").collect();
-                ref_result.push(RefResult {
+
+                let mut ref_result = RefResult {
                     ref_name: pkt_vec[2].to_string(),
                     from_id: pkt_vec[0].to_string(),
                     to_id: pkt_vec[1].to_string(),
-                    // TODO: according to the ref handle result, if pack file parsed success return ok
-                    result: "ok".to_owned(),
-                });
+                    result: "ng".to_owned(),
+                };
+                ref_result.get_result();
+                ref_results.push(ref_result);
 
                 tracing::info!("pkt_line: {:?}", pkt_vec);
                 //TODO: don't know what to do with multiple refs
@@ -248,7 +309,7 @@ impl HttpProtocol {
         let mut buf = BytesMut::new();
         let msg = "unpack ok\n";
         add_to_pkt_line(&mut buf, msg.to_owned());
-        for res in ref_result {
+        for res in ref_results {
             let ref_res = format!("{} {}", res.result, res.ref_name);
             add_to_pkt_line(&mut buf, ref_res);
         }
@@ -282,10 +343,10 @@ async fn send_pack(
     }
 }
 
-fn add_to_pkt_line(buf: &mut BytesMut, buf_str: String) {
+fn add_to_pkt_line(pkt_line_stream: &mut BytesMut, buf_str: String) {
     let buf_str_length = buf_str.len() + 4;
-    buf.put(Bytes::from(format!("{buf_str_length:04x}")));
-    buf.put(buf_str.as_bytes());
+    pkt_line_stream.put(Bytes::from(format!("{buf_str_length:04x}")));
+    pkt_line_stream.put(buf_str.as_bytes());
 }
 
 /// Read a single pkt-format line from body chunk, return the single line length and line bytes

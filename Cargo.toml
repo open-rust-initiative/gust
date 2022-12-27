@@ -32,5 +32,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 bytes = "1.1.0"
 futures = "0.3.25"
-# entity = { path = "../entity" }
-# migration = { path = "../migration" }
+dirs = "4.0.0"
