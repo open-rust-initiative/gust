@@ -10,7 +10,6 @@ use super::Hash;
 use super::ObjectType;
 use crate::errors::GitError;
 use crate::git::hash::HashType;
-use crate::git::pack::encode;
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {

@@ -1,10 +1,28 @@
+//!
+//!
+//!
+//!
 use thiserror::Error;
-use crate::git::hash::Hash;
 
 #[derive(Error, Debug)]
 pub enum GitError {
     #[error("The `{0}` is not a valid git object type.")]
     InvalidObjectType(String),
+
+    #[error("The `{0}` is not a valid git blob object.")]
+    InvalidBlobObject(String),
+
+    #[error("The `{0}` is not a valid git tree object.")]
+    InvalidTreeObject(String),
+
+    #[error("The `{0}` is not a valid git tree item.")]
+    InvalidTreeItem(String),
+
+    #[error("The `{0}` is not a valid git commit object.")]
+    InvalidCommitObject(String),
+
+    #[error("The `{0}` is not a valid git tag object.")]
+    InvalidTagObject(String),
 
     #[error("The `{0}` is not a valid idx file.")]
     InvalidIdxFile(String),
@@ -14,9 +32,6 @@ pub enum GitError {
 
     #[error("The `{0}` is not a valid pack header.")]
     InvalidPackHeader(String),
-
-    #[error("The `{0}` is not a valid git tree type.")]
-    InvalidTreeItem(String),
 
     #[error("The {0} is not a valid Hash value ")]
     InvalidHashValue(String),
@@ -31,11 +46,8 @@ pub enum GitError {
     InvalidObjectInfo(String),
 
     #[error("Can't found Hash value :{0} from current file")]
-    NotFountHashValue(Hash),
+    NotFountHashValue(String),
 
     #[error(transparent)]
     IOError(#[from] std::io::Error),
-    
-
-
 }

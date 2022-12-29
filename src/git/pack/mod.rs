@@ -190,7 +190,7 @@ impl Pack {
                 } else {
                     // object = read_object(hash)?;
                     // &object
-                    return Err(GitError::NotFountHashValue(hash) );
+                    return Err(GitError::NotFountHashValue(hash.to_string()) );
                     
                 };
                 apply_delta(pack_file, &base_object)
