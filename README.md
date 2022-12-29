@@ -1,4 +1,5 @@
-# Gust 
+# Gust
+
 ##  Monorepo Platform for DevOps and Open Source Supply Chain
 
 Git is a content-addressable filesystem and a distributed collaboration system. All files of a single repository persisted on the disk of the machine. It brings a lot of benefits to performance and maintenance. But it also has challenges for monorepo. It is hard to manage a vast code repository like a repo has 20 TB, which is typical in a middle size enterprise.

@@ -1,8 +1,10 @@
 use std::{fs::File, sync::Arc};
-use crate::{utils, errors::GitError, git::hash::Hash};
+use crate::{utils, git::hash::Hash};
 use super::{Pack, cache::PackObjectCache};
 use std::convert::TryFrom;
 use std::cmp::Ordering;
+use crate::git::errors::GitError;
+
 impl Eq for Pack{}
 impl Ord for Pack {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -37,13 +39,13 @@ impl Pack{
     pub fn decode_with_cache(&self,cache:&mut PackObjectCache) -> Result<Self, GitError> {
         let mut pack_file = File::open(self.pack_file.clone()).unwrap();
         // Check the Header of Pack File
-        let mut _pack = Self::check_header(&mut pack_file)?;
+        let mut _pack = Self::check_header(&mut pack_file).unwrap();
 
         for _ in 0.._pack.number_of_objects {
             //update offset of the Object
             let offset = utils::get_offset(&mut pack_file).unwrap();
             //Get the next Object by the Pack::next_object() func
-            let object = Pack::next_object(&mut pack_file, offset, cache)?;
+            let object = Pack::next_object(&mut pack_file, offset, cache).unwrap();
             // Larger offsets would require a version-2 pack index
             let offset = u32::try_from(offset)
                 .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
@@ -56,7 +58,7 @@ impl Pack{
         print!("{}",cache.by_hash.len());
         Ok(_pack)
     }
-    pub fn multi_decode(root:&str) -> Result<Self, GitError>{ 
+    pub fn multi_decode(root:&str) -> Result<Self, GitError>{
 
         let mut total_pack = Self::default();
         total_pack.number_of_objects=0;

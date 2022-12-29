@@ -10,9 +10,9 @@ const VAR_INT_CONTINUE_FLAG: u8 = 1 << VAR_INT_ENCODING_BITS;
 use std::{io::{self,Read,SeekFrom,Seek}, fs::File, vec, path::PathBuf, str::FromStr};
 use flate2::read::ZlibDecoder;
 
-use crate::errors::GitError;
-
+use super::git::errors::GitError;
 use super::git::hash::Hash;
+
 ///保留value二进制的后bits位
 fn keep_bits(value: usize, bits: u8) -> usize {
     value & ((1 << bits) - 1)
@@ -122,6 +122,7 @@ pub fn read_offset_encoding<R: Read>(stream: &mut R) -> io::Result<u64> {
         value += 1;
     }
 }
+
 ///
 /// # Example
 /// 
@@ -176,11 +177,11 @@ pub fn get_offset(file: &mut File) -> io::Result<u64> {
 // Call reader() to process a zlib stream from a file.
 // Reset the file offset afterwards to the end of the zlib stream,
 // since ZlibDecoder uses BufReader, which may consume extra bytes.
-pub fn read_zlib_stream_exact<T, F>(file: &mut File, reader: F) -> Result<T,GitError>
-  where F: FnOnce(&mut ZlibDecoder<&mut File>) -> Result<T,GitError>
+pub fn read_zlib_stream_exact<T, F>(file: &mut File, reader: F) -> Result<T, GitError>
+  where F: FnOnce(&mut ZlibDecoder<&mut File>) -> Result<T, GitError>
 {
 
-  let offset = get_offset(file)?;
+  let offset = get_offset(file).unwrap();
   let mut decompressed = ZlibDecoder::new(file);
   let result = reader(&mut decompressed);
   let zlib_end = offset + decompressed.total_in();

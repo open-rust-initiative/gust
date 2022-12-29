@@ -8,7 +8,7 @@ use std::fmt::Display;
 
 use super::super::Hash;
 use super::Metadata;
-use crate::errors::GitError;
+use crate::git::errors::GitError;
 use crate::git::object::types::ObjectType;
 use bstr::ByteSlice;
 

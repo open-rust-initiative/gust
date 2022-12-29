@@ -3,7 +3,6 @@
 //!
 use super::tree::*;
 use super::Metadata;
-use crate::errors::GitError;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::sync::Arc;
@@ -70,6 +69,8 @@ impl Blob {
     }
 }
 use bstr::BString;
+use crate::git::errors::GitError;
+
 impl Display for Blob {
     ///为了节省输出空间 暂时只输出第一行内容
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

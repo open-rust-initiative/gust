@@ -7,7 +7,7 @@ use bstr::ByteSlice;
 
 use super::sign::AuthorSign;
 use super::Metadata;
-use crate::errors::GitError;
+use crate::errors::GustError;
 use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
 
@@ -15,6 +15,8 @@ use std::fmt::Display;
 
 /// Git Object: tag
 use std::cmp::Ordering;
+use crate::git::errors::GitError;
+
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tag {
@@ -67,7 +69,7 @@ impl Tag {
 
     ///
     #[allow(unused)]
-    fn decode_metadata(&mut self) -> Result<(), GitError> {
+    fn decode_metadata(&mut self) -> Result<(), GustError> {
         let mut data = self.meta.data.clone();
 
         let object_begin = data.find_byte(0x20).unwrap();

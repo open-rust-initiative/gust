@@ -1,11 +1,15 @@
 //!Hash值结构体 20位u8数组
 //! > Attention to the Display function
 
-use crate::errors::GitError;
-use sha1::{Digest, Sha1};
 use std::convert::TryFrom;
 use std::fmt::Display;
 use std::str::FromStr;
+
+use sha1::{Digest, Sha1};
+use colored::Colorize;
+
+use crate::git::errors::GitError;
+use crate::git::object::{types::ObjectType, Metadata};
 
 ///Hash值的位数 - sha1
 pub const HASH_BYTES: usize = 20;
@@ -25,9 +29,8 @@ pub enum HashType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct Hash(pub [u8; HASH_BYTES]);
 
-use super::object::{types::ObjectType, Metadata};
 /// Display trait for Hash type
-use colored::Colorize;
+
 impl Display for Hash {
     // Hash 值打印的彩色与16进制格式
     /// # !Attention
@@ -37,7 +40,6 @@ impl Display for Hash {
     ///  the hash value `18fd2deaaf152c7f1222c52fb2673f6192b375f0`<br>
     ///  will be the `1;31m8d2deaaf152c7f1222c52fb2673f6192b375f00m`
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        //
         write!(f, "{}", self.to_plain_str().red().bold())
     }
 }
@@ -146,13 +148,13 @@ impl FromStr for Hash {
 }
 
 mod tests {
+    use std::collections::BTreeMap;
+    use std::str::FromStr;
 
     /// The Right Hash decode
     #[test]
     fn test_hash() {
-        use super::Hash;
-        use std::str::FromStr;
-        let test_hash = Hash::from_str("18fd2deaaf152c7f1222c52fb2673f6192b375f0").unwrap();
+        let test_hash = super::Hash::from_str("18fd2deaaf152c7f1222c52fb2673f6192b375f0").unwrap();
         let result_hash: [u8; 20] = [
             24, 253, 45, 234, 175, 21, 44, 127, 18, 34, 197, 47, 178, 103, 63, 97, 146, 179, 117,
             240,
@@ -171,48 +173,43 @@ mod tests {
     /// The Right Hash decode
     #[test]
     fn test_hash_with_zero() {
-        use super::Hash;
-        use std::str::FromStr;
-        let test_hash = Hash::from_str("08fd2deaaf152c7f1222c52fb2673f6192b37500").unwrap();
+        let test_hash = super::Hash::from_str("08fd2deaaf152c7f1222c52fb2673f6192b37500").unwrap();
         let result_hash: [u8; 20] = [
             8, 253, 45, 234, 175, 21, 44, 127, 18, 34, 197, 47, 178, 103, 63, 97, 146, 179, 117, 0,
         ];
         assert_eq!(test_hash.0, result_hash);
         println!("{}", test_hash);
     }
+
     /// The Wrong Hash decode
     #[test]
     fn test_error_hash() {
-        use super::Hash;
-        use std::str::FromStr;
         let test_str = "18fd2deaaf152c7f1222c52fb2673f6192z375f0";
-        let test_hash = Hash::from_str(test_str).unwrap_err();
+        let test_hash = super::Hash::from_str(test_str).unwrap_err();
         print!("{:?}", test_hash);
         assert_eq!(
             format!("The {} is not a valid Hash value ", test_str),
             test_hash.to_string()
         );
     }
+
     #[test]
     fn test_btree_map() {
-        use super::Hash;
-        use std::collections::BTreeMap;
-        use std::str::FromStr;
         let mut map = BTreeMap::new();
         map.insert(
-            Hash::from_str("cd64b12b3949483d42d34979a3f89589aad804c2").unwrap(),
+            super::Hash::from_str("cd64b12b3949483d42d34979a3f89589aad804c2").unwrap(),
             1,
         );
         map.insert(
-            Hash::from_str("1c6ec4271e3e75b585e8d150f9758e4ee4890dd5").unwrap(),
+            super::Hash::from_str("1c6ec4271e3e75b585e8d150f9758e4ee4890dd5").unwrap(),
             2,
         );
         map.insert(
-            Hash::from_str("f4010b9167a3c7d81bc81bfbffbeac0c9e95052f").unwrap(),
+            super::Hash::from_str("f4010b9167a3c7d81bc81bfbffbeac0c9e95052f").unwrap(),
             3,
         );
         map.insert(
-            Hash::from_str("aa36c1e0d709f96d7b356967e16766bafdf63a75").unwrap(),
+            super::Hash::from_str("aa36c1e0d709f96d7b356967e16766bafdf63a75").unwrap(),
             4,
         );
         for (key, value) in map.iter() {

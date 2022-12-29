@@ -1,7 +1,6 @@
 //!	Decode pack file by the `ObjDecodedMap`
 use super::super::object as obj;
 use super::cache::PackObjectCache;
-use crate::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
 use colored::Colorize;
@@ -11,6 +10,8 @@ use obj::Metadata;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
+use crate::git::errors::GitError;
+
 ///!对取出的object字段进行进一步解码与包装
 /// 用于存储解析出的object抽象对象的hashmap
 #[derive(Default, Clone)]

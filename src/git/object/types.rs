@@ -3,7 +3,7 @@
 //! PackObjectType
 //!
 //!
-use crate::errors::GitError;
+use crate::git::errors::GitError;
 use std::{fmt::Display, vec};
 
 /// Four abstract Object Types:
