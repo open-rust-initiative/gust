@@ -222,8 +222,8 @@ mod tests {
         git::{
             object::{types::ObjectType, Metadata},
             pack::Pack,
+            utils,
         },
-        utils,
     };
     use bstr::ByteSlice;
 

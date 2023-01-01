@@ -218,12 +218,13 @@ impl Idx {
 #[cfg(test)]
 mod tests {
     use super::Idx;
-    use crate::utils;
+    use crate::git::utils;
     use bstr::ByteSlice;
     use std::env;
     use std::fs::File;
     use std::io::{BufReader, Read, Write};
     use std::path::{Path, PathBuf};
+
     ///测试读取idx
     #[test]
     fn test_idx_read_from_file() {
