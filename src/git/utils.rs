@@ -2,6 +2,7 @@
 //!
 //!
 //!
+
 use std::{io::{self, Read, SeekFrom, Seek},
           fs::File, vec, path::PathBuf, str::FromStr};
 
@@ -17,14 +18,14 @@ const VAR_INT_CONTINUE_FLAG: u8 = 1 << VAR_INT_ENCODING_BITS;
 
 /// Preserve the last bits of value binary
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 fn keep_bits(value: usize, bits: u8) -> usize {
     value & ((1 << bits) - 1)
 }
 
 /// Read the next N bytes from the reader
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_bytes<R: Read, const N: usize>(stream: &mut R) -> io::Result<[u8; N]> {
     let mut bytes = [0; N];
     stream.read_exact(&mut bytes)?;
@@ -34,7 +35,7 @@ pub fn read_bytes<R: Read, const N: usize>(stream: &mut R) -> io::Result<[u8; N]
 
 /// Read a u32 from the reader
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_u32<R: Read>(stream: &mut R) -> io::Result<u32> {
     let bytes = read_bytes(stream)?;
 
@@ -43,7 +44,7 @@ pub fn read_u32<R: Read>(stream: &mut R) -> io::Result<u32> {
 
 /// Read a hash from the reader
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_hash<R: Read>(stream: &mut R) -> io::Result<Hash> {
     let bytes = read_bytes(stream)?;
 
@@ -52,7 +53,7 @@ pub fn read_hash<R: Read>(stream: &mut R) -> io::Result<Hash> {
 
 /// Read a vec until the delimiter is read
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_until_delimiter<R: Read>(stream: &mut R, delimiter: u8) -> io::Result<Vec<u8>> {
     let mut bytes = vec![];
 
@@ -70,7 +71,7 @@ pub fn read_until_delimiter<R: Read>(stream: &mut R, delimiter: u8) -> io::Resul
 
 /// Returns whether the first bit of u8 is 1 and returns the 7-bit truth value
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_var_int_byte<R: Read>(stream: &mut R) -> io::Result<(u8, bool)> {
     let [byte] = read_bytes(stream)?;
     let value = byte & !VAR_INT_CONTINUE_FLAG;
@@ -81,7 +82,7 @@ pub fn read_var_int_byte<R: Read>(stream: &mut R) -> io::Result<(u8, bool)> {
 
 /// Read the type and size of the object
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_size_encoding<R: Read>(stream: &mut R) -> io::Result<usize> {
     let mut value = 0;
     let mut length = 0;
@@ -99,7 +100,7 @@ pub fn read_size_encoding<R: Read>(stream: &mut R) -> io::Result<usize> {
 
 ///
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn write_size_encoding(number: usize) -> Vec<u8> {
     let mut num = vec![];
     let mut number = number;
@@ -120,7 +121,7 @@ pub fn write_size_encoding(number: usize) -> Vec<u8> {
 
 /// Read the first few fields of the object and parse
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_type_and_size<R: Read>(stream: &mut R) -> io::Result<(u8, usize)> {
     // Object type and uncompressed pack data size
     // are stored in a "size-encoding" variable-length integer.
@@ -135,7 +136,7 @@ pub fn read_type_and_size<R: Read>(stream: &mut R) -> io::Result<(u8, usize)> {
 
 /// The offset for an OffsetDelta object
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_offset_encoding<R: Read>(stream: &mut R) -> io::Result<u64> {
     // Like the object length, the offset for an OffsetDelta object
     // is stored in a variable number of bytes,
@@ -166,7 +167,7 @@ pub fn read_offset_encoding<R: Read>(stream: &mut R) -> io::Result<u64> {
 /// println!("{:?}",re);
 /// ```
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn write_offset_encoding(number: u64) -> Vec<u8> {
     let mut num = vec![];
     let mut number = number;
@@ -187,7 +188,7 @@ pub fn write_offset_encoding(number: u64) -> Vec<u8> {
 ///
 ///
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_partial_int<R: Read>(
     stream: &mut R,
     bytes: u8,
@@ -206,7 +207,7 @@ pub fn read_partial_int<R: Read>(
 
 ///
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn seek(file: &mut File, offset: u64) -> io::Result<()> {
     file.seek(SeekFrom::Start(offset))?;
 
@@ -215,7 +216,7 @@ pub fn seek(file: &mut File, offset: u64) -> io::Result<()> {
 
 ///
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn get_offset(file: &mut File) -> io::Result<u64> {
     file.seek(SeekFrom::Current(0))
 }
@@ -224,7 +225,7 @@ pub fn get_offset(file: &mut File) -> io::Result<u64> {
 /// Call reader() to process a zlib stream from a file.
 /// Reset the file offset afterwards to the end of the zlib stream,
 /// since ZlibDecoder uses BufReader, which may consume extra bytes.
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn read_zlib_stream_exact<T, F>(file: &mut File, reader: F) -> Result<T, GitError>
     where F: FnOnce(&mut ZlibDecoder<&mut File>) -> Result<T, GitError>
 {
@@ -241,7 +242,7 @@ pub fn read_zlib_stream_exact<T, F>(file: &mut File, reader: F) -> Result<T, Git
 ///
 ///
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn u32_vec(value: u32) -> Vec<u8> {
     let mut result: Vec<u8> = vec![];
     result.push((value >> 24 & 0xff) as u8);
@@ -254,7 +255,7 @@ pub fn u32_vec(value: u32) -> Vec<u8> {
 ///
 ///
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn get_pack_raw_data(data: Vec<u8>) -> Vec<u8> {
     let result = &data[12..data.len() - 20];
     let result = result.to_vec();
@@ -264,13 +265,13 @@ pub fn get_pack_raw_data(data: Vec<u8>) -> Vec<u8> {
 ///
 ///
 ///
-#[allow(dead_code)]
+#[allow(unused)]
 fn get_hash_form_filename(filename: &str) -> String {
     String::from(&filename[5..45])
 }
 
 /// Return a list of pack files in the pack directory.
-#[allow(dead_code)]
+#[allow(unused)]
 pub fn find_all_pack_file(pack_dir: &str) -> (Vec<PathBuf>, Vec<Hash>) {
     let mut file_path = vec![];
     let mut hash_list = vec![];

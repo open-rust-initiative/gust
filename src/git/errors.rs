@@ -2,10 +2,11 @@
 //!
 //!
 //!
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-#[allow(dead_code)]
+#[allow(unused)]
 pub enum GitError {
     #[error("The `{0}` is not a valid git object type.")]
     InvalidObjectType(String),
