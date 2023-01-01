@@ -13,7 +13,7 @@ use super::hash::Hash;
 use super::idx::Idx;
 use super::object::delta::*;
 use super::object::Metadata;
-use crate::errors::GitError;
+use crate::git::errors::GitError;
 use crate::utils;
 
 mod cache;
@@ -146,14 +146,14 @@ impl Pack {
         cache: &mut PackObjectCache,
     ) -> Result<Arc<Metadata>, GitError> {
         use super::object::types::ObjectType;
-        utils::seek(pack_file, offset)?;
-        let (type_num, size) = utils::read_type_and_size(pack_file)?;
+        utils::seek(pack_file, offset).unwrap();
+        let (type_num, size) = utils::read_type_and_size(pack_file).unwrap();
         //Get the Object according to the Types Enum
         let object = match type_num {
             // Undelta representation
             1..=4 => utils::read_zlib_stream_exact(pack_file, |decompressed| {
                 let mut contents = Vec::with_capacity(size);
-                decompressed.read_to_end(&mut contents)?;
+                decompressed.read_to_end(&mut contents).unwrap();
                 if contents.len() != size {
                     return Err(GitError::InvalidObjectInfo(format!(
                         "Incorrect object size"
@@ -163,11 +163,11 @@ impl Pack {
             }),
             // Delta; base object is at an offset in the same packfile
             6 => {
-                let delta_offset = utils::read_offset_encoding(pack_file)?;
+                let delta_offset = utils::read_offset_encoding(pack_file).unwrap();
                 let base_offset = offset.checked_sub(delta_offset).ok_or_else(|| {
                     GitError::InvalidObjectInfo(format!("Invalid OffsetDelta offset"))
                 })?;
-                let offset = utils::get_offset(pack_file)?;
+                let offset = utils::get_offset(pack_file).unwrap();
 
                 let base_object = if let Some(object) = cache.offset_object(base_offset) {
                     Arc::clone(object)
@@ -175,7 +175,7 @@ impl Pack {
                     //递归调用 找出base object
                     Pack::next_object(pack_file, base_offset, cache)?
                 };
-                utils::seek(pack_file, offset)?;
+                utils::seek(pack_file, offset).unwrap();
                 let base_obj = base_object.as_ref();
                 let objs = apply_delta(pack_file, base_obj)?;
                 Ok(objs)
@@ -183,14 +183,14 @@ impl Pack {
             // Delta; base object is given by a hash outside the packfile
             //TODO : This Type need to be completed ，对应多文件的todo
             7 => {
-                let hash = utils::read_hash(pack_file)?;
+                let hash = utils::read_hash(pack_file).unwrap();
                 //let object;
                 let base_object = if let Some(object) = cache.hash_object(hash) {
                     object
                 } else {
                     // object = read_object(hash)?;
                     // &object
-                    return Err(GitError::NotFountHashValue(hash) );
+                    return Err(GitError::NotFountHashValue(hash.to_string()) );
                     
                 };
                 apply_delta(pack_file, &base_object)
@@ -239,7 +239,7 @@ impl Pack {
         let decoded_pack = match Pack::decode(&mut pack_file) {
             Ok(f) => f,
             Err(e) => match e {
-                GitError::NotFountHashValue(a) => panic!("{}",a),
+                GitError::NotFountHashValue(a) => panic!("{}", a),
                 _ => panic!("unknow error"),
             },
         };

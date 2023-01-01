@@ -10,7 +10,7 @@ use std::fmt::Display;
 
 use bstr::ByteSlice;
 
-use crate::errors::GitError;
+use crate::errors::GustError;
 
 ///
 #[allow(unused)]
@@ -38,7 +38,7 @@ impl Display for AuthorSign {
 impl AuthorSign {
     ///
     #[allow(unused)]
-    pub(crate) fn decode_from_data(&mut self, data: Vec<u8>) -> Result<(), GitError> {
+    pub(crate) fn decode_from_data(&mut self, data: Vec<u8>) -> Result<(), GustError> {
         let mut data = data;
 
         let name_start = data.find_byte(0x20).unwrap();
@@ -71,7 +71,7 @@ impl AuthorSign {
 
     ///
     #[allow(unused)]
-    pub(crate) fn encode_to_data(&self) -> Result<Vec<u8>, GitError> {
+    pub(crate) fn encode_to_data(&self) -> Result<Vec<u8>, GustError> {
         let mut data = Vec::new();
 
         data.extend_from_slice(self.t.as_bytes());

@@ -9,7 +9,7 @@ use super::super::hash::Hash;
 use super::super::object::Metadata;
 use super::decode::ObjDecodedMap;
 use super::Pack;
-use crate::errors::GitError;
+use crate::git::errors::GitError;
 use crate::git::object::diff::DeltaDiff;
 use crate::git::object::types::ObjectType;
 use crate::utils;
@@ -312,7 +312,7 @@ impl Pack {
     }
     #[allow(unused)]
     pub fn write(map: &mut ObjDecodedMap, target_dir: &str) -> Result<(), GitError> {
-        map.check_completeness()?;
+        map.check_completeness().unwrap();
         let meta_vec = map.vec_sliding_window();
         let (_pack, data_write) = Pack::encode_delta(meta_vec);
         let mut to_path = PathBuf::from(target_dir);

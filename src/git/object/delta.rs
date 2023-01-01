@@ -1,5 +1,5 @@
 use super::{Hash, Metadata};
-use crate::errors::GitError;
+use crate::git::errors::GitError;
 use crate::utils;
 use flate2::read::ZlibDecoder;
 use std::fs::File;
@@ -22,7 +22,7 @@ pub fn apply_delta(pack_file: &mut File, base: &Metadata) -> Result<Metadata, Gi
             ));
         }
 
-        let result_size = utils::read_size_encoding(delta)?;
+        let result_size = utils::read_size_encoding(delta).unwrap();
         let mut result = Vec::with_capacity(result_size);
         while apply_delta_instruction(delta, &base.data, &mut result)? {}
         if result.len() != result_size {
@@ -64,13 +64,13 @@ fn apply_delta_instruction<R: Read>(
 
         // Append the provided bytes
         let mut data = vec![0; instruction as usize];
-        stream.read_exact(&mut data)?;
+        stream.read_exact(&mut data).unwrap();
         result.extend_from_slice(&data);
     } else {
         // Copy instruction
         let mut nonzero_bytes = instruction;
-        let offset = utils::read_partial_int(stream, COPY_OFFSET_BYTES, &mut nonzero_bytes)?;
-        let mut size = utils::read_partial_int(stream, COPY_SIZE_BYTES, &mut nonzero_bytes)?;
+        let offset = utils::read_partial_int(stream, COPY_OFFSET_BYTES, &mut nonzero_bytes).unwrap();
+        let mut size = utils::read_partial_int(stream, COPY_SIZE_BYTES, &mut nonzero_bytes).unwrap();
         if size == 0 {
             // Copying 0 bytes doesn't make sense, so git assumes a different size
             size = COPY_ZERO_SIZE;
@@ -122,9 +122,9 @@ fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
     let object_file = Path::new(OBJECTS_DIRECTORY)
         .join(directory_name)
         .join(file_name);
-    let object_file = File::open(object_file)?;
+    let object_file = File::open(object_file).unwrap();
     let mut object_stream = ZlibDecoder::new(object_file);
-    let object_type = utils::read_until_delimiter(&mut object_stream, b' ')?;
+    let object_type = utils::read_until_delimiter(&mut object_stream, b' ').unwrap();
     let object_type = match &object_type[..] {
         _commit_object_type => Commit,
         _tree_object_type => Tree,
@@ -137,7 +137,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
             )))
         }
     };
-    let size = utils::read_until_delimiter(&mut object_stream, b'\0')?;
+    let size = utils::read_until_delimiter(&mut object_stream, b'\0').unwrap();
     let size = match parse_decimal(&size) {
         Some(a) => a,
         None => {
@@ -149,7 +149,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
     };
 
     let mut contents = Vec::with_capacity(size);
-    object_stream.read_to_end(&mut contents)?;
+    object_stream.read_to_end(&mut contents).unwrap();
     if contents.len() != size {
         return Err(GitError::DeltaObjError(format!("Incorrect object size")));
     }

@@ -8,8 +8,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Cursor;
 
-use crate::errors::GitError;
+use crate::git::errors::GitError;
 use crate::git::hash::Hash;
+
 use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::utils;

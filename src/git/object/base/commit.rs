@@ -5,11 +5,12 @@
 use super::super::Hash;
 use super::sign::AuthorSign;
 use super::Metadata;
-use crate::errors::GitError;
+use crate::errors::GustError;
 use crate::git::object::types::ObjectType;
 use bstr::ByteSlice;
 use std::cmp::Ordering;
 use std::fmt::Display;
+use crate::git::errors::GitError;
 
 /// Git Object: commit
 #[allow(unused)]
@@ -70,7 +71,7 @@ impl Commit {
 
     /// Decode the Metadata.data and convert to `Commit` Class
     // If there a
-    pub(crate) fn decode_meta(&mut self) -> Result<(), GitError> {
+    pub(crate) fn decode_meta(&mut self) -> Result<(), GustError> {
         let mut data = self.meta.data.clone();
 
         // Find the tree id and remove it from the data

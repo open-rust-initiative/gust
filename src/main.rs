@@ -1,7 +1,6 @@
 //!
 //!
 //!
-extern crate core;
 
 mod gateway;
 mod database;
