@@ -1,21 +1,21 @@
-//!	Tag  对象结构体
+//!    Tag  对象结构体
 //!
 //!
 //!
-
-use bstr::ByteSlice;
-
-use super::sign::AuthorSign;
-use super::Metadata;
-use crate::errors::GustError;
-use crate::git::hash::Hash;
-use crate::git::object::types::ObjectType;
-
-use std::fmt::Display;
 
 /// Git Object: tag
 use std::cmp::Ordering;
+use std::fmt::Display;
+
+use bstr::ByteSlice;
+
+use crate::errors::GustError;
 use crate::git::errors::GitError;
+use crate::git::hash::Hash;
+use crate::git::object::types::ObjectType;
+
+use super::Metadata;
+use super::sign::AuthorSign;
 
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
@@ -27,6 +27,7 @@ pub struct Tag {
     pub tagger: AuthorSign,
     pub message: String,
 }
+
 impl Ord for Tag {
     fn cmp(&self, other: &Self) -> Ordering {
         other.meta.size.cmp(&self.meta.size)
@@ -44,6 +45,7 @@ impl PartialEq for Tag {
         self.meta.size == other.meta.size
     }
 }
+
 ///
 impl Tag {
     /// Tag 的构造函数 接收一个@param meta::Metadata
@@ -139,6 +141,7 @@ impl Tag {
         self.meta.write_to_file(root_path)
     }
 }
+
 impl Display for Tag {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "Type: Tag").unwrap();
@@ -147,21 +150,22 @@ impl Display for Tag {
         writeln!(f, "{}", self.message)
     }
 }
+
 ///
 #[cfg(test)]
 mod tests {
-    use crate::git::hash::Hash;
-    use crate::git::hash::HashType;
-    use crate::git::object::types::ObjectType;
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
     use std::vec;
 
+    use crate::git::hash::Hash;
+    use crate::git::hash::HashType;
+    use crate::git::object::types::ObjectType;
+
     use super::AuthorSign;
     use super::Metadata;
-
     use super::Tag;
 
     ///
@@ -232,6 +236,7 @@ mod tests {
 
         println!("{}", tag);
     }
+
     ///
     #[test]
     fn test_tag_write_to_file() {

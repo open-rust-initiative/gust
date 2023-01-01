@@ -8,18 +8,21 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use self::cache::PackObjectCache;
-use super::hash::Hash;
-use super::idx::Idx;
-use super::object::delta::*;
-use super::object::Metadata;
 use crate::git::errors::GitError;
 use crate::git::utils;
+use crate::git::hash::Hash;
+use crate::git::idx::Idx;
+use crate::git::object::delta::*;
+use crate::git::object::metadata::Metadata;
+
+use self::cache::PackObjectCache;
 
 mod cache;
+
 pub mod decode;
 pub mod encode;
 pub mod multidecode;
+
 /// ### Pack文件结构<br>
 ///  `head`: always = "PACK" <br>
 /// `version`: version code <br>
@@ -34,7 +37,7 @@ pub struct Pack {
     number_of_objects: usize,
     pub signature: Hash,
     pub result: Arc<PackObjectCache>,
-    pack_file :PathBuf,
+    pack_file: PathBuf,
 }
 
 impl Pack {
@@ -79,7 +82,7 @@ impl Pack {
             number_of_objects: 0,
             signature: Hash::default(),
             result: Arc::new(PackObjectCache::default()),
-            pack_file:PathBuf::new(),
+            pack_file: PathBuf::new(),
         };
 
         // Get the Pack Head 4 b ,which should be the "PACK"
@@ -190,15 +193,14 @@ impl Pack {
                 } else {
                     // object = read_object(hash)?;
                     // &object
-                    return Err(GitError::NotFountHashValue(hash.to_string()) );
-                    
+                    return Err(GitError::NotFountHashValue(hash.to_string()));
                 };
                 apply_delta(pack_file, &base_object)
             }
             _ => {
                 return Err(GitError::InvalidObjectType(
                     ObjectType::number_type(type_num).to_string(),
-                ))
+                ));
             }
         }?;
 
@@ -252,14 +254,14 @@ impl Pack {
 ///
 #[cfg(test)]
 mod tests {
-
-    use crate::git::idx::Idx;
-
-    use super::Pack;
     use std::fs::File;
     use std::io::BufReader;
     use std::io::Read;
     use std::path::Path;
+
+    use crate::git::idx::Idx;
+
+    use super::Pack;
 
     /// Test the pack File decode standalone
     #[test]
@@ -272,6 +274,7 @@ mod tests {
             decoded_pack.signature.to_plain_str()
         );
     }
+
     #[test]
     fn test_decode_pack_file_with_print() {
         let decoded_pack = Pack::decode_file(
@@ -282,6 +285,7 @@ mod tests {
             decoded_pack.signature.to_plain_str()
         );
     }
+
     #[test]
     fn test_parse_simple_pack() {
         let decoded_pack = Pack::decode_file(
@@ -311,24 +315,25 @@ mod tests {
         let mut pack_file = File::open(&Path::new(
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
         ))
-        .unwrap();
+            .unwrap();
         let (raw_pack, _raw_data) = Pack::decode_raw_data(&mut pack_file);
         assert_eq!(
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             raw_pack.signature.to_plain_str()
         );
     }
+
     ///Test the pack decode by the Idx File
     #[test]
     fn test_pack_idx_decode() {
         let mut pack_file = File::open(&Path::new(
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack",
         ))
-        .unwrap();
+            .unwrap();
         let idx_file = File::open(&Path::new(
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.idx",
         ))
-        .unwrap();
+            .unwrap();
         let mut reader = BufReader::new(idx_file);
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
@@ -346,18 +351,18 @@ mod tests {
 
     #[test]
     pub fn test_create_time() {
-        let  pack_file = File::open(&Path::new(
+        let pack_file = File::open(&Path::new(
             "./resources/friger/pack-6cf1ec1a89de3757f7ba776e4dc108b88367c460.pack",
         ))
-        .unwrap();
+            .unwrap();
         let metadata = pack_file.metadata().unwrap();
-        print!("{:?}",metadata.created().unwrap());
+        print!("{:?}", metadata.created().unwrap());
 
-        let  pack_file = File::open(&Path::new(
+        let pack_file = File::open(&Path::new(
             "./resources/friger/pack-040de05aef75a0d847bff37f8cacab22dae377c9.pack",
         ))
-        .unwrap();
+            .unwrap();
         let metadata = pack_file.metadata().unwrap();
-        print!("{:?}",metadata.created().unwrap());
+        print!("{:?}", metadata.created().unwrap());
     }
 }

@@ -6,11 +6,12 @@ use std::convert::TryFrom;
 use std::fmt::Display;
 use std::str::FromStr;
 
-use sha1::{Digest, Sha1};
 use colored::Colorize;
+use sha1::{Digest, Sha1};
 
 use crate::git::errors::GitError;
-use crate::git::object::{types::ObjectType, Metadata};
+use crate::git::object::metadata::Metadata;
+use crate::git::object::types::ObjectType;
 
 const HASH_BYTES: usize = 20;
 const COMMIT_OBJECT_TYPE: &[u8] = b"commit";

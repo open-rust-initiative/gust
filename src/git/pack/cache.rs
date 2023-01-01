@@ -1,10 +1,10 @@
-//!	Build Cache Info for the decode packed object
-use crate::git::object::Metadata;
+//!    Build Cache Info for the decode packed object
 use std::collections::{BTreeMap, HashMap};
+use std::sync::Arc;
+
+use crate::git::object::metadata::Metadata;
 
 use super::super::hash::Hash;
-
-use std::sync::Arc;
 
 /// #### Build Cache Info for the decode packed object
 /// There are two hashmap for object ,<br>
@@ -15,6 +15,7 @@ pub struct PackObjectCache {
     pub by_offset: HashMap<Hash, u64>,
     pub offset_hash: BTreeMap<u64, Hash>,
 }
+
 //
 impl PackObjectCache {
     /// update cache by input object:`Rc<Object>` and the offset:`u64`

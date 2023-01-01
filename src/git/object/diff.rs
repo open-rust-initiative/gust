@@ -8,14 +8,14 @@
 //!
 use std::vec;
 
-use diffs::myers;
 use diffs::Diff;
+use diffs::myers;
 
 use crate::git::utils;
-
-use super::Metadata;
+use crate::git::object::metadata::Metadata;
 
 const DATA_INS_LEN: usize = 0x7f;
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct DeltaDiff {
@@ -50,7 +50,7 @@ impl DeltaDiff {
             0,
             new.data.len(),
         )
-        .unwrap();
+            .unwrap();
         _new
     }
 
@@ -112,6 +112,7 @@ impl DeltaDiff {
         self.ssam_r
     }
 }
+
 impl Diff for DeltaDiff {
     type Error = ();
     /// offset < 2^32
@@ -199,7 +200,8 @@ impl Diff for DeltaDiff {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Optype {
-    DATA, // 插入的数据
+    DATA,
+    // 插入的数据
     COPY, // 数据复制
 }
 
@@ -217,15 +219,18 @@ struct DeltaOp {
 mod tests {
     use std::io::Write;
 
-    use super::DeltaDiff;
+    use bstr::ByteSlice;
+
     use crate::{
         git::{
-            object::{types::ObjectType, Metadata},
+            object::metadata::Metadata,
+            object::types::ObjectType,
             pack::Pack,
             utils,
         },
     };
-    use bstr::ByteSlice;
+
+    use super::DeltaDiff;
 
     /// 通过两个metadata 来进行对后者No.2的压缩
     /// 首先，需要两个是相同的类型(ObjectType)
@@ -240,11 +245,11 @@ mod tests {
         let m1 = Metadata::read_object_from_file(
             "./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string(),
         )
-        .unwrap();
+            .unwrap();
         let mut m2 = Metadata::read_object_from_file(
             "./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string(),
         )
-        .unwrap();
+            .unwrap();
         let diff = DeltaDiff::new(m1.clone(), m2.clone());
         println!("{:?}", diff.ops);
         let meta_vec1 = m1.convert_to_vec().unwrap();
@@ -273,17 +278,17 @@ mod tests {
         let m1 = Metadata::read_object_from_file(
             "./resources/diff/16ecdcc8f663777896bd39ca025a041b7f005e".to_string(),
         )
-        .unwrap();
+            .unwrap();
         let mut m2 = Metadata::read_object_from_file(
             "./resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3".to_string(),
         )
-        .unwrap();
+            .unwrap();
         let diff = DeltaDiff::new(m1.clone(), m2.clone());
         println!("{:?}", diff);
 
         //不需要压缩
         let offset_head = m1.id.0.to_vec();
-        assert!(offset_head.len() == 20);
+        assert_eq!(offset_head.len(), 20);
 
         //需要压缩
         let zlib_data = diff.get_delta_metadata();

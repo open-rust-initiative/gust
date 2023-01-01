@@ -1,11 +1,15 @@
 //!
 //!Blob 文件对象结构体
 //!
-use super::tree::*;
-use super::Metadata;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::sync::Arc;
+
+use bstr::BString;
+
+use crate::git::errors::GitError;
+use crate::git::object::metadata::Metadata;
+use crate::git::object::base::tree::*;
 
 /// Git Object: blob
 #[derive(Eq, Debug, Hash, Clone)]
@@ -13,6 +17,7 @@ pub struct Blob {
     pub filename: String,
     pub meta: Arc<Metadata>,
 }
+
 impl Ord for Blob {
     fn cmp(&self, other: &Self) -> Ordering {
         let o = other.filename.cmp(&self.filename);
@@ -41,6 +46,7 @@ impl PartialEq for Blob {
         false
     }
 }
+
 ///
 impl Blob {
     #[allow(unused)]
@@ -68,8 +74,6 @@ impl Blob {
         })
     }
 }
-use bstr::BString;
-use crate::git::errors::GitError;
 
 impl Display for Blob {
     ///为了节省输出空间 暂时只输出第一行内容
@@ -90,6 +94,7 @@ impl Display for Blob {
         writeln!(f, "Only Show the first line of the File...")
     }
 }
+
 ///
 #[cfg(test)]
 mod tests {
@@ -100,10 +105,11 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
+    use crate::git::object::metadata::Metadata;
     use crate::git::object::types::ObjectType;
-    use crate::git::object::Metadata;
 
     use super::Blob;
+
     ///
     #[test]
     fn test_blob_write_to_file() {

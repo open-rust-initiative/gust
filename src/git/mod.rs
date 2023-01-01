@@ -7,15 +7,13 @@
 //!
 //!
 
-mod hash;
-mod idx;
-mod object;
-mod pack;
-mod utils;
-mod errors;
+pub mod hash;
+pub mod idx;
+pub mod object;
+pub mod pack;
+pub mod utils;
+pub mod errors;
 
 ///
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}

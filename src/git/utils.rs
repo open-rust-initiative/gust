@@ -3,13 +3,13 @@
 //!
 //!
 
-use std::{io::{self, Read, SeekFrom, Seek},
-          fs::File, vec, path::PathBuf, str::FromStr};
+use std::{fs::File,
+          io::{self, Read, Seek, SeekFrom}, path::PathBuf, str::FromStr, vec};
 
 use flate2::read::ZlibDecoder;
 
-use crate::git::hash::Hash;
 use crate::git::errors::GitError;
+use crate::git::hash::Hash;
 
 const TYPE_BITS: u8 = 3;
 const VAR_INT_ENCODING_BITS: u8 = 7;
@@ -303,6 +303,4 @@ pub fn find_all_pack_file(pack_dir: &str) -> (Vec<PathBuf>, Vec<Hash>) {
 
 
 #[cfg(test)]
-mod test {
-
-}
+mod test {}

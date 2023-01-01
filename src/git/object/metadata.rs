@@ -1,16 +1,22 @@
-use anyhow::Context;
-use bstr::ByteSlice;
-use deflate::{write::ZlibEncoder, Compression};
-use flate2::read::ZlibDecoder;
+//!
+//!
+//!
+//!
+
 use std::fs::{create_dir_all, File};
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
-use super::Hash;
-use super::ObjectType;
+use anyhow::Context;
+use bstr::ByteSlice;
+use deflate::{Compression, write::ZlibEncoder};
+use flate2::read::ZlibDecoder;
+
 use crate::errors::GustError;
 use crate::git::errors::GitError;
-use crate::git::hash::HashType;
+use crate::git::hash::{Hash, HashType};
+use crate::git::object::types::ObjectType;
+
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {
