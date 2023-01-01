@@ -13,7 +13,7 @@ use crate::git::hash::Hash;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::utils;
+use crate::git::utils;
 
 use super::pack::Pack;
 

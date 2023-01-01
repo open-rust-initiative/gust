@@ -6,11 +6,14 @@
 //!
 //! 每次的复制 字节大小为u8 *4 ,size 为u8*3
 //!
-use super::Metadata;
-use crate::utils;
+use std::vec;
+
 use diffs::myers;
 use diffs::Diff;
-use std::vec;
+
+use crate::git::utils;
+
+use super::Metadata;
 
 const DATA_INS_LEN: usize = 0x7f;
 #[allow(dead_code)]

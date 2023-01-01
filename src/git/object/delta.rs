@@ -1,11 +1,19 @@
-use super::{Hash, Metadata};
-use crate::git::errors::GitError;
-use crate::utils;
-use flate2::read::ZlibDecoder;
+//!
+//!
+//!
+//!
+//!
 use std::fs::File;
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 use std::str::FromStr;
+
+use flate2::read::ZlibDecoder;
+
+use crate::git::errors::GitError;
+use crate::git::utils;
+
+use super::{Hash, Metadata};
 
 const COPY_INSTRUCTION_FLAG: u8 = 1 << 7;
 const COPY_OFFSET_BYTES: u8 = 4;

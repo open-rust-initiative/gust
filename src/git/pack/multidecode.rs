@@ -1,9 +1,17 @@
+//!
+//!
+//!
+//!
 use std::{fs::File, sync::Arc};
-use crate::{utils, git::hash::Hash};
-use super::{Pack, cache::PackObjectCache};
 use std::convert::TryFrom;
 use std::cmp::Ordering;
+
 use crate::git::errors::GitError;
+use crate::git::utils;
+use crate::git::hash::Hash;
+
+use super::{Pack, cache::PackObjectCache};
+
 
 impl Eq for Pack{}
 impl Ord for Pack {
@@ -58,11 +66,13 @@ impl Pack{
         print!("{}",cache.by_hash.len());
         Ok(_pack)
     }
+
+    #[allow(dead_code)]
     pub fn multi_decode(root:&str) -> Result<Self, GitError>{
 
         let mut total_pack = Self::default();
         total_pack.number_of_objects=0;
-        let (files,hash_vec) = utils::find_all_pack_file(root);
+        let (files, _hash_vec) = utils::find_all_pack_file(root);
         let mut pack_vec = vec![];
         for _file_ in files.iter(){
             let mut _pack = Pack::default();

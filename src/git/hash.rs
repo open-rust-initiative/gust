@@ -148,12 +148,11 @@ impl FromStr for Hash {
 }
 
 mod tests {
-    use std::collections::BTreeMap;
-    use std::str::FromStr;
-
     /// The Right Hash decode
     #[test]
     fn test_hash() {
+        use std::str::FromStr;
+
         let test_hash = super::Hash::from_str("18fd2deaaf152c7f1222c52fb2673f6192b375f0").unwrap();
         let result_hash: [u8; 20] = [
             24, 253, 45, 234, 175, 21, 44, 127, 18, 34, 197, 47, 178, 103, 63, 97, 146, 179, 117,
@@ -173,6 +172,8 @@ mod tests {
     /// The Right Hash decode
     #[test]
     fn test_hash_with_zero() {
+        use std::str::FromStr;
+
         let test_hash = super::Hash::from_str("08fd2deaaf152c7f1222c52fb2673f6192b37500").unwrap();
         let result_hash: [u8; 20] = [
             8, 253, 45, 234, 175, 21, 44, 127, 18, 34, 197, 47, 178, 103, 63, 97, 146, 179, 117, 0,
@@ -184,6 +185,8 @@ mod tests {
     /// The Wrong Hash decode
     #[test]
     fn test_error_hash() {
+        use std::str::FromStr;
+
         let test_str = "18fd2deaaf152c7f1222c52fb2673f6192z375f0";
         let test_hash = super::Hash::from_str(test_str).unwrap_err();
         print!("{:?}", test_hash);
@@ -195,7 +198,9 @@ mod tests {
 
     #[test]
     fn test_btree_map() {
-        let mut map = BTreeMap::new();
+        use std::str::FromStr;
+        
+        let mut map = std::collections::BTreeMap::new();
         map.insert(
             super::Hash::from_str("cd64b12b3949483d42d34979a3f89589aad804c2").unwrap(),
             1,

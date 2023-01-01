@@ -14,7 +14,7 @@ use super::idx::Idx;
 use super::object::delta::*;
 use super::object::Metadata;
 use crate::git::errors::GitError;
-use crate::utils;
+use crate::git::utils;
 
 mod cache;
 pub mod decode;

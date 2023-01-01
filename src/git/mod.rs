@@ -11,9 +11,10 @@ pub mod hash;
 
 mod id;
 mod idx;
-mod midx;
 mod object;
 mod pack;
+mod utils;
+
 pub(crate) mod errors;
 
 /// In the git object store format, between the type and size fields has a space character

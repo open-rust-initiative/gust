@@ -1,18 +1,25 @@
 //! encode pack file ,and create file
-use bstr::ByteSlice;
+//!
+//!
+//!
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use bstr::ByteSlice;
+
+use crate::git::errors::GitError;
+use crate::git::object::diff::DeltaDiff;
+use crate::git::object::types::ObjectType;
+use crate::git::utils;
+
 use super::super::hash::Hash;
 use super::super::object::Metadata;
 use super::decode::ObjDecodedMap;
 use super::Pack;
-use crate::git::errors::GitError;
-use crate::git::object::diff::DeltaDiff;
-use crate::git::object::types::ObjectType;
-use crate::utils;
+
+
 const SLIDING_WINDOW: i32 = 10;
 ///
 /// Pack类的encode函数，将解析出的pack或其他途径生成的pack生成对应的文件
