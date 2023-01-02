@@ -1,16 +1,19 @@
-//!	Tree 对象结构体
+//!
 //!
 //!
 //!
 //!
 
+use std::cmp::Ordering;
 use std::fmt::Display;
 
-use super::super::Hash;
-use super::Metadata;
+use bstr::ByteSlice;
+use colored::Colorize;
+
 use crate::git::errors::GitError;
 use crate::git::object::types::ObjectType;
-use bstr::ByteSlice;
+use crate::git::object::metadata::Metadata;
+use crate::git::hash::Hash;
 
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -21,8 +24,6 @@ pub enum TreeItemType {
     Commit,
     Link,
 }
-
-use colored::Colorize;
 
 impl Display for TreeItemType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -65,7 +66,7 @@ impl TreeItemType {
             _ => {
                 return Err(GitError::InvalidTreeItem(
                     String::from_utf8(mode.to_vec()).unwrap(),
-                ))
+                ));
             }
         })
     }
@@ -80,14 +81,13 @@ pub struct TreeItem {
     pub filename: String,
 }
 
-/// Git Object: tree
-use std::cmp::Ordering;
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tree {
     pub meta: Metadata,
     pub tree_items: Vec<TreeItem>,
     pub tree_name: String,
 }
+
 impl Ord for Tree {
     fn cmp(&self, other: &Self) -> Ordering {
         let o = other.tree_name.cmp(&self.tree_name);
@@ -159,7 +159,7 @@ impl Tree {
             let filename = String::from_utf8(
                 self.meta.data[index + mode_index + 1..index + *filename_index].to_vec(),
             )
-            .unwrap();
+                .unwrap();
 
             let id = Hash::from_row(
                 &self.meta.data[index + filename_index + 1..index + filename_index + 21].to_vec(),
@@ -209,12 +209,12 @@ mod tests {
     use std::sync::Arc;
     use std::vec;
 
-    use super::super::blob::Blob;
-    use super::Metadata;
-    use super::ObjectType;
     use crate::git::hash::Hash;
     use crate::git::hash::HashType;
 
+    use super::Metadata;
+    use super::ObjectType;
+    use super::super::blob::Blob;
     use super::Tree;
     use super::TreeItemType;
 
@@ -276,7 +276,7 @@ mod tests {
             .expect("Read error!");
 
         let blob_gitmega = Blob {
-            meta:Arc::new(meta_gitmega) ,
+            meta: Arc::new(meta_gitmega),
             filename: String::new(),
         };
 
@@ -291,7 +291,7 @@ mod tests {
             .expect("Read error!");
 
         let blob_gust = Blob {
-            meta:Arc::new(meta_gust) ,
+            meta: Arc::new(meta_gust),
             filename: String::new(),
         };
 

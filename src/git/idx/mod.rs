@@ -8,12 +8,11 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::Cursor;
 
-use crate::git::errors::GitError;
-use crate::git::hash::Hash;
-
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::utils;
+use crate::git::errors::GitError;
+use crate::git::hash::Hash;
+use crate::git::utils;
 
 use super::pack::Pack;
 
@@ -35,12 +34,12 @@ impl Display for IdxItem {
 
 ///
 #[allow(unused)]
-#[derive(Default,Debug)]
+#[derive(Default, Debug)]
 pub struct Idx {
     pub version: u32,
     pub number_of_objects: usize,
     pub map_of_prefix: HashMap<String, usize>,
-    pub item_hash:HashMap<Hash,usize>,
+    pub item_hash: HashMap<Hash, usize>,
     pub idx_items: Vec<IdxItem>,
     pub pack_signature: Hash,
     pub idx_signature: Hash,
@@ -143,9 +142,8 @@ impl Idx {
         self.idx_signature = Hash::from_row(&data[offset..].to_vec());
 
 
-
         /// fill the item_hash map.
-        for (index,item) in self.idx_items.iter().enumerate() {
+        for (index, item) in self.idx_items.iter().enumerate() {
             self.item_hash.insert(item.id, index);
         }
         Ok(())
@@ -217,13 +215,17 @@ impl Idx {
 ///
 #[cfg(test)]
 mod tests {
-    use super::Idx;
-    use crate::utils;
-    use bstr::ByteSlice;
     use std::env;
     use std::fs::File;
     use std::io::{BufReader, Read, Write};
     use std::path::{Path, PathBuf};
+
+    use bstr::ByteSlice;
+
+    use crate::git::utils;
+
+    use super::Idx;
+
     ///测试读取idx
     #[test]
     fn test_idx_read_from_file() {
@@ -249,7 +251,7 @@ mod tests {
             "92d07408a070a5fbea3c1f2d00e696293b78e7c6",
             idx.idx_signature.to_plain_str()
         );
-        println!("{:?}",idx);
+        println!("{:?}", idx);
     }
 
     ///测试写入idx文件

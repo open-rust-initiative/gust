@@ -1,11 +1,19 @@
-use super::{Hash, Metadata};
-use crate::git::errors::GitError;
-use crate::utils;
-use flate2::read::ZlibDecoder;
+//!
+//!
+//!
+//!
+//!
 use std::fs::File;
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 use std::str::FromStr;
+
+use flate2::read::ZlibDecoder;
+
+use crate::git::errors::GitError;
+use crate::git::utils;
+use crate::git::object::metadata::Metadata;
+use crate::git::hash::Hash;
 
 const COPY_INSTRUCTION_FLAG: u8 = 1 << 7;
 const COPY_OFFSET_BYTES: u8 = 4;
@@ -50,7 +58,7 @@ fn apply_delta_instruction<R: Read>(
             return Err(GitError::DeltaObjError(format!(
                 "Wrong instruction in delta :{}",
                 err.to_string()
-            )))
+            )));
         }
     };
     if instruction & COPY_INSTRUCTION_FLAG == 0 {
@@ -115,7 +123,7 @@ const OBJECTS_DIRECTORY: &str = ".git/objects";
 ///读出unpack 的Object
 #[allow(unused)]
 fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
-    use super::ObjectType::*;
+    use crate::git::object::types::ObjectType::*;
 
     let hex_hash = hash.to_string();
     let (directory_name, file_name) = hex_hash.split_at(2);
@@ -134,7 +142,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
             return Err(GitError::DeltaObjError(format!(
                 "Invalid object type: {:?}",
                 object_type
-            )))
+            )));
         }
     };
     let size = utils::read_until_delimiter(&mut object_stream, b'\0').unwrap();
@@ -144,7 +152,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
             return Err(GitError::DeltaObjError(format!(
                 "Invalid object size: {:?}",
                 size
-            )))
+            )));
         }
     };
 
