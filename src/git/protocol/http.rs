@@ -20,6 +20,7 @@ use tokio::{
     io::{AsyncReadExt, BufReader},
 };
 
+
 use crate::git::protocol::HttpProtocol;
 
 #[derive(Debug, Clone)]
@@ -48,12 +49,16 @@ impl HttpProtocol {
 
     const NUL: char = '\0';
 
+    // sideband 1 will contain packfile data,
+    // sideband 2 will be used for progress information that the client will generally print to stderr and
+    // sideband 3 is used for error information.
+    const SIDE_BAND_BYTE_1: u8 = b'\x01';
+
     pub async fn git_info_refs(
         &self,
         work_dir: PathBuf,
         service: String,
     ) -> Result<Response<Body>, (StatusCode, String)> {
-
         let mut headers = HashMap::new();
         headers.insert(
             "Content-Type".to_string(),
@@ -116,9 +121,7 @@ impl HttpProtocol {
 
     fn build_smart_reply(ref_list: &Vec<String>, service: String) -> BytesMut {
         let mut pkt_line_stream = BytesMut::new();
-
-        let first_pkt_line = format!("# service={}\n", service);
-        add_to_pkt_line(&mut pkt_line_stream, first_pkt_line);
+        add_to_pkt_line(&mut pkt_line_stream, format!("# service={}\n", service));
         pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
 
         for ref_line in ref_list {
@@ -152,16 +155,18 @@ impl HttpProtocol {
                 tracing::info!("read line: {:?}", pkt_line);
                 let dst = pkt_line.to_vec();
                 let commands = &dst[0..4];
-                if commands == b"want" {
-                    want.push(String::from_utf8(dst[5..45].to_vec()).unwrap());
-                } else if commands == b"have" {
-                    have.push(String::from_utf8(dst[5..45].to_vec()).unwrap());
-                } else {
-                    println!(
-                        "unsupported command: {:?}",
-                        String::from_utf8(commands.to_vec())
-                    );
-                    continue;
+
+                match commands {
+                    b"want" => want.push(String::from_utf8(dst[5..45].to_vec()).unwrap()),
+                    b"have" => have.push(String::from_utf8(dst[5..45].to_vec()).unwrap()),
+                    b"done" => break,
+                    other => {
+                        println!(
+                            "unsupported command: {:?}",
+                            String::from_utf8(other.to_vec())
+                        );
+                        continue;
+                    }
                 }
             }
         }
@@ -188,9 +193,6 @@ impl HttpProtocol {
         let mode = &self.mode;
         let _str = HttpProtocol::value_in_ack_mode(mode);
 
-        // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
-        // following its first "ACK obj-id ready" message.
-
         let mut buf = BytesMut::new();
         let (mut sender, body) = Body::channel();
 
@@ -200,6 +202,8 @@ impl HttpProtocol {
         for commit in &have {
             add_to_pkt_line(&mut buf, format!("ACK {} common\n", commit));
         }
+        // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
+        // following its first "ACK obj-id ready" message.
         add_to_pkt_line(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
 
         // TODO: determine which commit id to use in ACK line
@@ -211,15 +215,9 @@ impl HttpProtocol {
         tracing::info!("send buf: {:?}", buf);
         sender.send_data(buf.freeze()).await.unwrap();
 
-        let pack_file = File::open(format!(
-            "./pack-{}.pack",
-            "a1bd835a33d12c185dd6bc94f7ad174a4a8ca009"
-        ))
-        .await
-        .unwrap();
-        // let result: Vec<u8> = decoded_pack.encode(None);
-        let reader = BufReader::new(pack_file);
-        tokio::spawn(send_pack(sender, reader));
+        let result: Vec<u8> = decoded_pack.encode(Some(meta_vec));
+        // let reader = BufReader::new(result);
+        tokio::spawn(send_pack(sender, result));
         let resp = resp.body(body).unwrap();
         Ok(resp)
     }
@@ -281,8 +279,7 @@ impl HttpProtocol {
         }
 
         let mut buf = BytesMut::new();
-        let msg = "unpack ok\n";
-        add_to_pkt_line(&mut buf, msg.to_owned());
+        add_to_pkt_line(&mut buf, "unpack ok\n".to_owned());
         for res in ref_results {
             let ref_res = format!("{} {}", res.result, res.ref_name);
             add_to_pkt_line(&mut buf, ref_res);
@@ -296,10 +293,42 @@ impl HttpProtocol {
     }
 }
 
+fn find_common_base(
+    idx: &Idx,
+    mut obj_id: Hash,
+    pack_file: &mut std::fs::File,
+    have: &Vec<String>,
+) -> Vec<MetaData> {
+    let mut cache = PackObjectCache::default();
+    let mut result: Vec<MetaData> = vec![];
+    loop {
+        let offset = idx.get_offset(obj_id).offset;
+
+        let meta = Pack::next_object(pack_file, offset.try_into().unwrap(), &mut cache).unwrap();
+        let meta = MetaData::new(meta.t, &meta.data);
+
+        let commit = Commit::new(meta);
+        let parent_ids = commit.parent_tree_ids;
+
+        if parent_ids.len() == 1 {
+            obj_id = parent_ids[0];
+            if have.contains(&obj_id.to_plain_str()) {
+                break;
+            }
+            result.push(commit.meta);
+        } else {
+            break;
+        }
+    }
+    result
+}
+
 async fn send_pack(
     mut sender: Sender,
-    mut reader: BufReader<File>,
+    // mut reader: BufReader<File>,
+    result: Vec<u8>,
 ) -> Result<(), (StatusCode, &'static str)> {
+    let mut reader = BufReader::new(result.as_slice());
     loop {
         let mut bytes_out = BytesMut::new();
         let mut temp = BytesMut::new();
@@ -310,9 +339,9 @@ async fn send_pack(
             return Ok(());
         }
         bytes_out.put(Bytes::from(format!("{length:04x}")));
-        bytes_out.put_u8(b'\x01');
+        bytes_out.put_u8(HttpProtocol::SIDE_BAND_BYTE_1);
         bytes_out.put(&mut temp);
-        // println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
+        println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
         sender.send_data(bytes_out.freeze()).await.unwrap();
     }
 }
