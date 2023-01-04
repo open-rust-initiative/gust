@@ -1,29 +1,26 @@
+//!
+//!
+//!
+//!
+use std::collections::HashMap;
+use std::env;
+use std::path::PathBuf;
+
 use anyhow::Result;
 use axum::body::Body;
 use axum::http::{Response, StatusCode};
-
 use bstr::ByteSlice;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::StreamExt;
-use git::pack::Pack;
 use hyper::body::Sender;
 use hyper::Request;
-
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::{
     fs::File,
     io::{AsyncReadExt, BufReader},
 };
 
-use std::collections::HashMap;
-use std::env;
-use std::path::PathBuf;
-use std::str::FromStr;
-
-use crate::git;
-use crate::git::hash::Hash;
-
-use super::HttpProtocol;
+use crate::git::protocol::HttpProtocol;
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -172,31 +169,8 @@ impl HttpProtocol {
         tracing::info!("want commands: {:?}, have commans: {:?}", want, have);
         let work_dir =
             PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
-        let object_root = work_dir.join("crates.io-index/.git/objects");
-        // let pack = build_pack(work_dir.clone());
+        let _object_root = work_dir.join("crates.io-index/.git/objects");
 
-        // let entries = fs::read_dir(&object_root)
-        //     .unwrap()
-        //     .map(|res| res.map(|e| e.path()))
-        //     .collect::<Result<Vec<_>, io::Error>>()
-        //     .unwrap();
-        // // entry length less than 2 represents only contains pack and info dir
-        // if entries.len() == 2 {
-        //     let pack_root = object_root.join("pack");
-        //     let decoded_pack = Pack::multi_decode(pack_root.to_str().unwrap()).unwrap();
-        //     for (hash, meta) in &decoded_pack.result.by_hash {
-        //         let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
-        //         tracing::info!("res:{:?}", res);
-        //     }
-        // }
-
-        // let pack_path = object_root.join("pack/pack-db444c5a50d3ff97f514825f419bc8b02f18fc7f.pack");
-        // let mut origin_pack_file = std::fs::File::open(pack_path).unwrap();
-        // let mut decoded_pack =
-            // Pack::decodev2(&mut origin_pack_file, Hash::from_str(&have[0]).unwrap()).unwrap();
-
-        // TODO: pack target object to pack file
-        // let final_pack = Pack::pack_object_dir(object_root.to_str().unwrap(), "./");
         let mut headers = HashMap::new();
         headers.insert(
             "Content-Type".to_string(),
@@ -212,7 +186,7 @@ impl HttpProtocol {
         }
 
         let mode = &self.mode;
-        let str = HttpProtocol::value_in_ack_mode(mode);
+        let _str = HttpProtocol::value_in_ack_mode(mode);
 
         // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
         // following its first "ACK obj-id ready" message.
@@ -252,7 +226,7 @@ impl HttpProtocol {
 
     pub async fn git_receive_pack(
         &self,
-        work_dir: PathBuf,
+        _work_dir: PathBuf,
         req: Request<Body>,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         // not in memory

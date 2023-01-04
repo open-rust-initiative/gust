@@ -1,6 +1,9 @@
 //!
 //!
 //!
+use std::str::FromStr;
+use std::path::PathBuf;
+use std::{env, net::SocketAddr};
 
 use anyhow::Result;
 use axum::body::Body;
@@ -8,18 +11,12 @@ use axum::extract::{Path, Query};
 use axum::http::{Response, StatusCode};
 use axum::routing::{get, post};
 use axum::{Router, Server};
-
 use hyper::Request;
-
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::{env, net::SocketAddr};
-
-use std::str::FromStr;
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 
-use crate::git::protocal::HttpProtocol;
+use crate::git::protocol::HttpProtocol;
 
 #[tokio::main]
 pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,7 +24,7 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
     dotenvy::dotenv().ok();
-    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
+    let _db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
     let host = env::var("HOST").expect("HOST is not set in .env file");
     let port = env::var("PORT").expect("PORT is not set in .env file");
     let server_url = format!("{}:{}", host, port);
@@ -56,6 +53,7 @@ struct Params {
     pub repo: String,
 }
 
+//
 async fn git_info_refs(
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
@@ -76,6 +74,7 @@ async fn git_info_refs(
     }
 }
 
+//
 async fn git_upload_pack(
     Path(params): Path<Params>,
     req: Request<Body>,
@@ -85,8 +84,10 @@ async fn git_upload_pack(
 
     http_protocol.git_upload_pack(req).await
 }
+
+//
 async fn git_receive_pack(
-    Path(params): Path<Params>,
+    Path(_params): Path<Params>,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("req: {:?}", req);
