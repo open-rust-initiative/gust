@@ -9,8 +9,9 @@ use std::convert::TryFrom;
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::utils;
+use crate::git::pack::cache::PackObjectCache;
+use crate::git::pack::Pack;
 
-use super::{cache::PackObjectCache, Pack};
 
 impl Eq for Pack {}
 

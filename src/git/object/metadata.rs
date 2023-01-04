@@ -19,7 +19,7 @@ use crate::git::object::types::ObjectType;
 
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
-pub struct Metadata {
+pub struct MetaData {
     pub t: ObjectType,
     pub h: HashType,
     pub id: Hash,
@@ -29,22 +29,27 @@ pub struct Metadata {
 }
 
 /// Implement function for Metadata
-impl Metadata {
+impl MetaData {
+    ///
     pub fn hash(&self) -> Hash {
         Hash::from_meta(&self)
     }
-    pub fn new(obj_type: ObjectType, data: &Vec<u8>) -> Metadata {
-        let mut _metadata = Metadata {
-            t: obj_type,
+
+    ///
+    pub fn new(object_type: ObjectType, data: &Vec<u8>) -> MetaData {
+        let mut metadata = MetaData {
+            t: object_type,
             h: HashType::Sha1,
             id: Hash::default(),
             size: data.len(),
             data: data.to_vec(),
             delta_header: vec![],
         };
+
         // compute hash value
-        _metadata.id = _metadata.hash();
-        _metadata
+        metadata.id = metadata.hash();
+
+        metadata
     }
 
     /// Write the object to the file system with folder and file.
@@ -56,6 +61,7 @@ impl Metadata {
     #[allow(unused)]
     pub(crate) fn write_to_file(&self, root_path: String) -> Result<String, GitError> {
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
+
         encoder.write_all(&self.t.to_bytes());
         encoder.write(&[b' ']);
         encoder.write(self.data.len().to_string().as_bytes());
@@ -99,6 +105,7 @@ impl Metadata {
         } else {
             compressed_data.push(0);
         }
+
         match self.t {
             ObjectType::OffsetDelta => {
                 compressed_data.append(&mut self.delta_header.clone());
@@ -108,16 +115,18 @@ impl Metadata {
             }
             _ => {}
         }
+
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::Default);
         encoder.write_all(&self.data).expect("Write error!");
         compressed_data.append(&mut encoder.finish().expect("Failed to finish compression!"));
+
         Ok(compressed_data)
     }
 
     /// Read the object from the file system and parse to a metadata object.<br>
     /// This file is the “loose” object format.
     #[allow(unused)]
-    pub(crate) fn read_object_from_file(path: String) -> Result<Metadata, GitError> {
+    pub(crate) fn read_object_from_file(path: String) -> Result<MetaData, GitError> {
         let file = File::open(path).unwrap();
         let mut reader = BufReader::new(file);
         let mut data = Vec::new();
@@ -142,10 +151,10 @@ impl Metadata {
         let mut data = decoded[size_index + 1..].to_vec();
 
         match String::from_utf8(t.to_vec()).unwrap().as_str() {
-            "blob" => Ok(Metadata::new(ObjectType::Blob, &data)),
-            "tree" => Ok(Metadata::new(ObjectType::Tree, &data)),
-            "commit" => Ok(Metadata::new(ObjectType::Commit, &data)),
-            "tag" => Ok(Metadata::new(ObjectType::Tag, &data)),
+            "blob" => Ok(MetaData::new(ObjectType::Blob, &data)),
+            "tree" => Ok(MetaData::new(ObjectType::Tree, &data)),
+            "commit" => Ok(MetaData::new(ObjectType::Commit, &data)),
+            "tag" => Ok(MetaData::new(ObjectType::Tag, &data)),
             _ => Err(GitError::InvalidObjectType(
                 String::from_utf8(t.to_vec()).unwrap(),
             )),

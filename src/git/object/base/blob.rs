@@ -8,14 +8,14 @@ use std::sync::Arc;
 use bstr::BString;
 
 use crate::git::errors::GitError;
-use crate::git::object::metadata::Metadata;
+use crate::git::object::metadata::MetaData;
 use crate::git::object::base::tree::*;
 
 /// Git Object: blob
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Blob {
     pub filename: String,
-    pub meta: Arc<Metadata>,
+    pub meta: Arc<MetaData>,
 }
 
 impl Ord for Blob {
@@ -50,7 +50,7 @@ impl PartialEq for Blob {
 ///
 impl Blob {
     #[allow(unused)]
-    pub fn new(metadata: Metadata) -> Self {
+    pub fn new(metadata: MetaData) -> Self {
         Self {
             meta: Arc::new(metadata),
             filename: String::new(),
@@ -105,7 +105,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    use crate::git::object::metadata::Metadata;
+    use crate::git::object::metadata::MetaData;
     use crate::git::object::types::ObjectType;
 
     use super::Blob;
@@ -126,7 +126,7 @@ mod tests {
 
         let data = buffer;
 
-        let meta = Metadata::new(ObjectType::Blob, &data);
+        let meta = MetaData::new(ObjectType::Blob, &data);
 
         meta.write_to_file("/tmp".to_string())
             .expect("Write error!");
@@ -139,7 +139,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-82352c3a6a7a8bd32011751699c7a3648d1b5d3c-gitmega.md");
 
-        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         assert_eq!(meta.t, crate::git::object::types::ObjectType::Blob);

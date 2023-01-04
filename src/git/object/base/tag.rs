@@ -13,14 +13,14 @@ use crate::errors::GustError;
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
+use crate::git::object::metadata::MetaData;
+use crate::git::object::base::sign::AuthorSign;
 
-use super::Metadata;
-use super::sign::AuthorSign;
 
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tag {
-    pub meta: Metadata,
+    pub meta: MetaData,
     pub object: Hash,
     pub t: ObjectType,
     pub tag: String,
@@ -50,7 +50,7 @@ impl PartialEq for Tag {
 impl Tag {
     /// Tag 的构造函数 接收一个@param meta::Metadata
     /// 同时执行tag解码 -> `fn decode_metadata`
-    pub fn new(meta: Metadata) -> Self {
+    pub fn new(meta: MetaData) -> Self {
         let mut a = Self {
             meta: meta.clone(),
             object: meta.id.clone(),
@@ -110,7 +110,7 @@ impl Tag {
 
     ///
     #[allow(unused)]
-    fn encode_metadata(&self) -> Result<Metadata, ()> {
+    fn encode_metadata(&self) -> Result<MetaData, ()> {
         let mut data = Vec::new();
 
         data.extend_from_slice("object".as_bytes());
@@ -132,7 +132,7 @@ impl Tag {
         data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
         data.extend_from_slice(self.message.as_bytes());
 
-        Ok(Metadata::new(ObjectType::Tag, &data))
+        Ok(MetaData::new(ObjectType::Tag, &data))
     }
 
     ///
@@ -165,7 +165,7 @@ mod tests {
     use crate::git::object::types::ObjectType;
 
     use super::AuthorSign;
-    use super::Metadata;
+    use super::MetaData;
     use super::Tag;
 
     ///
@@ -174,7 +174,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/tag-e5c324b03b72b26f11557c4955c6d17c68dc8595");
 
-        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         assert_eq!(ObjectType::Tag, meta.t);
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_output_meat() {
-        let meta = Metadata {
+        let meta = MetaData {
             t: ObjectType::Tag,
             h: HashType::Sha1,
             id: Hash::from_str("df1087c478c8d337cb587b897e86f2455e2687ed").unwrap(),
@@ -240,7 +240,7 @@ mod tests {
     ///
     #[test]
     fn test_tag_write_to_file() {
-        let meta = Metadata::new(ObjectType::Tag, &vec![]);
+        let meta = MetaData::new(ObjectType::Tag, &vec![]);
 
         let tagger = AuthorSign {
             t: "tagger".to_string(),

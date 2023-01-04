@@ -12,7 +12,7 @@ use colored::Colorize;
 
 use crate::git::errors::GitError;
 use crate::git::object::types::ObjectType;
-use crate::git::object::metadata::Metadata;
+use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
 
 ///
@@ -83,7 +83,7 @@ pub struct TreeItem {
 
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tree {
-    pub meta: Metadata,
+    pub meta: MetaData,
     pub tree_items: Vec<TreeItem>,
     pub tree_name: String,
 }
@@ -138,7 +138,7 @@ impl Display for Tree {
 
 ///
 impl Tree {
-    pub fn new(metadata: Metadata) -> Self {
+    pub fn new(metadata: MetaData) -> Self {
         let mut a = Self {
             meta: metadata,
             tree_items: vec![],
@@ -180,7 +180,7 @@ impl Tree {
 
     ///
     #[allow(unused)]
-    pub(crate) fn encode_metadata(&self) -> Result<Metadata, ()> {
+    pub(crate) fn encode_metadata(&self) -> Result<MetaData, ()> {
         let mut data = Vec::new();
         for item in &self.tree_items {
             data.extend_from_slice(&item.mode);
@@ -190,7 +190,7 @@ impl Tree {
             data.extend_from_slice(&item.id.0.to_vec());
         }
 
-        Ok(Metadata::new(ObjectType::Tree, &data))
+        Ok(MetaData::new(ObjectType::Tree, &data))
     }
 
     ///
@@ -212,7 +212,7 @@ mod tests {
     use crate::git::hash::Hash;
     use crate::git::hash::HashType;
 
-    use super::Metadata;
+    use super::MetaData;
     use super::ObjectType;
     use super::super::blob::Blob;
     use super::Tree;
@@ -224,7 +224,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-82352c3a6a7a8bd32011751699c7a3648d1b5d3c-gitmega.md");
 
-        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         assert_eq!(meta.t, ObjectType::Blob);
@@ -248,7 +248,7 @@ mod tests {
 
         let mut tree = Tree {
             tree_name: String::new(),
-            meta: Metadata {
+            meta: MetaData {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
                 id: Hash::default(),
@@ -272,7 +272,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-fc1a505ac94f98cc5f29100a2d9aef97027a32fb-gitmega.md");
 
-        let meta_gitmega = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta_gitmega = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         let blob_gitmega = Blob {
@@ -287,7 +287,7 @@ mod tests {
         path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-a3b55a2ce16d2429dae2d690d2c15bcf26fbe33c-gust.md");
 
-        let meta_gust = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta_gust = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         let blob_gust = Blob {
@@ -299,7 +299,7 @@ mod tests {
 
         let mut tree = Tree {
             tree_name: String::new(),
-            meta: Metadata {
+            meta: MetaData {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
                 id: Hash::default(),
@@ -324,7 +324,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/tree-1bdbc1e723aa199e83e33ecf1bb19f874a56ebc3");
 
-        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         assert_eq!(ObjectType::Tree, meta.t);
@@ -361,7 +361,7 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/tree-9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20");
 
-        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         assert_eq!(ObjectType::Tree, meta.t);

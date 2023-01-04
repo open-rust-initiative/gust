@@ -11,14 +11,14 @@ use crate::errors::GustError;
 use crate::git::errors::GitError;
 use crate::git::object::types::ObjectType;
 use crate::git::hash::Hash;
-use crate::git::object::metadata::Metadata;
+use crate::git::object::metadata::MetaData;
 use crate::git::object::base::sign::AuthorSign;
 
 /// Git Object: commit
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Commit {
-    pub meta: Metadata,
+    pub meta: MetaData,
     pub tree_id: Hash,
     pub parent_tree_ids: Vec<Hash>,
     pub author: AuthorSign,
@@ -47,7 +47,7 @@ impl PartialEq for Commit {
 ///
 impl Commit {
     ///
-    pub fn new(metadata: Metadata) -> Self {
+    pub fn new(metadata: MetaData) -> Self {
         let mut a = Self {
             meta: metadata,
             tree_id: Hash::default(),
@@ -127,7 +127,7 @@ impl Commit {
 
     ///
     #[allow(unused)]
-    pub(crate) fn encode_metadata(&self) -> Result<Metadata, ()> {
+    pub(crate) fn encode_metadata(&self) -> Result<MetaData, ()> {
         let mut data = Vec::new();
 
         data.extend_from_slice("tree".as_bytes());
@@ -148,7 +148,7 @@ impl Commit {
         data.extend_from_slice(0x0au8.to_be_bytes().as_ref());
         data.extend_from_slice(self.message.as_bytes());
 
-        Ok(Metadata::new(ObjectType::Commit, &data))
+        Ok(MetaData::new(ObjectType::Commit, &data))
     }
 }
 
@@ -178,10 +178,10 @@ mod tests {
 
     use super::AuthorSign;
     use super::Commit;
-    use super::Metadata;
+    use super::MetaData;
 
     fn get_empty_commit(path: PathBuf) -> super::Commit {
-        let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
+        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
             .expect("Read error!");
 
         Commit {
@@ -241,7 +241,7 @@ mod tests {
     ///
     #[test]
     fn test_commit_write_to_file() {
-        let meta = Metadata::new(ObjectType::Commit, &vec![]);
+        let meta = MetaData::new(ObjectType::Commit, &vec![]);
 
         let author = AuthorSign {
             t: "author".to_string(),
