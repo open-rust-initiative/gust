@@ -10,7 +10,7 @@ use colored::Colorize;
 use sha1::{Digest, Sha1};
 
 use crate::git::errors::GitError;
-use crate::git::object::metadata::Metadata;
+use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 
 const HASH_BYTES: usize = 20;
@@ -62,7 +62,7 @@ impl Hash {
     /// Create Hash from the Object
     ///
     #[allow(unused)]
-    pub fn from_meta(meta: &Metadata) -> Hash {
+    pub fn from_meta(meta: &MetaData) -> Hash {
         match meta.h {
             HashType::Sha1 => {
                 let mut h = Sha1::new();

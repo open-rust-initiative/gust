@@ -12,7 +12,7 @@ use flate2::read::ZlibDecoder;
 
 use crate::git::errors::GitError;
 use crate::git::utils;
-use crate::git::object::metadata::Metadata;
+use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
 
 const COPY_INSTRUCTION_FLAG: u8 = 1 << 7;
@@ -21,7 +21,7 @@ const COPY_SIZE_BYTES: u8 = 3;
 const COPY_ZERO_SIZE: usize = 0x10000;
 
 ///使用delta指令
-pub fn apply_delta(pack_file: &mut File, base: &Metadata) -> Result<Metadata, GitError> {
+pub fn apply_delta(pack_file: &mut File, base: &MetaData) -> Result<MetaData, GitError> {
     utils::read_zlib_stream_exact(pack_file, |delta| {
         let base_size = utils::read_size_encoding(delta).unwrap();
         if base.size != base_size {
@@ -40,7 +40,7 @@ pub fn apply_delta(pack_file: &mut File, base: &Metadata) -> Result<Metadata, Gi
         }
 
         // The object type is the same as the base object
-        Ok(Metadata::new(base.t, &result))
+        Ok(MetaData::new(base.t, &result))
     })
 }
 
@@ -99,7 +99,7 @@ fn apply_delta_instruction<R: Read>(
 
 // 这里默认的是若是pack里面没有，则只能从loose里面找了
 #[allow(unused)]
-pub fn read_object(hash: Hash) -> Result<Metadata, GitError> {
+pub fn read_object(hash: Hash) -> Result<MetaData, GitError> {
     let object = match read_unpacked_object(hash) {
         // Found in objects directory
         Ok(object) => object,
@@ -122,7 +122,7 @@ const OBJECTS_DIRECTORY: &str = ".git/objects";
 
 ///读出unpack 的Object
 #[allow(unused)]
-fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
+fn read_unpacked_object(hash: Hash) -> Result<MetaData, GitError> {
     use crate::git::object::types::ObjectType::*;
 
     let hex_hash = hash.to_string();
@@ -162,7 +162,7 @@ fn read_unpacked_object(hash: Hash) -> Result<Metadata, GitError> {
         return Err(GitError::DeltaObjError(format!("Incorrect object size")));
     }
 
-    Ok(Metadata::new(object_type, &contents))
+    Ok(MetaData::new(object_type, &contents))
 }
 
 ///解析u8数组的十进制

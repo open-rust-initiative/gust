@@ -16,7 +16,7 @@ use crate::git::utils;
 use crate::git::pack::decode::ObjDecodedMap;
 use crate::git::pack::Pack;
 use crate::git::hash::Hash;
-use crate::git::object::metadata::Metadata;
+use crate::git::object::metadata::MetaData;
 
 const SLIDING_WINDOW: i32 = 10;
 
@@ -63,7 +63,7 @@ impl Pack {
     ///   let result:Vec<u8> = Pack::default().encode(metadata_vec);  
     /// ```
     ///
-    pub fn encode(&mut self, meta_vec: Option<Vec<Metadata>>) -> Vec<u8> {
+    pub fn encode(&mut self, meta_vec: Option<Vec<MetaData>>) -> Vec<u8> {
         use sha1::{Digest, Sha1};
         let mut result: Vec<u8>;
         let mut offset = 12;
@@ -95,7 +95,7 @@ impl Pack {
     /// 一次通过metadata的完整data输出
     /// 从decode的 `vec_sliding_window` 来
     #[allow(unused)]
-    pub fn encode_delta(meta_vec: Vec<Metadata>) -> (Self, Vec<u8>) {
+    pub fn encode_delta(meta_vec: Vec<MetaData>) -> (Self, Vec<u8>) {
         let mut _pack = Pack::default();
         _pack.number_of_objects = meta_vec.len();
         let mut result = _pack.encode_header();
@@ -163,7 +163,7 @@ impl Pack {
                 hash_value.to_folder(),
                 hash_value.to_filename()
             );
-            let _meta = Metadata::read_object_from_file(loose_path);
+            let _meta = MetaData::read_object_from_file(loose_path);
             match _meta {
                 Ok(meta) => meta_vec.push(meta),
                 Err(e) => eprintln!("{}", e),

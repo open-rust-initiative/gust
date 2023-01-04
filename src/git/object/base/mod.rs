@@ -6,8 +6,6 @@
 
 use std::fmt::Display;
 
-use crate::git::object::metadata::Metadata;
-
 pub mod blob;
 pub mod commit;
 pub mod sign;

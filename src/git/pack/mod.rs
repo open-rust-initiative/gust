@@ -13,9 +13,8 @@ use crate::git::utils;
 use crate::git::hash::Hash;
 use crate::git::idx::Idx;
 use crate::git::object::delta::*;
-use crate::git::object::metadata::Metadata;
-
-use self::cache::PackObjectCache;
+use crate::git::object::metadata::MetaData;
+use crate::git::pack::cache::PackObjectCache;
 
 mod cache;
 
@@ -147,7 +146,7 @@ impl Pack {
         pack_file: &mut File,
         offset: u64,
         cache: &mut PackObjectCache,
-    ) -> Result<Arc<Metadata>, GitError> {
+    ) -> Result<Arc<MetaData>, GitError> {
         use super::object::types::ObjectType;
         utils::seek(pack_file, offset).unwrap();
         let (type_num, size) = utils::read_type_and_size(pack_file).unwrap();
@@ -162,7 +161,7 @@ impl Pack {
                         "Incorrect object size"
                     )));
                 }
-                Ok(Metadata::new(ObjectType::number_type(type_num), &contents))
+                Ok(MetaData::new(ObjectType::number_type(type_num), &contents))
             }),
             // Delta; base object is at an offset in the same packfile
             6 => {

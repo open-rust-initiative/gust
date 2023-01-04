@@ -1,4 +1,7 @@
 //!    Decode pack file by the `ObjDecodedMap`
+//!
+//!
+//!
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
@@ -12,9 +15,9 @@ use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
 use crate::git::object as obj;
-use crate::git::object::metadata::Metadata;
+use crate::git::object::metadata::MetaData;
+use crate::git::pack::cache::PackObjectCache;
 
-use super::cache::PackObjectCache;
 
 ///!对取出的object字段进行进一步解码与包装
 /// 用于存储解析出的object抽象对象的hashmap
@@ -34,7 +37,7 @@ impl ObjDecodedMap {
     #[allow(unused)]
     pub fn update_from_cache(&mut self, cache: &PackObjectCache) {
         for (key, value) in cache.by_hash.iter() {
-            let metadata = Metadata::new(value.t, &value.data);
+            let metadata = MetaData::new(value.t, &value.data);
             let _obj: ObjectClass = match value.t {
                 // 交给各自的new函数,通过metadata来解码
                 ObjectType::Blob => {
@@ -111,7 +114,7 @@ impl ObjDecodedMap {
 
     /// 将 `check_completeness` 函数解析后的放入
     #[allow(unused)]
-    pub fn vec_sliding_window(&self) -> Vec<Metadata> {
+    pub fn vec_sliding_window(&self) -> Vec<MetaData> {
         let mut list = vec![];
         for c in self.commits.iter() {
             list.push(c.meta.clone());
