@@ -13,7 +13,7 @@ pub mod object;
 pub mod pack;
 pub mod utils;
 pub mod errors;
-pub mod protocal;
+pub mod protocol;
 
 ///
 #[cfg(test)]

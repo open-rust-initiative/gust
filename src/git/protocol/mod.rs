@@ -1,4 +1,9 @@
-pub mod http_protocol;
+//!
+//!
+//!
+//!
+pub mod http;
+pub mod ssh;
 
 // #[derive(Default)]
 pub struct HttpProtocol {
@@ -12,12 +17,13 @@ impl Default for HttpProtocol {
     }
 }
 
-// #[derive(Default)]
+#[allow(unused)]
 pub enum AckMode {
     MultiAck,
     MultiAckDetailed,
     Neither,
 }
+
 impl HttpProtocol {
     pub fn value_in_ack_mode<'a>(mode: &AckMode) -> &'a str {
         match mode {

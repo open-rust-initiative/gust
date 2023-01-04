@@ -16,5 +16,6 @@ use gateway::api::lib;
 
 fn main() -> Result<()> {
     lib::main().unwrap();
+
     Ok(())
 }
