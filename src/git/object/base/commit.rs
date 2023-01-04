@@ -2,14 +2,17 @@
 //!Commit 对象结构体
 //!
 
-use super::super::Hash;
-use super::sign::AuthorSign;
-use super::Metadata;
-use crate::errors::GitError;
-use crate::git::object::types::ObjectType;
-use bstr::ByteSlice;
 use std::cmp::Ordering;
 use std::fmt::Display;
+
+use bstr::ByteSlice;
+
+use crate::errors::GustError;
+use crate::git::errors::GitError;
+use crate::git::object::types::ObjectType;
+use crate::git::hash::Hash;
+use crate::git::object::metadata::Metadata;
+use crate::git::object::base::sign::AuthorSign;
 
 /// Git Object: commit
 #[allow(unused)]
@@ -22,6 +25,7 @@ pub struct Commit {
     pub committer: AuthorSign,
     pub message: String,
 }
+
 impl Ord for Commit {
     fn cmp(&self, other: &Self) -> Ordering {
         other.meta.size.cmp(&self.meta.size)
@@ -39,6 +43,7 @@ impl PartialEq for Commit {
         self.meta.size == other.meta.size
     }
 }
+
 ///
 impl Commit {
     ///
@@ -70,7 +75,7 @@ impl Commit {
 
     /// Decode the Metadata.data and convert to `Commit` Class
     // If there a
-    pub(crate) fn decode_meta(&mut self) -> Result<(), GitError> {
+    pub(crate) fn decode_meta(&mut self) -> Result<(), GustError> {
         let mut data = self.meta.data.clone();
 
         // Find the tree id and remove it from the data
@@ -163,16 +168,17 @@ impl Display for Commit {
 
 #[cfg(test)]
 mod tests {
-    use super::AuthorSign;
-    use super::Metadata;
-    use crate::git::hash::Hash;
-    use crate::git::object::types::ObjectType;
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
 
+    use crate::git::hash::Hash;
+    use crate::git::object::types::ObjectType;
+
+    use super::AuthorSign;
     use super::Commit;
+    use super::Metadata;
 
     fn get_empty_commit(path: PathBuf) -> super::Commit {
         let meta = Metadata::read_object_from_file(path.to_str().unwrap().to_string())
@@ -255,13 +261,13 @@ mod tests {
 
         let mut commit = super::Commit {
             meta,
-            tree_id:Hash::from_str("9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20").unwrap(),
+            tree_id: Hash::from_str("9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20").unwrap(),
             parent_tree_ids: vec![
                 Hash::from_str("1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a").unwrap(),
             ],
             author,
             committer,
-            message:"gpgsig -----BEGIN PGP SIGNATURE-----\n \n iQIzBAABCAAdFiEEanuf5/5ADLU2lvsCZL9E4tsHuXIFAmJRs88ACgkQZL9E4tsH\n uXJAmBAAtubFjLjNzIgal1/Gwy/zlpw7aQvVO2xcX3Xhbeb0UJyKvrSm/Ht19kiz\n 6Bc8ZV75mpKKip93XAljUgWgAO6Q4DUFnVA5bwF1vvhKHbgXLr+I8q+5GqmLW61U\n oBrB/3aJJ/uAxElQz5nOhgB7ztCfeKQ5egbhBXn9QGqPg/RkfQmDPYsU7evk1J0Z\n CyKinbSNe0c92qE95nURzozFb1zf0rO9NtnpYohFCEO5qyuoV4nz7npnJD4Miqy9\n IUQapeJeZC7eDvU8AWbxARrkXQkyfLSebDVcqbz7WfQz+4dhoK7jADaB48oKpR/K\n bKZDJU9a2t2nPC1ojzjQJgXZ6x4linQofBR8wE1ns3W5RoRgcBSj8dQMNH8wXa/T\n oQD6hlCJpjvbiYHuc3tSgCESI4ZU7zGpL9BAQK+C91T8CUamycF1H7TAHXdzNClR\n bWO4EeRzvwZZyIL029DYFxD2IFN7OQb5jc7JvcroIW8jUN0sMPS6jY+d0bg5pgIs\n yJjmI6qPYy7R35OElfTlw8aVSOAnVbQh7MZt6n3JUyezwK9MwbiKdAYKOLYaVaC0\n ++SY+NV4Dwe6W72KhFhxwOJQRGMfES1mRxy4n85BgqfCGy7STGSBOmon3VZEl89z\n rmvdX0JXy93hGH0oUQINsN9bzpsdaQUWVND8wAnb0+sU4LvJz90=\n =9qni\n -----END PGP SIGNATURE-----\n\nAdd gust.md and modify gitmega.md\n\nSigned-off-by: Quanyi Ma <eli@patch.sh>\n".to_string(),
+            message: "gpgsig -----BEGIN PGP SIGNATURE-----\n \n iQIzBAABCAAdFiEEanuf5/5ADLU2lvsCZL9E4tsHuXIFAmJRs88ACgkQZL9E4tsH\n uXJAmBAAtubFjLjNzIgal1/Gwy/zlpw7aQvVO2xcX3Xhbeb0UJyKvrSm/Ht19kiz\n 6Bc8ZV75mpKKip93XAljUgWgAO6Q4DUFnVA5bwF1vvhKHbgXLr+I8q+5GqmLW61U\n oBrB/3aJJ/uAxElQz5nOhgB7ztCfeKQ5egbhBXn9QGqPg/RkfQmDPYsU7evk1J0Z\n CyKinbSNe0c92qE95nURzozFb1zf0rO9NtnpYohFCEO5qyuoV4nz7npnJD4Miqy9\n IUQapeJeZC7eDvU8AWbxARrkXQkyfLSebDVcqbz7WfQz+4dhoK7jADaB48oKpR/K\n bKZDJU9a2t2nPC1ojzjQJgXZ6x4linQofBR8wE1ns3W5RoRgcBSj8dQMNH8wXa/T\n oQD6hlCJpjvbiYHuc3tSgCESI4ZU7zGpL9BAQK+C91T8CUamycF1H7TAHXdzNClR\n bWO4EeRzvwZZyIL029DYFxD2IFN7OQb5jc7JvcroIW8jUN0sMPS6jY+d0bg5pgIs\n yJjmI6qPYy7R35OElfTlw8aVSOAnVbQh7MZt6n3JUyezwK9MwbiKdAYKOLYaVaC0\n ++SY+NV4Dwe6W72KhFhxwOJQRGMfES1mRxy4n85BgqfCGy7STGSBOmon3VZEl89z\n rmvdX0JXy93hGH0oUQINsN9bzpsdaQUWVND8wAnb0+sU4LvJz90=\n =9qni\n -----END PGP SIGNATURE-----\n\nAdd gust.md and modify gitmega.md\n\nSigned-off-by: Quanyi Ma <eli@patch.sh>\n".to_string(),
         };
 
         commit.meta = commit.encode_metadata().unwrap();

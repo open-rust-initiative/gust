@@ -1,7 +1,8 @@
 //!
 //!
 //!
-extern crate core;
+
+use anyhow::Result;
 
 mod gateway;
 mod database;

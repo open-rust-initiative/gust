@@ -1,28 +1,39 @@
+//!
+//!
+//!
+//!
+//!
+
+use std::fmt::Display;
+
+use crate::git::object::metadata::Metadata;
+
 pub mod blob;
 pub mod commit;
 pub mod sign;
 pub mod tag;
 pub mod tree;
-use std::fmt::Display;
-
-pub use super::Metadata;
 
 /// **The Object Class Enum**<br>
 /// Merge the four basic classes into an enumeration structure for easy saving
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
-pub enum ObjClass {
+pub enum ObjectClass {
     BLOB(blob::Blob),
     COMMIT(commit::Commit),
     TREE(tree::Tree),
     TAG(tag::Tag),
 }
-impl Display for ObjClass {
+
+///
+///
+///
+impl Display for ObjectClass {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ObjClass::BLOB(_) => write!(f,"BLOB"),
-            ObjClass::COMMIT(_) =>write!(f,"COMMIT"),
-            ObjClass::TREE(_) =>write!(f,"TREE"),
-            ObjClass::TAG(_) => write!(f,"TAG"),
+            ObjectClass::BLOB(_) => write!(f, "BLOB"),
+            ObjectClass::COMMIT(_) => write!(f, "COMMIT"),
+            ObjectClass::TREE(_) => write!(f, "TREE"),
+            ObjectClass::TAG(_) => write!(f, "TAG"),
         }
     }
 }

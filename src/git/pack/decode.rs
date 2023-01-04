@@ -1,27 +1,33 @@
-//!	Decode pack file by the `ObjDecodedMap`
-use super::super::object as obj;
-use super::cache::PackObjectCache;
-use crate::errors::GitError;
-use crate::git::hash::Hash;
-use crate::git::object::types::ObjectType;
-use colored::Colorize;
-use obj::base::ObjClass;
-use obj::base::{blob, commit, tag, tree};
-use obj::Metadata;
+//!    Decode pack file by the `ObjDecodedMap`
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::sync::Arc;
+
+use colored::Colorize;
+
+use obj::base::{blob, commit, tag, tree};
+use obj::base::ObjectClass;
+
+use crate::git::errors::GitError;
+use crate::git::hash::Hash;
+use crate::git::object::types::ObjectType;
+use crate::git::object as obj;
+use crate::git::object::metadata::Metadata;
+
+use super::cache::PackObjectCache;
+
 ///!对取出的object字段进行进一步解码与包装
 /// 用于存储解析出的object抽象对象的hashmap
 #[derive(Default, Clone)]
 pub struct ObjDecodedMap {
-    pub _map_hash: HashMap<Hash, Arc<ObjClass>>,
+    pub _map_hash: HashMap<Hash, Arc<ObjectClass>>,
     blobs: Vec<blob::Blob>,
     trees: Vec<tree::Tree>,
     tags: Vec<tag::Tag>,
     commits: Vec<commit::Commit>,
     name_map: HashMap<Hash, String>,
 }
+
 //在解析完object后执行的进一步的解码过程
 impl ObjDecodedMap {
     /// 通过cache对不同结构进行进一步解析
@@ -29,27 +35,27 @@ impl ObjDecodedMap {
     pub fn update_from_cache(&mut self, cache: &PackObjectCache) {
         for (key, value) in cache.by_hash.iter() {
             let metadata = Metadata::new(value.t, &value.data);
-            let _obj: ObjClass = match value.t {
+            let _obj: ObjectClass = match value.t {
                 // 交给各自的new函数,通过metadata来解码
                 ObjectType::Blob => {
                     let a = blob::Blob::new(metadata);
                     self.blobs.push(a.clone());
-                    ObjClass::BLOB(a)
+                    ObjectClass::BLOB(a)
                 }
                 ObjectType::Commit => {
                     let a = commit::Commit::new(metadata);
                     self.commits.push(a.clone());
-                    ObjClass::COMMIT(a)
+                    ObjectClass::COMMIT(a)
                 }
                 ObjectType::Tag => {
                     let a = tag::Tag::new(metadata);
                     self.tags.push(a.clone());
-                    ObjClass::TAG(a)
+                    ObjectClass::TAG(a)
                 }
                 ObjectType::Tree => {
                     let a = tree::Tree::new(metadata);
                     self.trees.push(a.clone());
-                    ObjClass::TREE(a)
+                    ObjectClass::TREE(a)
                 }
                 _ => panic!("src/git/pack/decode.rs: 33 invalid type in encoded metadata"),
             };
@@ -138,11 +144,6 @@ impl ObjDecodedMap {
             println!("{}", blob);
         }
     }
-
-
-
-
-
 }
 
 impl Display for ObjDecodedMap {
@@ -159,10 +160,12 @@ impl Display for ObjDecodedMap {
         )
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use super::super::Pack;
     use super::ObjDecodedMap;
+    use super::super::Pack;
+
     #[test]
     pub fn test_map_new() {
         let mut _map = ObjDecodedMap::default();
@@ -179,8 +182,7 @@ mod tests {
         result.print_vec();
     }
 
-    
-    
+
     // #[test]
     // fn test_object_dir_encod_temp() {
     //     let decoded_pack = Pack::decode_file(

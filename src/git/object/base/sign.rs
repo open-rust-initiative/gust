@@ -1,4 +1,4 @@
-//!	Sign 签名 对象结构体
+//!    Sign 签名 对象结构体
 //!
 //!
 //!
@@ -10,7 +10,7 @@ use std::fmt::Display;
 
 use bstr::ByteSlice;
 
-use crate::errors::GitError;
+use crate::errors::GustError;
 
 ///
 #[allow(unused)]
@@ -38,7 +38,7 @@ impl Display for AuthorSign {
 impl AuthorSign {
     ///
     #[allow(unused)]
-    pub(crate) fn decode_from_data(&mut self, data: Vec<u8>) -> Result<(), GitError> {
+    pub(crate) fn decode_from_data(&mut self, data: Vec<u8>) -> Result<(), GustError> {
         let mut data = data;
 
         let name_start = data.find_byte(0x20).unwrap();
@@ -71,7 +71,7 @@ impl AuthorSign {
 
     ///
     #[allow(unused)]
-    pub(crate) fn encode_to_data(&self) -> Result<Vec<u8>, GitError> {
+    pub(crate) fn encode_to_data(&self) -> Result<Vec<u8>, GustError> {
         let mut data = Vec::new();
 
         data.extend_from_slice(self.t.as_bytes());
@@ -108,7 +108,7 @@ mod tests {
             108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49,
             54, 49, 53, 32, 43, 48, 56, 48, 48,
         ]
-        .to_vec();
+            .to_vec();
 
         assert_eq!(data, author_data);
     }
@@ -120,7 +120,7 @@ mod tests {
             108, 105, 64, 112, 97, 116, 99, 104, 46, 115, 104, 62, 32, 49, 54, 52, 57, 53, 50, 49,
             54, 49, 53, 32, 43, 48, 56, 48, 48,
         ]
-        .to_vec();
+            .to_vec();
 
         let mut author = super::AuthorSign {
             t: "".to_string(),

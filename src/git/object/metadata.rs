@@ -1,16 +1,22 @@
-use anyhow::Context;
-use bstr::ByteSlice;
-use deflate::{write::ZlibEncoder, Compression};
-use flate2::read::ZlibDecoder;
+//!
+//!
+//!
+//!
+
 use std::fs::{create_dir_all, File};
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
-use super::Hash;
-use super::ObjectType;
-use crate::errors::GitError;
-use crate::git::hash::HashType;
-use crate::git::pack::encode;
+use anyhow::Context;
+use bstr::ByteSlice;
+use deflate::{Compression, write::ZlibEncoder};
+use flate2::read::ZlibDecoder;
+
+use crate::errors::GustError;
+use crate::git::errors::GitError;
+use crate::git::hash::{Hash, HashType};
+use crate::git::object::types::ObjectType;
+
 /// The metadata of git object.
 #[derive(PartialEq, Eq, Debug, Hash, Ord, PartialOrd, Clone)]
 pub struct Metadata {
@@ -76,7 +82,7 @@ impl Metadata {
     }
 
     ///Convert Metadata to the Vec<u8> ,so that it can write to File
-    pub fn convert_to_vec(&self) -> Result<Vec<u8>, GitError> {
+    pub fn convert_to_vec(&self) -> Result<Vec<u8>, GustError> {
         let mut compressed_data =
             vec![(0x80 | (self.t.type2_number() << 4)) + (self.size & 0x0f) as u8];
         let mut _size = self.size >> 4;
@@ -112,14 +118,14 @@ impl Metadata {
     /// This file is the “loose” object format.
     #[allow(unused)]
     pub(crate) fn read_object_from_file(path: String) -> Result<Metadata, GitError> {
-        let file = File::open(path)?;
+        let file = File::open(path).unwrap();
         let mut reader = BufReader::new(file);
         let mut data = Vec::new();
-        reader.read_to_end(&mut data)?;
+        reader.read_to_end(&mut data).unwrap();
 
         let mut decoder = ZlibDecoder::new(&data[..]);
         let mut decoded = Vec::new();
-        decoder.read_to_end(&mut decoded)?;
+        decoder.read_to_end(&mut decoded).unwrap();
 
         let type_index = decoded.find_byte(0x20).unwrap();
         let t = &decoded[0..type_index];

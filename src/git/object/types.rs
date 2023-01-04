@@ -3,8 +3,10 @@
 //! PackObjectType
 //!
 //!
-use crate::errors::GitError;
+
 use std::{fmt::Display, vec};
+
+use crate::git::errors::GitError;
 
 /// Four abstract Object Types:
 /// - Blob
@@ -62,6 +64,9 @@ impl ObjectType {
             _ => Err(GitError::InvalidObjectType(s.to_string())),
         }
     }
+
+    ///
+    #[allow(unused)]
     pub fn type2_number(&self) -> u8 {
         match self {
             ObjectType::Commit => 1,
@@ -73,6 +78,8 @@ impl ObjectType {
         }
     }
 
+    ///
+    #[allow(unused)]
     pub fn number_type(num: u8) -> Self {
         match num {
             1 => ObjectType::Commit,
@@ -81,7 +88,7 @@ impl ObjectType {
             4 => ObjectType::Tag,
             6 => ObjectType::OffsetDelta,
             7 => ObjectType::HashDelta,
-            _ => panic!("InValid git types"),
+            _ => panic!("Invalid Git object types"),
         }
     }
 }

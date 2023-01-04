@@ -1,19 +1,25 @@
 //! encode pack file ,and create file
-use bstr::ByteSlice;
+//!
+//!
+//!
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use super::super::hash::Hash;
-use super::super::object::Metadata;
-use super::decode::ObjDecodedMap;
-use super::Pack;
-use crate::errors::GitError;
+use bstr::ByteSlice;
+
+use crate::git::errors::GitError;
 use crate::git::object::diff::DeltaDiff;
 use crate::git::object::types::ObjectType;
-use crate::utils;
+use crate::git::utils;
+use crate::git::pack::decode::ObjDecodedMap;
+use crate::git::pack::Pack;
+use crate::git::hash::Hash;
+use crate::git::object::metadata::Metadata;
+
 const SLIDING_WINDOW: i32 = 10;
+
 ///
 /// Pack类的encode函数，将解析出的pack或其他途径生成的pack生成对应的文件
 impl Pack {
@@ -34,7 +40,7 @@ impl Pack {
         let all_num = self.get_object_number();
         assert!(all_num != 0); // guarantee self.number_of_objects!=0
         assert!(all_num < (1 << 32)); //TODO: GitError:numbers of objects should  < 4G ,
-                                      //Encode the number of object  into file
+        //Encode the number of object  into file
         result.append(&mut utils::u32_vec(all_num as u32));
         result
     }
@@ -305,14 +311,14 @@ impl Pack {
             target_dir,
             new_pack.signature.to_plain_str()
         ))
-        .expect("create failed");
+            .expect("create failed");
         file.write_all(result.as_bytes()).expect("write failed");
 
         new_pack
     }
     #[allow(unused)]
     pub fn write(map: &mut ObjDecodedMap, target_dir: &str) -> Result<(), GitError> {
-        map.check_completeness()?;
+        map.check_completeness().unwrap();
         let meta_vec = map.vec_sliding_window();
         let (_pack, data_write) = Pack::encode_delta(meta_vec);
         let mut to_path = PathBuf::from(target_dir);
@@ -323,13 +329,16 @@ impl Pack {
         Ok(())
     }
 }
+
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
+    use bstr::ByteSlice;
+
+    use crate::git::pack::{decode::ObjDecodedMap, Pack};
 
     const TEST_DIR: &str = "./test_dir";
-    use crate::git::pack::{decode::ObjDecodedMap, Pack};
-    use bstr::ByteSlice;
-    use std::io::Write;
 
     #[test]
     fn test_object_dir_encode() {
@@ -353,9 +362,10 @@ mod tests {
         let mut map = ObjDecodedMap::default();
         map.update_from_cache(&decoded_pack.get_cache());
         Pack::write(&mut map, TEST_DIR).unwrap();
-        
+
         Pack::decode_file("./test_dir/pack-83df56e42ca705892f7fd64f96ecb9870b5c5ed8.pack");
     }
+
     #[test]
     fn test_multi_pack_encode() {
         let pack_1 = Pack::decode_file(
