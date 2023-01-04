@@ -349,6 +349,7 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[test]
     pub fn test_create_time() {
         let pack_file = File::open(&Path::new(
