@@ -75,11 +75,12 @@ impl Pack {
                 for metadata in a {
                     result.append(&mut metadata.convert_to_vec().unwrap());
                     //self.result.update(Arc::new(metadata), offset);
-                    println!("Decode offset:{}", offset);
+                    // println!("Decode offset:{}", offset);
                     offset = result.len() as u64;
                 }
             }
             None => {
+                self.number_of_objects = self.result.by_hash.len();
                 result = self.encode_header();
                 for (key, value) in self.result.by_hash.iter() {
                     result.append(&mut value.convert_to_vec().unwrap());

@@ -12,7 +12,6 @@ mod utils;
 mod errors;
 mod git;
 
-use anyhow::Result;
 use gateway::api::lib;
 
 fn main() -> Result<()> {

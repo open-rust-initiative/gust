@@ -6,18 +6,21 @@
 
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{BufReader, Cursor, Read};
+use std::path::PathBuf;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::utils;
-use crate::git::pack::Pack;
+
+use super::pack::Pack;
 
 ///
 #[allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IdxItem {
     pub id: Hash,
     pub crc32: String,
@@ -57,6 +60,14 @@ impl Idx {
         } else {
             pre
         }
+    }
+
+    pub fn decode_from_path(&mut self, path: PathBuf) {
+        let f = File::open(path).ok();
+        let mut reader = BufReader::new(f.unwrap());
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer).ok();
+        self.decode(buffer).unwrap();
     }
 
     ///
@@ -208,6 +219,13 @@ impl Idx {
         result.append(&mut idx_hash.0.to_vec());
         idx._file_data = result;
         idx
+    }
+
+    pub fn get_offset(&self, obj_id: Hash) -> IdxItem {
+        let prefix = self.item_hash.get(&obj_id);
+        let obj_prefix = self.idx_items[*prefix.unwrap()].clone();
+
+        obj_prefix
     }
 }
 

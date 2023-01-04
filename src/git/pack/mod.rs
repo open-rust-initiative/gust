@@ -16,8 +16,7 @@ use crate::git::object::delta::*;
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::cache::PackObjectCache;
 
-mod cache;
-
+pub mod cache;
 pub mod decode;
 pub mod encode;
 pub mod multidecode;
@@ -142,7 +141,7 @@ impl Pack {
     }
     /// Get the Object from File by the Give Offset<br>
     /// By the way , the cache can hold the fount object
-    fn next_object(
+    pub fn next_object(
         pack_file: &mut File,
         offset: u64,
         cache: &mut PackObjectCache,
