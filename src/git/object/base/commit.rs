@@ -4,15 +4,18 @@
 
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::path::PathBuf;
 
 use bstr::ByteSlice;
 
 use crate::errors::GustError;
 use crate::git::errors::GitError;
-use crate::git::object::types::ObjectType;
 use crate::git::hash::Hash;
-use crate::git::object::metadata::MetaData;
 use crate::git::object::base::sign::AuthorSign;
+use crate::git::object::metadata::MetaData;
+use crate::git::object::types::ObjectType;
+
+use super::ObjectClass;
 
 /// Git Object: commit
 #[allow(unused)]
@@ -46,6 +49,11 @@ impl PartialEq for Commit {
 
 ///
 impl Commit {
+    pub fn parse_from_file(path: PathBuf) -> Self {
+        let meta = ObjectClass::parse_meta(path);
+        Commit::new(meta)
+    }
+
     ///
     pub fn new(metadata: MetaData) -> Self {
         let mut a = Self {

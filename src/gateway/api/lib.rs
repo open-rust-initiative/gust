@@ -32,6 +32,7 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/:repo/info/refs", get(git_info_refs))
         .route("/:repo/git-upload-pack", post(git_upload_pack))
         .route("/:repo/git-receive-pack", post(git_receive_pack))
+        .route("/:repo/decode", post(decode_packfile))
         .layer(
             ServiceBuilder::new().layer(CookieManagerLayer::new()),
             // .layer(Extension(data_source)),
@@ -96,4 +97,11 @@ async fn git_receive_pack(
     let http_protocol = HttpProtocol::default();
 
     http_protocol.git_receive_pack(work_dir, req).await
+}
+
+/// try to unpack all object from pack file
+async fn decode_packfile() {
+    let http_protocol = HttpProtocol::default();
+
+    http_protocol.decode_packfile().await
 }

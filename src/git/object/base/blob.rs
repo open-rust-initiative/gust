@@ -3,7 +3,7 @@
 //!
 use std::cmp::Ordering;
 use std::fmt::Display;
-use std::sync::Arc;
+use std::path::PathBuf;
 
 use bstr::BString;
 
@@ -11,11 +11,13 @@ use crate::git::errors::GitError;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::base::tree::*;
 
+use super::ObjectClass;
+
 /// Git Object: blob
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Blob {
     pub filename: String,
-    pub meta: Arc<MetaData>,
+    pub meta: MetaData,
 }
 
 impl Ord for Blob {
@@ -49,10 +51,15 @@ impl PartialEq for Blob {
 
 ///
 impl Blob {
+    pub fn parse_from_file(path: PathBuf) -> Self {
+        let meta = ObjectClass::parse_meta(path);
+        Blob::new(meta)
+    }
+
     #[allow(unused)]
     pub fn new(metadata: MetaData) -> Self {
         Self {
-            meta: Arc::new(metadata),
+            meta: metadata,
             filename: String::new(),
         }
     }
@@ -103,7 +110,6 @@ mod tests {
     use std::io::BufReader;
     use std::io::Read;
     use std::path::{Path, PathBuf};
-    use std::sync::Arc;
 
     use crate::git::object::metadata::MetaData;
     use crate::git::object::types::ObjectType;
@@ -145,7 +151,7 @@ mod tests {
         assert_eq!(meta.t, crate::git::object::types::ObjectType::Blob);
 
         let blob = Blob {
-            meta: Arc::new(meta),
+            meta: meta,
             filename: String::new(),
         };
 

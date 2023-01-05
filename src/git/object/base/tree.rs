@@ -6,6 +6,7 @@
 
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::path::PathBuf;
 
 use bstr::ByteSlice;
 use colored::Colorize;
@@ -14,6 +15,8 @@ use crate::git::errors::GitError;
 use crate::git::object::types::ObjectType;
 use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
+
+use super::ObjectClass;
 
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
@@ -138,6 +141,12 @@ impl Display for Tree {
 
 ///
 impl Tree {
+
+    pub fn parse_from_file(path: PathBuf) -> Self {
+        let meta = ObjectClass::parse_meta(path);
+        Tree::new(meta)
+    }
+
     pub fn new(metadata: MetaData) -> Self {
         let mut a = Self {
             meta: metadata,
@@ -235,7 +244,7 @@ mod tests {
         assert_eq!(16, meta.size);
 
         let blob = Blob {
-            meta: Arc::new(meta),
+            meta: meta,
             filename: String::new(),
         };
 
@@ -276,7 +285,7 @@ mod tests {
             .expect("Read error!");
 
         let blob_gitmega = Blob {
-            meta: Arc::new(meta_gitmega),
+            meta: meta_gitmega,
             filename: String::new(),
         };
 
@@ -291,7 +300,7 @@ mod tests {
             .expect("Read error!");
 
         let blob_gust = Blob {
-            meta: Arc::new(meta_gust),
+            meta: meta_gust,
             filename: String::new(),
         };
 

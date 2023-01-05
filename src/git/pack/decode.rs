@@ -126,7 +126,7 @@ impl ObjDecodedMap {
             list.push(tree.meta.clone());
         }
         for blob in self.blobs.iter() {
-            list.push(blob.meta.as_ref().clone());
+            list.push(blob.meta.clone());
         }
 
         list

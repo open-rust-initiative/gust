@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::Result;
 use axum::body::Body;
@@ -20,8 +21,14 @@ use tokio::{
     io::{AsyncReadExt, BufReader},
 };
 
+use crate::git::hash::Hash;
+use crate::git::object::base::blob::Blob;
+use crate::git::object::base::commit::Commit;
+use crate::git::object::base::tree::Tree;
+use crate::git::object::metadata::MetaData;
+use crate::git::pack::Pack;
 
-use crate::git::protocol::HttpProtocol;
+use super::HttpProtocol;
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -174,8 +181,18 @@ impl HttpProtocol {
         tracing::info!("want commands: {:?}, have commans: {:?}", want, have);
         let work_dir =
             PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
-        let _object_root = work_dir.join("crates.io-index/.git/objects");
 
+        let object_root = work_dir.join("crates.io-index/.git/objects");
+
+        let mut meta_map: HashMap<Hash, MetaData> = HashMap::new();
+        let mut decoded_pack = Pack::default();
+        if have.is_empty() {
+            // TODO git pull command
+        } else {
+            meta_map = find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
+        }
+
+        // TODO: pack target object to pack file
         let mut headers = HashMap::new();
         headers.insert(
             "Content-Type".to_string(),
@@ -207,14 +224,16 @@ impl HttpProtocol {
         add_to_pkt_line(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
 
         // TODO: determine which commit id to use in ACK line
-        add_to_pkt_line(
-            &mut buf,
-            format!("ACK {} \n", "b2a1b00f1662679ac82272feaf8d08638e74f0eb"),
-        );
+        add_to_pkt_line(&mut buf, format!("ACK {} \n", have[have.len() - 1]));
 
         tracing::info!("send buf: {:?}", buf);
         sender.send_data(buf.freeze()).await.unwrap();
 
+        let mut meta_vec: Vec<MetaData> = vec![];
+        for (_hash, data) in meta_map {
+            meta_vec.push(data);
+        }
+        tracing::info!("{}", meta_vec.len());
         let result: Vec<u8> = decoded_pack.encode(Some(meta_vec));
         // let reader = BufReader::new(result);
         tokio::spawn(send_pack(sender, result));
@@ -291,31 +310,64 @@ impl HttpProtocol {
         let resp = resp.body(body).unwrap();
         Ok(resp)
     }
+
+    pub async fn decode_packfile(&self) {
+        let work_dir =
+            PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
+        let object_root = work_dir.join("crates.io-index/.git/objects");
+        let pack_path = object_root.join("pack/pack-db444c5a50d3ff97f514825f419bc8b02f18fc7f.pack");
+        let mut origin_pack_file = std::fs::File::open(pack_path).unwrap();
+
+        let decoded_pack = Pack::decode(&mut origin_pack_file).unwrap();
+        for (_hash, meta) in &decoded_pack.result.by_hash {
+            let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
+            tracing::info!("res:{:?}", res);
+        }
+    }
 }
 
 fn find_common_base(
-    idx: &Idx,
     mut obj_id: Hash,
-    pack_file: &mut std::fs::File,
+    object_root: PathBuf,
     have: &Vec<String>,
-) -> Vec<MetaData> {
-    let mut cache = PackObjectCache::default();
-    let mut result: Vec<MetaData> = vec![];
+) -> HashMap<Hash, MetaData> {
+    // let mut cache = PackObjectCache::default();
+    let mut result: HashMap<Hash, MetaData> = HashMap::new();
+
     loop {
-        let offset = idx.get_offset(obj_id).offset;
-
-        let meta = Pack::next_object(pack_file, offset.try_into().unwrap(), &mut cache).unwrap();
-        let meta = MetaData::new(meta.t, &meta.data);
-
-        let commit = Commit::new(meta);
+        let commit = Commit::parse_from_file(
+            object_root
+                .join(obj_id.to_folder())
+                .join(obj_id.to_filename()),
+        );
+        result.insert(commit.meta.id, commit.meta);
         let parent_ids = commit.parent_tree_ids;
 
         if parent_ids.len() == 1 {
             obj_id = parent_ids[0];
+            // stop when find common base commit
             if have.contains(&obj_id.to_plain_str()) {
                 break;
             }
-            result.push(commit.meta);
+            let tree_id = commit.tree_id;
+            let tree = Tree::parse_from_file(
+                object_root
+                    .join(tree_id.to_folder())
+                    .join(tree_id.to_filename()),
+            );
+            result.insert(tree.meta.id, tree.meta.to_owned());
+
+            for tree_item in tree.tree_items {
+                if !result.contains_key(&tree_item.id) {
+                    let blob = Blob::parse_from_file(
+                        object_root
+                            .join(tree_item.id.to_folder())
+                            .join(tree_item.id.to_filename()),
+                    );
+                    result.insert(blob.meta.id, blob.meta);
+                }
+            }
+            println!("{}", tree.meta.id);
         } else {
             break;
         }
@@ -341,7 +393,7 @@ async fn send_pack(
         bytes_out.put(Bytes::from(format!("{length:04x}")));
         bytes_out.put_u8(HttpProtocol::SIDE_BAND_BYTE_1);
         bytes_out.put(&mut temp);
-        println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
+        // println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
         sender.send_data(bytes_out.freeze()).await.unwrap();
     }
 }

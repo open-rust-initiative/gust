@@ -4,7 +4,9 @@
 //!
 //!
 
-use std::fmt::Display;
+use std::{fmt::Display, path::PathBuf};
+
+use super::metadata::MetaData;
 
 pub mod blob;
 pub mod commit;
@@ -33,5 +35,13 @@ impl Display for ObjectClass {
             ObjectClass::TREE(_) => write!(f, "TREE"),
             ObjectClass::TAG(_) => write!(f, "TAG"),
         }
+    }
+}
+
+impl ObjectClass {
+    fn parse_meta(path: PathBuf) -> MetaData {
+        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
+            .expect("Read error!");
+        meta
     }
 }
