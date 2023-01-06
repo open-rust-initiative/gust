@@ -24,7 +24,7 @@ use tokio::{
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
 use crate::git::object::base::commit::Commit;
-use crate::git::object::base::tree::Tree;
+use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 
@@ -331,48 +331,85 @@ fn find_common_base(
     object_root: PathBuf,
     have: &Vec<String>,
 ) -> HashMap<Hash, MetaData> {
-    // let mut cache = PackObjectCache::default();
     let mut result: HashMap<Hash, MetaData> = HashMap::new();
 
+    // let mut commits: Vec<Commit> = vec![];
     loop {
         let commit = Commit::parse_from_file(
             object_root
                 .join(obj_id.to_folder())
                 .join(obj_id.to_filename()),
         );
+        let tree_id = commit.tree_id;
+        println!("one layer commit: {}, tree: {}", obj_id, tree_id);
+        // commits.push(commit.clone());
         result.insert(commit.meta.id, commit.meta);
+
+        // stop when find common base commit
+        if have.contains(&obj_id.to_plain_str()) {
+            break;
+        }
+
         let parent_ids = commit.parent_tree_ids;
 
         if parent_ids.len() == 1 {
             obj_id = parent_ids[0];
-            // stop when find common base commit
-            if have.contains(&obj_id.to_plain_str()) {
-                break;
-            }
-            let tree_id = commit.tree_id;
-            let tree = Tree::parse_from_file(
-                object_root
-                    .join(tree_id.to_folder())
-                    .join(tree_id.to_filename()),
-            );
-            result.insert(tree.meta.id, tree.meta.to_owned());
-
-            for tree_item in tree.tree_items {
-                if !result.contains_key(&tree_item.id) {
-                    let blob = Blob::parse_from_file(
-                        object_root
-                            .join(tree_item.id.to_folder())
-                            .join(tree_item.id.to_filename()),
-                    );
-                    result.insert(blob.meta.id, blob.meta);
-                }
-            }
-            println!("{}", tree.meta.id);
+            parse_tree(tree_id, &object_root, &mut result);
         } else {
             break;
         }
     }
+
+    // for commit in commits.iter().rev() {
+    //     let tree_id = commit.tree_id;
+    //     parse_tree(tree_id, &object_root, &mut result);
+    // }
+
     result
+}
+
+fn parse_blob(object_root: &PathBuf, object_id: Hash, result: &mut HashMap<Hash, MetaData>) {
+    if result.contains_key(&object_id) {
+        return;
+    }
+    let blob = Blob::parse_from_file(
+        object_root
+            .join(object_id.to_folder())
+            .join(object_id.to_filename()),
+    );
+    result.insert(blob.meta.id, blob.meta);
+}
+
+fn parse_tree(tree_id: Hash, object_root: &PathBuf, result: &mut HashMap<Hash, MetaData>) {
+    if result.contains_key(&tree_id) {
+        return;
+    }
+    let tree = Tree::parse_from_file(
+        object_root
+            .join(tree_id.to_folder())
+            .join(tree_id.to_filename()),
+    );
+    result.insert(tree.meta.id, tree.meta.to_owned());
+
+    let mut b_count = 0;
+    let mut t_count = 0;
+    for tree_item in tree.tree_items {
+        match tree_item.item_type {
+            TreeItemType::Blob => {
+                b_count += 1;
+                println!("bid: {}", tree_item.id);
+                parse_blob(&object_root, tree_item.id, result)
+            }
+            TreeItemType::BlobExecutable => todo!(),
+            TreeItemType::Tree => {
+                t_count += 1;
+                parse_tree(tree_id, &object_root, result);
+            }
+            TreeItemType::Commit => todo!(),
+            TreeItemType::Link => todo!(),
+        }
+    }
+    println!("b_count: {}, t_count:{}", b_count, t_count);
 }
 
 async fn send_pack(
