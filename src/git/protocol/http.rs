@@ -2,7 +2,7 @@
 //!
 //!
 //!
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -24,7 +24,7 @@ use tokio::{
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
 use crate::git::object::base::commit::Commit;
-use crate::git::object::base::tree::Tree;
+use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 
@@ -331,48 +331,103 @@ fn find_common_base(
     object_root: PathBuf,
     have: &Vec<String>,
 ) -> HashMap<Hash, MetaData> {
-    // let mut cache = PackObjectCache::default();
     let mut result: HashMap<Hash, MetaData> = HashMap::new();
-
+    let mut basic_objects: HashSet<Hash> = HashSet::new();
+    let common_base_commit: Commit;
+    let mut commits: Vec<Commit> = vec![];
     loop {
         let commit = Commit::parse_from_file(
             object_root
                 .join(obj_id.to_folder())
                 .join(obj_id.to_filename()),
         );
+        // stop when find common base commit
+        if have.contains(&obj_id.to_plain_str()) {
+            common_base_commit = commit;
+            tracing::info!("found common base commit:{}", obj_id);
+            break;
+        }
+        commits.push(commit.clone());
         result.insert(commit.meta.id, commit.meta);
+
         let parent_ids = commit.parent_tree_ids;
 
         if parent_ids.len() == 1 {
             obj_id = parent_ids[0];
-            // stop when find common base commit
-            if have.contains(&obj_id.to_plain_str()) {
-                break;
-            }
-            let tree_id = commit.tree_id;
-            let tree = Tree::parse_from_file(
-                object_root
-                    .join(tree_id.to_folder())
-                    .join(tree_id.to_filename()),
-            );
-            result.insert(tree.meta.id, tree.meta.to_owned());
+        } else {
+            panic!("mutlti branch not supported  yet")
+            // break;
+        }
+    }
 
-            for tree_item in tree.tree_items {
-                if !result.contains_key(&tree_item.id) {
-                    let blob = Blob::parse_from_file(
-                        object_root
-                            .join(tree_item.id.to_folder())
-                            .join(tree_item.id.to_filename()),
-                    );
+    // init basic hashset by common base commit
+    parse_tree(&object_root, common_base_commit.tree_id, &mut result, &mut basic_objects, true);
+    for commit in commits.iter().rev() {
+        let tree_id = commit.tree_id;
+        parse_tree(&object_root, tree_id, &mut result, &mut basic_objects, false);
+    }
+    result
+}
+
+fn parse_blob(
+    object_root: &PathBuf,
+    object_id: Hash,
+) -> Result<Blob, anyhow::Error> {
+    let blob = Blob::parse_from_file(
+        object_root
+            .join(object_id.to_folder())
+            .join(object_id.to_filename()),
+    );
+    Ok(blob)
+}
+
+fn parse_tree(
+    object_root: &PathBuf,
+    tree_id: Hash,
+    result: &mut HashMap<Hash, MetaData>,
+    basic_objects: &mut HashSet<Hash>,
+    init_basic: bool,
+) {
+    if basic_objects.contains(&tree_id) {
+        return;
+    }
+    let tree = Tree::parse_from_file(
+        object_root
+            .join(tree_id.to_folder())
+            .join(tree_id.to_filename()),
+    );
+    basic_objects.insert(tree_id);
+    if !init_basic {
+        result.insert(tree_id, tree.meta.to_owned());
+    }
+
+    for tree_item in tree.tree_items {
+        // this itme has been parsed
+        if basic_objects.contains(&tree_item.id) {
+            continue;
+        }
+        match tree_item.item_type {
+            TreeItemType::Blob => {
+                if !init_basic {
+                    let blob = parse_blob(&object_root, tree_item.id).unwrap();
                     result.insert(blob.meta.id, blob.meta);
                 }
             }
-            println!("{}", tree.meta.id);
-        } else {
-            break;
+            TreeItemType::BlobExecutable => todo!(),
+            TreeItemType::Tree => {
+                parse_tree(
+                    &object_root,
+                    tree_item.id,
+                    result,
+                    basic_objects,
+                    init_basic,
+                );
+            }
+            TreeItemType::Commit => todo!(),
+            TreeItemType::Link => todo!(),
         }
+        basic_objects.insert(tree_item.id);
     }
-    result
 }
 
 async fn send_pack(
