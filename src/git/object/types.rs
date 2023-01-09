@@ -1,6 +1,8 @@
-//! ### Types enums for object types
-//! There are ObjectType
-//! PackObjectType
+//!
+//!
+//!
+//!
+//!
 //!
 //!
 
@@ -65,7 +67,7 @@ impl ObjectType {
         }
     }
 
-    ///
+    /// TODO - Rename the function name
     #[allow(unused)]
     pub fn type2_number(&self) -> u8 {
         match self {

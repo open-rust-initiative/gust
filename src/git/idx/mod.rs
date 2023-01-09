@@ -62,6 +62,7 @@ impl Idx {
         }
     }
 
+    #[allow(unused)]
     pub fn decode_from_path(&mut self, path: PathBuf) {
         let f = File::open(path).ok();
         let mut reader = BufReader::new(f.unwrap());
@@ -221,6 +222,7 @@ impl Idx {
         idx
     }
 
+    #[allow(unused)]
     pub fn get_offset(&self, obj_id: Hash) -> IdxItem {
         let prefix = self.item_hash.get(&obj_id);
         let obj_prefix = self.idx_items[*prefix.unwrap()].clone();
