@@ -4,7 +4,7 @@
 //!
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -83,59 +83,13 @@ impl HttpProtocol {
 
         let heads = work_dir.join("heads");
         let mut ref_list = vec![];
-        Self::build_ref_list(heads, &mut ref_list, String::from("refs/heads/"));
-        let pkt_line_stream = Self::build_smart_reply(&ref_list, service);
+        add_to_ref_list(heads, &mut ref_list, String::from("refs/heads/"));
+        let pkt_line_stream = build_smart_reply(&ref_list, service);
 
         tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
         let body = Body::from(pkt_line_stream.freeze());
         let resp = resp.body(body).unwrap();
         Ok(resp)
-    }
-
-    fn build_ref_list(path: PathBuf, ref_list: &mut Vec<String>, mut name: String) {
-        let paths = std::fs::read_dir(&path).unwrap();
-        for path in paths {
-            if let Ok(ref_file) = path {
-                name.push_str(ref_file.file_name().to_str().unwrap());
-                let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
-                let object_id = object_id.strip_suffix('\n').unwrap();
-                let pkt_line;
-                // The stream MUST include capability declarations behind a NUL on the first ref.
-                if ref_list.is_empty() {
-                    pkt_line = format!(
-                        "{}{}{}{}{}{}",
-                        object_id,
-                        HttpProtocol::SP,
-                        name,
-                        HttpProtocol::NUL,
-                        HttpProtocol::CAP_LIST,
-                        HttpProtocol::LF
-                    );
-                } else {
-                    pkt_line = format!(
-                        "{}{}{}{}{}",
-                        object_id,
-                        HttpProtocol::SP,
-                        name,
-                        HttpProtocol::NUL,
-                        HttpProtocol::LF
-                    );
-                }
-                ref_list.push(pkt_line);
-            }
-        }
-    }
-
-    fn build_smart_reply(ref_list: &Vec<String>, service: String) -> BytesMut {
-        let mut pkt_line_stream = BytesMut::new();
-        add_to_pkt_line(&mut pkt_line_stream, format!("# service={}\n", service));
-        pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
-
-        for ref_line in ref_list {
-            add_to_pkt_line(&mut pkt_line_stream, ref_line.to_string());
-        }
-        pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
-        pkt_line_stream
     }
 
     pub async fn git_upload_pack(
@@ -154,7 +108,7 @@ impl HttpProtocol {
                 let (bytes_take, pkt_line) = read_pkt_line(&mut bytes);
                 // if read 0000
                 if bytes_take == 0 {
-                    if bytes.len() == 0 {
+                    if bytes.is_empty() {
                         break;
                     }
                     continue;
@@ -187,7 +141,9 @@ impl HttpProtocol {
         let mut meta_map: HashMap<Hash, MetaData> = HashMap::new();
         let mut decoded_pack = Pack::default();
         if have.is_empty() {
-            // TODO git pull command
+            // git clone
+
+            todo!();
         } else {
             meta_map = find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
         }
@@ -223,19 +179,12 @@ impl HttpProtocol {
         // following its first "ACK obj-id ready" message.
         add_to_pkt_line(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
 
-        // TODO: determine which commit id to use in ACK line
         add_to_pkt_line(&mut buf, format!("ACK {} \n", have[have.len() - 1]));
 
         tracing::info!("send buf: {:?}", buf);
         sender.send_data(buf.freeze()).await.unwrap();
 
-        let mut meta_vec: Vec<MetaData> = vec![];
-        for (_hash, data) in meta_map {
-            meta_vec.push(data);
-        }
-        tracing::info!("{}", meta_vec.len());
-        let result: Vec<u8> = decoded_pack.encode(Some(meta_vec));
-        // let reader = BufReader::new(result);
+        let result: Vec<u8> = decoded_pack.encode(Some(meta_map.into_values().collect()));
         tokio::spawn(send_pack(sender, result));
         let resp = resp.body(body).unwrap();
         Ok(resp)
@@ -255,12 +204,12 @@ impl HttpProtocol {
         while let Some(chunk) = body.next().await {
             let mut bytes = chunk.unwrap();
             if pkt_line_parsed {
-                let res = buffer.write(&mut bytes).await;
+                let res = buffer.write(&bytes).await;
                 tracing::info!("write to PAKC: {:?}", res);
             } else {
                 tracing::info!("{:?}", bytes);
                 let (_pkt_length, pkt_line) = read_pkt_line(&mut bytes);
-                let pkt_vec: Vec<_> = pkt_line.to_str().unwrap().split(" ").collect();
+                let pkt_vec: Vec<_> = pkt_line.to_str().unwrap().split(' ').collect();
 
                 let mut ref_result = RefResult {
                     ref_name: pkt_vec[2].to_string(),
@@ -274,7 +223,7 @@ impl HttpProtocol {
                 tracing::info!("pkt_line: {:?}", pkt_vec);
                 //TODO: don't know what to do with multiple refs
                 if bytes.copy_to_bytes(4).to_vec() == b"0000" {
-                    let res = buffer.write(&mut bytes).await;
+                    let res = buffer.write(&bytes).await;
                     tracing::info!("write to PAKC: {:?}", res);
                 }
                 pkt_line_parsed = true;
@@ -319,7 +268,7 @@ impl HttpProtocol {
         let mut origin_pack_file = std::fs::File::open(pack_path).unwrap();
 
         let decoded_pack = Pack::decode(&mut origin_pack_file).unwrap();
-        for (_hash, meta) in &decoded_pack.result.by_hash {
+        for meta in decoded_pack.result.by_hash.values() {
             let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
             tracing::info!("res:{:?}", res);
         }
@@ -329,7 +278,7 @@ impl HttpProtocol {
 fn find_common_base(
     mut obj_id: Hash,
     object_root: PathBuf,
-    have: &Vec<String>,
+    have: &[String],
 ) -> HashMap<Hash, MetaData> {
     let mut result: HashMap<Hash, MetaData> = HashMap::new();
     let mut basic_objects: HashSet<Hash> = HashSet::new();
@@ -355,34 +304,34 @@ fn find_common_base(
         if parent_ids.len() == 1 {
             obj_id = parent_ids[0];
         } else {
-            panic!("mutlti branch not supported  yet")
-            // break;
+            tracing::error!("mutlti branch not supported yet");
+            todo!();
         }
     }
 
     // init basic hashset by common base commit
-    parse_tree(&object_root, common_base_commit.tree_id, &mut result, &mut basic_objects, true);
+    parse_tree(
+        &object_root,
+        common_base_commit.tree_id,
+        &mut result,
+        &mut basic_objects,
+        true,
+    );
     for commit in commits.iter().rev() {
         let tree_id = commit.tree_id;
-        parse_tree(&object_root, tree_id, &mut result, &mut basic_objects, false);
+        parse_tree(
+            &object_root,
+            tree_id,
+            &mut result,
+            &mut basic_objects,
+            false,
+        );
     }
     result
 }
 
-fn parse_blob(
-    object_root: &PathBuf,
-    object_id: Hash,
-) -> Result<Blob, anyhow::Error> {
-    let blob = Blob::parse_from_file(
-        object_root
-            .join(object_id.to_folder())
-            .join(object_id.to_filename()),
-    );
-    Ok(blob)
-}
-
 fn parse_tree(
-    object_root: &PathBuf,
+    object_root: &Path,
     tree_id: Hash,
     result: &mut HashMap<Hash, MetaData>,
     basic_objects: &mut HashSet<Hash>,
@@ -409,19 +358,17 @@ fn parse_tree(
         match tree_item.item_type {
             TreeItemType::Blob => {
                 if !init_basic {
-                    let blob = parse_blob(&object_root, tree_item.id).unwrap();
+                    let blob = Blob::parse_from_file(
+                        object_root
+                            .join(tree_item.id.to_folder())
+                            .join(tree_item.id.to_filename()),
+                    );
                     result.insert(blob.meta.id, blob.meta);
                 }
             }
             TreeItemType::BlobExecutable => todo!(),
             TreeItemType::Tree => {
-                parse_tree(
-                    &object_root,
-                    tree_item.id,
-                    result,
-                    basic_objects,
-                    init_basic,
-                );
+                parse_tree(object_root, tree_item.id, result, basic_objects, init_basic);
             }
             TreeItemType::Commit => todo!(),
             TreeItemType::Link => todo!(),
@@ -430,11 +377,7 @@ fn parse_tree(
     }
 }
 
-async fn send_pack(
-    mut sender: Sender,
-    // mut reader: BufReader<File>,
-    result: Vec<u8>,
-) -> Result<(), (StatusCode, &'static str)> {
+async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCode, &'static str)> {
     let mut reader = BufReader::new(result.as_slice());
     loop {
         let mut bytes_out = BytesMut::new();
@@ -451,6 +394,49 @@ async fn send_pack(
         // println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
         sender.send_data(bytes_out.freeze()).await.unwrap();
     }
+}
+
+fn add_to_ref_list(path: PathBuf, ref_list: &mut Vec<String>, mut name: String) {
+    let paths = std::fs::read_dir(&path).unwrap();
+    for ref_file in paths.flatten() {
+        name.push_str(ref_file.file_name().to_str().unwrap());
+        let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
+        let object_id = object_id.strip_suffix('\n').unwrap();
+        // The stream MUST include capability declarations behind a NUL on the first ref.
+        let pkt_line = if ref_list.is_empty() {
+            format!(
+                "{}{}{}{}{}{}",
+                object_id,
+                HttpProtocol::SP,
+                name,
+                HttpProtocol::NUL,
+                HttpProtocol::CAP_LIST,
+                HttpProtocol::LF
+            )
+        } else {
+            format!(
+                "{}{}{}{}{}",
+                object_id,
+                HttpProtocol::SP,
+                name,
+                HttpProtocol::NUL,
+                HttpProtocol::LF
+            )
+        };
+        ref_list.push(pkt_line);
+    }
+}
+
+fn build_smart_reply(ref_list: &Vec<String>, service: String) -> BytesMut {
+    let mut pkt_line_stream = BytesMut::new();
+    add_to_pkt_line(&mut pkt_line_stream, format!("# service={}\n", service));
+    pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+
+    for ref_line in ref_list {
+        add_to_pkt_line(&mut pkt_line_stream, ref_line.to_string());
+    }
+    pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+    pkt_line_stream
 }
 
 fn add_to_pkt_line(pkt_line_stream: &mut BytesMut, buf_str: String) {
@@ -471,4 +457,44 @@ fn read_pkt_line(bytes: &mut Bytes) -> (usize, Bytes) {
     let pkt_line = bytes.copy_to_bytes(pkt_length - 4);
 
     (pkt_length, pkt_line)
+}
+
+#[cfg(test)]
+pub mod test {
+
+    use bytes::{Bytes, BytesMut};
+
+    use super::{add_to_pkt_line, build_smart_reply, read_pkt_line};
+
+    #[test]
+    pub fn test_read_pkt_line() {
+        let mut bytes = Bytes::from_static(b"001e# service=git-upload-pack\n");
+        let (pkt_length, pkt_line) = read_pkt_line(&mut bytes);
+        assert_eq!(pkt_length, 30);
+        assert_eq!(&pkt_line[..], b"# service=git-upload-pack\n");
+    }
+
+    #[test]
+    pub fn test_build_smart_reply() {
+        let ref_list = vec![String::from("7bdc783132575d5b3e78400ace9971970ff43a18 refs/heads/master\0report-status report-status-v2 thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done object-format=sha1\n")];
+        let pkt_line_stream = build_smart_reply(&ref_list, String::from("git-upload-pack"));
+        assert_eq!(&pkt_line_stream[..], b"001e# service=git-upload-pack\n000000e87bdc783132575d5b3e78400ace9971970ff43a18 refs/heads/master\0report-status report-status-v2 thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done object-format=sha1\n0000")
+    }
+
+    #[test]
+    pub fn test_add_to_pkt_line() {
+        let mut buf = BytesMut::new();
+        add_to_pkt_line(
+            &mut buf,
+            format!(
+                "ACK {} common\n",
+                "7bdc783132575d5b3e78400ace9971970ff43a18"
+            ),
+        );
+        add_to_pkt_line(
+            &mut buf,
+            format!("ACK {} ready\n", "7bdc783132575d5b3e78400ace9971970ff43a18"),
+        );
+        assert_eq!(&buf.freeze()[..], b"0038ACK 7bdc783132575d5b3e78400ace9971970ff43a18 common\n0037ACK 7bdc783132575d5b3e78400ace9971970ff43a18 ready\n");
+    }
 }
