@@ -15,8 +15,8 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::utils;
+use crate::git::pack::Pack;
 
-use super::pack::Pack;
 
 ///
 #[allow(unused)]

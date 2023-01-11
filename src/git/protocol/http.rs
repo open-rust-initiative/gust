@@ -138,14 +138,14 @@ impl HttpProtocol {
 
         let object_root = work_dir.join("crates.io-index/.git/objects");
 
-        let mut meta_map: HashMap<Hash, MetaData> = HashMap::new();
+        let mut _meta_map: HashMap<Hash, MetaData> = HashMap::new();
         let mut decoded_pack = Pack::default();
         if have.is_empty() {
             // git clone
 
             todo!();
         } else {
-            meta_map = find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
+            _meta_map = find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
         }
 
         // TODO: pack target object to pack file
@@ -184,7 +184,7 @@ impl HttpProtocol {
         tracing::info!("send buf: {:?}", buf);
         sender.send_data(buf.freeze()).await.unwrap();
 
-        let result: Vec<u8> = decoded_pack.encode(Some(meta_map.into_values().collect()));
+        let result: Vec<u8> = decoded_pack.encode(Some(_meta_map.into_values().collect()));
         tokio::spawn(send_pack(sender, result));
         let resp = resp.body(body).unwrap();
         Ok(resp)

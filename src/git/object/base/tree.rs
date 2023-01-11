@@ -15,8 +15,7 @@ use crate::git::errors::GitError;
 use crate::git::object::types::ObjectType;
 use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
-
-use super::ObjectClass;
+use crate::git::object::base::ObjectClass;
 
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
