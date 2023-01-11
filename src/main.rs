@@ -6,11 +6,11 @@ use anyhow::Result;
 
 mod gateway;
 mod database;
-mod gust;
 mod lfs;
 mod utils;
 mod errors;
 mod git;
+mod gust;
 
 use gateway::api::lib;
 

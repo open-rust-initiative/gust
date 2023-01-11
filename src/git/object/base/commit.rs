@@ -1,5 +1,5 @@
 //!
-//!Commit 对象结构体
+//! Commit Object Struct
 //!
 
 use std::cmp::Ordering;
@@ -9,13 +9,13 @@ use std::path::PathBuf;
 use bstr::ByteSlice;
 
 use crate::errors::GustError;
+
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object::base::sign::AuthorSign;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
-
-use super::ObjectClass;
+use crate::git::object::base::ObjectClass;
 
 /// Git Object: commit
 #[allow(unused)]

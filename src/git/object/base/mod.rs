@@ -6,7 +6,7 @@
 
 use std::{fmt::Display, path::PathBuf};
 
-use super::metadata::MetaData;
+use crate::git::object::metadata::MetaData;
 
 pub mod blob;
 pub mod commit;

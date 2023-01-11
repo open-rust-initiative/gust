@@ -10,8 +10,7 @@ use bstr::BString;
 use crate::git::errors::GitError;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::base::tree::*;
-
-use super::ObjectClass;
+use crate::git::object::base::ObjectClass;
 
 /// Git Object: blob
 #[derive(Eq, Debug, Hash, Clone)]

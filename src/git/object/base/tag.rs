@@ -10,6 +10,7 @@ use std::fmt::Display;
 use bstr::ByteSlice;
 
 use crate::errors::GustError;
+
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object::types::ObjectType;
