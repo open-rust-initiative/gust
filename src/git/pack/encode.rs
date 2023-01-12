@@ -10,13 +10,13 @@ use std::str::FromStr;
 use bstr::ByteSlice;
 
 use crate::git::errors::GitError;
+use crate::git::hash::Hash;
 use crate::git::object::diff::DeltaDiff;
+use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
-use crate::git::utils;
 use crate::git::pack::decode::ObjDecodedMap;
 use crate::git::pack::Pack;
-use crate::git::hash::Hash;
-use crate::git::object::metadata::MetaData;
+use crate::git::utils;
 
 const SLIDING_WINDOW: i32 = 10;
 
@@ -40,7 +40,7 @@ impl Pack {
         let all_num = self.get_object_number();
         assert!(all_num != 0); // guarantee self.number_of_objects!=0
         assert!(all_num < (1 << 32)); //TODO: GitError:numbers of objects should  < 4G ,
-        //Encode the number of object  into file
+                                      //Encode the number of object  into file
         result.append(&mut utils::u32_vec(all_num as u32));
         result
     }
@@ -211,7 +211,7 @@ impl Pack {
     /// - in: target_path : The pack file dir to store
     ///
     /// 查找到所有的loose文件代表的Hash值
-    fn find_all_loose(loose_root_path: &str) -> Vec<String> {
+    pub fn find_all_loose(loose_root_path: &str) -> Vec<String> {
         let loose_root = std::path::PathBuf::from(loose_root_path);
         let mut loose_vec = Vec::new();
         // 打开loose 根目录
@@ -312,7 +312,7 @@ impl Pack {
             target_dir,
             new_pack.signature.to_plain_str()
         ))
-            .expect("create failed");
+        .expect("create failed");
         file.write_all(result.as_bytes()).expect("write failed");
 
         new_pack
@@ -454,7 +454,6 @@ mod tests {
             decoded_pack.signature.to_plain_str()
         );
     }
-
 
     // #[test]
     // fn test_vec(){

@@ -81,9 +81,12 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
 
-        let heads = work_dir.join("heads");
+        let heads = work_dir.join("refs/heads");
         let mut ref_list = vec![];
+        add_to_ref_list(heads.clone(), &mut ref_list, String::from("refs/heads/"));
         add_to_ref_list(heads, &mut ref_list, String::from("refs/heads/"));
+
+        // add_to_ref_list(remotes, &mut ref_list, String::from("refs/remotes/origin/"));
         let pkt_line_stream = build_smart_reply(&ref_list, service);
 
         tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
@@ -94,6 +97,7 @@ impl HttpProtocol {
 
     pub async fn git_upload_pack(
         &self,
+        work_dir: PathBuf,
         req: Request<Body>,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let (_parts, mut body) = req.into_parts();
@@ -102,7 +106,7 @@ impl HttpProtocol {
         let mut have: Vec<String> = Vec::new();
 
         while let Some(chunk) = body.next().await {
-            tracing::info!("chunk:{:?}", chunk);
+            tracing::info!("client sends :{:?}", chunk);
             let mut bytes = chunk.unwrap();
             loop {
                 let (bytes_take, pkt_line) = read_pkt_line(&mut bytes);
@@ -133,22 +137,37 @@ impl HttpProtocol {
         }
 
         tracing::info!("want commands: {:?}, have commans: {:?}", want, have);
-        let work_dir =
-            PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
 
-        let object_root = work_dir.join("crates.io-index/.git/objects");
+        let object_root = work_dir.join(".git/objects");
 
-        let mut _meta_map: HashMap<Hash, MetaData> = HashMap::new();
-        let mut decoded_pack = Pack::default();
+        let send_pack_data;
+        let mut buf = BytesMut::new();
+
         if have.is_empty() {
-            // git clone
-
-            todo!();
+            let loose_vec = Pack::find_all_loose(object_root.to_str().unwrap());
+            let (mut _loose_pack, loose_data) =
+                Pack::pack_loose(loose_vec, object_root.to_str().unwrap());
+            send_pack_data = loose_data;
+            add_to_pkt_line(&mut buf, String::from("NAK\n"));
         } else {
+            let mut decoded_pack = Pack::default();
+            let mut _meta_map: HashMap<Hash, MetaData> = HashMap::new();
             _meta_map = find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
+            send_pack_data = decoded_pack.encode(Some(_meta_map.into_values().collect()));
+
+            // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
+            // it is ready to send data with ACK obj-id ready lines,
+            // and signals the identified common commits with ACK obj-id common lines
+            for commit in &have {
+                add_to_pkt_line(&mut buf, format!("ACK {} common\n", commit));
+            }
+            // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
+            // following its first "ACK obj-id ready" message.
+            add_to_pkt_line(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
+
+            add_to_pkt_line(&mut buf, format!("ACK {} \n", have[have.len() - 1]));
         }
 
-        // TODO: pack target object to pack file
         let mut headers = HashMap::new();
         headers.insert(
             "Content-Type".to_string(),
@@ -163,29 +182,12 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
 
-        let mode = &self.mode;
-        let _str = HttpProtocol::value_in_ack_mode(mode);
-
-        let mut buf = BytesMut::new();
-        let (mut sender, body) = Body::channel();
-
-        // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
-        // it is ready to send data with ACK obj-id ready lines,
-        // and signals the identified common commits with ACK obj-id common lines
-        for commit in &have {
-            add_to_pkt_line(&mut buf, format!("ACK {} common\n", commit));
-        }
-        // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
-        // following its first "ACK obj-id ready" message.
-        add_to_pkt_line(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
-
-        add_to_pkt_line(&mut buf, format!("ACK {} \n", have[have.len() - 1]));
-
         tracing::info!("send buf: {:?}", buf);
+
+        let (mut sender, body) = Body::channel();
         sender.send_data(buf.freeze()).await.unwrap();
 
-        let result: Vec<u8> = decoded_pack.encode(Some(_meta_map.into_values().collect()));
-        tokio::spawn(send_pack(sender, result));
+        tokio::spawn(send_pack(sender, send_pack_data));
         let resp = resp.body(body).unwrap();
         Ok(resp)
     }
@@ -304,7 +306,7 @@ fn find_common_base(
         if parent_ids.len() == 1 {
             obj_id = parent_ids[0];
         } else {
-            tracing::error!("mutlti branch not supported yet");
+            tracing::error!("multi branch not supported yet");
             todo!();
         }
     }
@@ -397,9 +399,11 @@ async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCod
 }
 
 fn add_to_ref_list(path: PathBuf, ref_list: &mut Vec<String>, mut name: String) {
+    //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
     let paths = std::fs::read_dir(&path).unwrap();
     for ref_file in paths.flatten() {
         name.push_str(ref_file.file_name().to_str().unwrap());
+        println!("{:?}", ref_file);
         let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
         let object_id = object_id.strip_suffix('\n').unwrap();
         // The stream MUST include capability declarations behind a NUL on the first ref.
@@ -408,18 +412,18 @@ fn add_to_ref_list(path: PathBuf, ref_list: &mut Vec<String>, mut name: String) 
                 "{}{}{}{}{}{}",
                 object_id,
                 HttpProtocol::SP,
-                name,
+                "HEAD",
                 HttpProtocol::NUL,
                 HttpProtocol::CAP_LIST,
                 HttpProtocol::LF
             )
         } else {
             format!(
-                "{}{}{}{}{}",
+                "{}{}{}{}",
                 object_id,
                 HttpProtocol::SP,
                 name,
-                HttpProtocol::NUL,
+                // HttpProtocol::NUL,
                 HttpProtocol::LF
             )
         };

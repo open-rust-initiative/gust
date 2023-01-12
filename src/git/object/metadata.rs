@@ -129,10 +129,10 @@ impl MetaData {
     pub(crate) fn read_object_from_file(path: String) -> Result<MetaData, GitError> {
         let file = File::open(path).unwrap();
         let mut reader = BufReader::new(file);
-        let mut data = Vec::new();
-        reader.read_to_end(&mut data).unwrap();
+        // let mut data = Vec::new();
+        // reader.read_to_end(&mut data).unwrap();
 
-        let mut decoder = ZlibDecoder::new(&data[..]);
+        let mut decoder = ZlibDecoder::new(reader);
         let mut decoded = Vec::new();
         decoder.read_to_end(&mut decoded).unwrap();
 

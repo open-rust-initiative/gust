@@ -1,8 +1,8 @@
 //!
 //!
 //!
-use std::str::FromStr;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::{env, net::SocketAddr};
 
 use anyhow::Result;
@@ -59,9 +59,11 @@ async fn git_info_refs(
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
-    tracing::info!("{:?}", params.repo);
-    let work_dir =dirs::home_dir().unwrap().join("freighter").join(params.repo.replace(".git", "")).join(".git/refs");
-
+    let mut work_dir =
+        PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
+    work_dir = work_dir
+        .join(params.repo.replace(".git", ""))
+        .join(".git");
     let http_protocol = HttpProtocol::default();
 
     let service_name = service.service;
@@ -82,8 +84,10 @@ async fn git_upload_pack(
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("{:?}", params.repo);
     let http_protocol = HttpProtocol::default();
-
-    http_protocol.git_upload_pack(req).await
+    let mut work_dir =
+        PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
+    work_dir = work_dir.join(params.repo.replace(".git", ""));
+    http_protocol.git_upload_pack(work_dir, req).await
 }
 
 //
