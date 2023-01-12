@@ -9,6 +9,7 @@ pub mod ssh;
 pub struct HttpProtocol {
     pub mode: AckMode,
 }
+
 impl Default for HttpProtocol {
     fn default() -> Self {
         Self {

@@ -27,8 +27,8 @@ use crate::git::object::base::commit::Commit;
 use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
+use crate::git::protocol::HttpProtocol;
 
-use super::HttpProtocol;
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -48,7 +48,7 @@ impl RefResult {
 impl HttpProtocol {
     const PKT_LINE_END_MARKER: &[u8; 4] = b"0000";
 
-    const CAP_LIST: &str  = "report-status report-status-v2 thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done object-format=sha1";
+    const CAP_LIST: &str = "report-status report-status-v2 thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done object-format=sha1";
 
     const LF: char = '\n';
 
@@ -469,7 +469,6 @@ fn read_pkt_line(bytes: &mut Bytes) -> (usize, Bytes) {
 
 #[cfg(test)]
 pub mod test {
-
     use bytes::{Bytes, BytesMut};
 
     use super::{add_to_pkt_line, build_smart_reply, read_pkt_line};

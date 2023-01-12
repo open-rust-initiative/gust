@@ -1,7 +1,7 @@
 //!
 //!
 //!
-
+//!
 use std::convert::TryFrom;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -14,6 +14,7 @@ use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 
 const HASH_BYTES: usize = 20;
+
 const COMMIT_OBJECT_TYPE: &[u8] = b"commit";
 const TREE_OBJECT_TYPE: &[u8] = b"tree";
 const BLOB_OBJECT_TYPE: &[u8] = b"blob";

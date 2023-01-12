@@ -140,7 +140,6 @@ impl Display for Tree {
 
 ///
 impl Tree {
-
     pub fn parse_from_file(path: PathBuf) -> Self {
         let meta = ObjectClass::parse_meta(path);
         Tree::new(meta)
