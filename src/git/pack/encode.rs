@@ -40,7 +40,7 @@ impl Pack {
         let all_num = self.get_object_number();
         assert!(all_num != 0); // guarantee self.number_of_objects!=0
         assert!(all_num < (1 << 32)); //TODO: GitError:numbers of objects should  < 4G ,
-                                      //Encode the number of object  into file
+        //Encode the number of object  into file
         result.append(&mut utils::u32_vec(all_num as u32));
         result
     }
@@ -312,7 +312,7 @@ impl Pack {
             target_dir,
             new_pack.signature.to_plain_str()
         ))
-        .expect("create failed");
+            .expect("create failed");
         file.write_all(result.as_bytes()).expect("write failed");
 
         new_pack
