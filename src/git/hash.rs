@@ -2,6 +2,7 @@
 //!
 //!
 //!
+//!
 use std::convert::TryFrom;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -13,8 +14,10 @@ use crate::git::errors::GitError;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 
+///
 const HASH_BYTES: usize = 20;
 
+///
 const COMMIT_OBJECT_TYPE: &[u8] = b"commit";
 const TREE_OBJECT_TYPE: &[u8] = b"tree";
 const BLOB_OBJECT_TYPE: &[u8] = b"blob";
@@ -35,10 +38,10 @@ pub struct Hash(pub [u8; HASH_BYTES]);
 /// Display trait for Hash type
 impl Display for Hash {
     /// Display trait for Hash type
-    /// # !Attention
+    /// # Attention
     /// cause of the color chars for ,if you want to use the string with out color ,
     /// please call the func:`to_plain_str()` rather than the func:`to_string()`
-    /// ### For example :
+    /// # Example
     ///  the hash value `18fd2deaaf152c7f1222c52fb2673f6192b375f0`<br>
     ///  will be the `1;31m8d2deaaf152c7f1222c52fb2673f6192b375f00m`
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

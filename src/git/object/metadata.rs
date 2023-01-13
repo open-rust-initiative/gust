@@ -87,7 +87,7 @@ impl MetaData {
         Ok(path.to_str().unwrap().to_string())
     }
 
-    ///Convert Metadata to the Vec<u8> ,so that it can write to File
+    ///Convert Metadata to the `Vec<u8>` ,so that it can write to File
     pub fn convert_to_vec(&self) -> Result<Vec<u8>, GustError> {
         let mut compressed_data =
             vec![(0x80 | (self.t.type2_number() << 4)) + (self.size & 0x0f) as u8];

@@ -65,7 +65,7 @@ impl DeltaDiff {
     }
 
     ///
-    /// Decode the DeltaOp to Vec<u8>
+    /// Decode the DeltaOp to `Vec<u8>`
     fn decode_op(&self, op: &DeltaOp) -> Vec<u8> {
         let mut op_data = vec![];
 

@@ -38,13 +38,13 @@ impl Pack {
             0, 0, 0, 2,
         ]; // THe Version  of the Pack File
         let all_num = self.get_object_number();
-        assert!(all_num != 0); // guarantee self.number_of_objects!=0
+        assert_ne!(all_num, 0); // guarantee self.number_of_objects!=0
         assert!(all_num < (1 << 32)); //TODO: GitError:numbers of objects should  < 4G ,
         //Encode the number of object  into file
         result.append(&mut utils::u32_vec(all_num as u32));
         result
     }
-    /// 计算pack文件的hash value，赋予id字段，并将hash转为Vec<u8> 输出
+    /// 计算pack文件的hash value，赋予id字段，并将hash转为 `Vec<u8>` 输出
     fn append_hash_signature(&mut self, data: &Vec<u8>) -> Vec<u8> {
         let checksum = Hash::new(&data);
         self.signature = checksum.clone();
