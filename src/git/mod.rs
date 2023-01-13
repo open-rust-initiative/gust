@@ -14,6 +14,7 @@ pub mod pack;
 pub mod utils;
 pub mod errors;
 pub mod protocol;
+pub mod lfs;
 
 ///
 #[cfg(test)]

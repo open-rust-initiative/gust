@@ -8,9 +8,9 @@ rust-crypto = "0.2.36"
 hex = "0.4.3"
 deflate = "1.0.0"
 flate2 = "1.0.22"
-bstr = "1.0.1"
-anyhow = "1.0.66"
-thiserror = "1.0.37"
+bstr = "1.1.0"
+anyhow = "1.0.68"
+thiserror = "1.0.38"
 spdlog-rs = "0.3.7"
 byteorder = "1.4.3"
 sha-1 = "0.10.1"
@@ -19,17 +19,18 @@ min-max = "0.1"
 colored = "2.0.0"
 crc = "3.0.0"
 diffs = "0.4.1"
-tokio = { version = "1.23.0", features = ["full"] }
+tokio = { version = "1.24.1", features = ["full"] }
 hyper = { version = "0.14", features = ["full"] }
 axum = "0.6.1"
 tower = "0.4.13"
 tower-http = { version = "0.3.5", features = ["fs"] }
 tower-cookies = "0.8.0"
 dotenvy = "0.15.6"
-serde = { version = "1.0.149", features = ["derive"] }
+serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.89"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 bytes = "1.1.0"
 futures = "0.3.25"
 dirs = "4.0.0"
+clap = "4.0.32"
