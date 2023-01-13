@@ -81,12 +81,9 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
 
-        let heads = work_dir.join("refs/heads");
-        let mut ref_list = vec![];
-        add_to_ref_list(heads.clone(), &mut ref_list, String::from("refs/heads/"));
-        add_to_ref_list(heads, &mut ref_list, String::from("refs/heads/"));
+        let mut ref_list = add_head_to_ref_list(&work_dir).unwrap();
+        add_to_ref_list(&work_dir, &mut ref_list, String::from("refs/heads/"));
 
-        // add_to_ref_list(remotes, &mut ref_list, String::from("refs/remotes/origin/"));
         let pkt_line_stream = build_smart_reply(&ref_list, service);
 
         tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
@@ -398,35 +395,42 @@ async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCod
     }
 }
 
-fn add_to_ref_list(path: PathBuf, ref_list: &mut Vec<String>, mut name: String) {
+fn add_head_to_ref_list(work_dir: &PathBuf) -> Result<Vec<String>, anyhow::Error> {
+    let content = std::fs::read_to_string(work_dir.join("HEAD")).unwrap();
+    let content = content.replace("ref: ", "");
+    let content = content.strip_suffix('\n').unwrap();
+    let object_id = std::fs::read_to_string(work_dir.join(content)).unwrap();
+    let object_id = object_id.strip_suffix('\n').unwrap();
+    // The stream MUST include capability declarations behind a NUL on the first ref.
+    let pkt_line = format!(
+        "{}{}{}{}{}{}",
+        object_id,
+        HttpProtocol::SP,
+        "HEAD",
+        HttpProtocol::NUL,
+        HttpProtocol::CAP_LIST,
+        HttpProtocol::LF
+    );
+    let ref_list = vec![pkt_line];
+    Ok(ref_list)
+}
+
+fn add_to_ref_list(work_dir: &PathBuf, ref_list: &mut Vec<String>, mut name: String) {
     //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
+    let path = work_dir.join(&name);
     let paths = std::fs::read_dir(&path).unwrap();
     for ref_file in paths.flatten() {
         name.push_str(ref_file.file_name().to_str().unwrap());
-        println!("{:?}", ref_file);
         let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
         let object_id = object_id.strip_suffix('\n').unwrap();
-        // The stream MUST include capability declarations behind a NUL on the first ref.
-        let pkt_line = if ref_list.is_empty() {
-            format!(
-                "{}{}{}{}{}{}",
-                object_id,
-                HttpProtocol::SP,
-                "HEAD",
-                HttpProtocol::NUL,
-                HttpProtocol::CAP_LIST,
-                HttpProtocol::LF
-            )
-        } else {
-            format!(
-                "{}{}{}{}",
-                object_id,
-                HttpProtocol::SP,
-                name,
-                // HttpProtocol::NUL,
-                HttpProtocol::LF
-            )
-        };
+        let pkt_line = format!(
+            "{}{}{}{}",
+            object_id,
+            HttpProtocol::SP,
+            name,
+            // HttpProtocol::NUL,
+            HttpProtocol::LF
+        );
         ref_list.push(pkt_line);
     }
 }
