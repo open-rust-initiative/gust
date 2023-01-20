@@ -34,3 +34,8 @@ bytes = "1.1.0"
 futures = "0.3.25"
 dirs = "4.0.0"
 clap = "4.0.32"
+sea-orm = { version = "0.10.6", features = [
+    "sqlx-mysql",
+    "runtime-tokio-rustls",
+    "macros",
+] }

@@ -17,6 +17,8 @@ use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
 use crate::git::object::base::ObjectClass;
 
+use super::BaseObject;
+
 ///
 #[derive(PartialEq, Eq, Hash, Ord, PartialOrd, Debug, Clone, Copy)]
 pub enum TreeItemType {
@@ -88,6 +90,13 @@ pub struct Tree {
     pub meta: MetaData,
     pub tree_items: Vec<TreeItem>,
     pub tree_name: String,
+}
+
+
+impl BaseObject for Tree { 
+    fn get_object_type(&self) -> ObjectClass {
+        ObjectClass::TREE(self.to_owned())
+    }
 }
 
 impl Ord for Tree {

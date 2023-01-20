@@ -21,6 +21,7 @@ use tokio::{
     io::{AsyncReadExt, BufReader},
 };
 
+use crate::database::DataSource;
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
 use crate::git::object::base::commit::Commit;
@@ -28,7 +29,6 @@ use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::HttpProtocol;
-
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -191,8 +191,9 @@ impl HttpProtocol {
 
     pub async fn git_receive_pack(
         &self,
-        _work_dir: PathBuf,
         req: Request<Body>,
+        _work_dir: PathBuf,
+        _data_source: &DataSource,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         // not in memory
         let (_parts, mut body) = req.into_parts();
