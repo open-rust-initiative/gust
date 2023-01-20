@@ -1,17 +1,23 @@
 //!
 //! # Gust - A Monorepo Platform for Git
 //!
-//! Google has a monolithic repository platform, Piper, with more than 100 TB of data. It's building
+//! Google has a monorepo system, __Piper__, with more than 100 TB of data. It's building
 //! on top of Google's infrastructure. Gust's purpose is to imitate Piper's architecture to
-//! implement a developing platform which compatible Git and trunk-based development flow for
+//! implement a developing a monorepo platform which compatible Git and trunk-based development flow for
 //! collaboration, open source compliance and supply chain management and DevSecOps.
 //!
 //! ## Git Compatible
 //!
-//! Git is a content-addressable filesystem and a distributed collaboration system. All files of
-//! a single repository persisted on the disk of the machine. It brings a lot of benefits to
-//! performance and maintenance. But it also has challenges for monorepo. It is hard to manage a
-//! vast code repository like a repo has 20 TB, which is typical in a middle size enterprise.
+//! Git is a content-addressable file system. It is also a distributed collaboration system. All of
+//! the files in a single repository are persisted on the machine's hard drive. This has many
+//! advantages for performance and maintenance. But it also presents challenges for monorepo. It
+//! isn't easy to manage a large code repository, such as a 20TB repo, which is typical in a
+//! medium-sized company.
+//!
+//! Git is the world's most widely used version control system, and Gust aims to build a bridge
+//! between Git and Monorepo. Git can 'clone' or 'pull' any folder from Monorepo into the local
+//! development environment as a Git repository and 'push' it back. Gust hosts a codebase of
+//! monorepo with distribution databases such as SQL, NoSQL, and Graph Database.
 //!
 //! ## Trunk-based Development
 //!
@@ -31,6 +37,8 @@
 //! 2. [Monorepo: A single repository for all your code](https://medium.com/@mattklein123/monorepo-a-single-repository-for-all-your-code-86a852bff054)
 //! 3. [Why Google Stores Billions of Lines of Code in a Single Repository](https://cacm.acm.org/magazines/2016/7/204032-why-google-stores-billions-of-lines-of-code-in-a-single-repository)
 //! 4. [Trunk Based Development](https://trunkbaseddevelopment.com)
+//! 5. [Branching strategies: Git-flow vs trunk-based development](https://www.devbridge.com/articles/branching-strategies-git-flow-vs-trunk-based-development/)
+//! 6. [Monorepo.tools](https://monorepo.tools)
 
 
 pub mod gateway;
