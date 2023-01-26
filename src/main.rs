@@ -39,6 +39,7 @@
 //! 4. [Trunk Based Development](https://trunkbaseddevelopment.com)
 //! 5. [Branching strategies: Git-flow vs trunk-based development](https://www.devbridge.com/articles/branching-strategies-git-flow-vs-trunk-based-development/)
 //! 6. [Monorepo.tools](https://monorepo.tools)
+//! 7. [Google Open Source Third Party](https://opensource.google/documentation/reference/thirdparty)
 
 
 pub mod gateway;
@@ -56,6 +57,8 @@ use crate::gateway::api::lib;
 ///
 /// ### TODO
 /// 1. Add `clap` to parse command line arguments, don't start gateway service directly in the main function.
+/// 2. Add `log` function and initialization to log the application's running status.
+/// 3. Add `config` function to load the configuration file when the application running.
 pub fn main() -> Result<()> {
     lib::main().unwrap();
 
