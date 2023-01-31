@@ -21,7 +21,7 @@ use tokio::{
     io::{AsyncReadExt, BufReader},
 };
 
-use crate::database::DataSource;
+use crate::gateway::api::lib::StorageType;
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
 use crate::git::object::base::commit::Commit;
@@ -29,6 +29,8 @@ use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::HttpProtocol;
+use crate::gust::driver::database::mysql::mysql::Mysql;
+use crate::gust::driver::{ObjectStorage, BasicObject};
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -193,8 +195,19 @@ impl HttpProtocol {
         &self,
         req: Request<Body>,
         _work_dir: PathBuf,
-        _data_source: &DataSource,
+        storage: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
+
+        // this part need to be reused？
+        match storage {
+            StorageType::Mysql(conn) => {
+                let query = Mysql::default();
+                let res = query.save_objects(storage, vec![BasicObject::default()]).unwrap();
+                println!("{}", res);
+            },
+            StorageType::Filesystem => todo!(),
+        };
+
         // not in memory
         let (_parts, mut body) = req.into_parts();
         let mut pkt_line_parsed = false;

@@ -2,16 +2,15 @@
 //!
 //!
 //!
-use std::{fs::File, sync::Arc};
 use std::cmp::Ordering;
 use std::convert::TryFrom;
+use std::{fs::File, sync::Arc};
 
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
-use crate::git::utils;
 use crate::git::pack::cache::PackObjectCache;
 use crate::git::pack::Pack;
-
+use crate::git::utils;
 
 impl Eq for Pack {}
 

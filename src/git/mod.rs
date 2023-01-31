@@ -7,14 +7,14 @@
 //!
 //!
 
+pub mod errors;
 pub mod hash;
 pub mod idx;
+pub mod lfs;
 pub mod object;
 pub mod pack;
-pub mod utils;
-pub mod errors;
 pub mod protocol;
-pub mod lfs;
+pub mod utils;
 
 ///
 #[cfg(test)]

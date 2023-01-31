@@ -41,17 +41,35 @@
 //! 6. [Monorepo.tools](https://monorepo.tools)
 //! 7. [Google Open Source Third Party](https://opensource.google/documentation/reference/thirdparty)
 
-
-pub mod gateway;
-pub mod database;
-pub mod utils;
 pub mod errors;
+pub mod gateway;
 pub mod git;
 pub mod gust;
+pub mod utils;
+
+use std::path::PathBuf;
 
 use anyhow::Result;
+use clap::{command, Parser};
+use git::protocol::ServeCommand;
 
 use crate::gateway::api::lib;
+
+#[derive(Parser)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    // custome configuration file
+    #[arg(short, long, value_name = "FILE")]
+    config: Option<PathBuf>,
+
+    //custom log file
+    #[arg(short, long, value_name = "FILE")]
+    log_path: Option<PathBuf>,
+
+    //subcommand serve
+    #[command(subcommand)]
+    serve_command: Option<ServeCommand>,
+}
 
 /// The main entry of the application.
 ///
@@ -60,7 +78,13 @@ use crate::gateway::api::lib;
 /// 2. Add `log` function and initialization to log the application's running status.
 /// 3. Add `config` function to load the configuration file when the application running.
 pub fn main() -> Result<()> {
+    // let cli = Cli::parse();
     lib::main().unwrap();
+
+    // tracing_subscriber::fmt()
+    // .with_max_level(tracing::Level::DEBUG)
+    // .with_test_writer()
+    // .init();
 
     Ok(())
 }

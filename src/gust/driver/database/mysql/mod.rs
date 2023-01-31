@@ -1,1 +1,1 @@
-pub mod mysql_obj_service;
+pub mod mysql;

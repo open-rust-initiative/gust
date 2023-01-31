@@ -8,18 +8,17 @@ use std::{env, net::SocketAddr};
 
 use anyhow::Result;
 use axum::body::Body;
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::http::{Response, StatusCode};
 use axum::routing::{get, post};
 use axum::{Extension, Router, Server};
 use hyper::Request;
-use sea_orm::{ConnectOptions, Database};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
-use crate::database::DataSource;
 use crate::git::protocol::HttpProtocol;
 
 #[tokio::main]
@@ -44,10 +43,12 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sqlx_logging(true)
         .sqlx_logging_level(log::LevelFilter::Error);
 
-    let data_source = DataSource {
-        sea_orm: Database::connect(opt)
-            .await
-            .expect("Database connection failed"),
+    let state = AppState {
+        stotage_type: StorageType::Mysql(
+            Database::connect(opt)
+                .await
+                .expect("Database connection failed"),
+        ),
     };
 
     let app = Router::new()
@@ -56,15 +57,25 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/:repo/git-receive-pack", post(git_receive_pack))
         .route("/:repo/decode", post(decode_packfile))
         .layer(
-            ServiceBuilder::new()
-                .layer(CookieManagerLayer::new())
-                .layer(Extension(data_source)),
-        );
+            ServiceBuilder::new().layer(CookieManagerLayer::new()), // .layer(Extension(data_source)),
+        )
+        .with_state(state);
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
     Server::bind(&addr).serve(app.into_make_service()).await?;
 
     Ok(())
+}
+
+#[derive(Clone)]
+pub enum StorageType {
+    Mysql(DatabaseConnection),
+    Filesystem,
+}
+
+#[derive(Clone)]
+struct AppState {
+    stotage_type: StorageType,
 }
 
 #[derive(Deserialize, Debug)]
@@ -77,7 +88,7 @@ struct Params {
     pub repo: String,
 }
 
-//
+/// Discovering Reference
 async fn git_info_refs(
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
@@ -98,7 +109,7 @@ async fn git_info_refs(
     }
 }
 
-//
+/// Smart Service git-upload-pack
 async fn git_upload_pack(
     Path(params): Path<Params>,
     req: Request<Body>,
@@ -111,9 +122,10 @@ async fn git_upload_pack(
     http_protocol.git_upload_pack(work_dir, req).await
 }
 
-//
+/// Smart Service git-receive-pack
 async fn git_receive_pack(
-    Extension(ref data_source): Extension<DataSource>,
+    // Extension(ref data_source): Extension<DataSource>,
+    state: State<AppState>,
     Path(params): Path<Params>,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
@@ -124,7 +136,7 @@ async fn git_receive_pack(
 
     let http_protocol = HttpProtocol::default();
     http_protocol
-        .git_receive_pack(req, work_dir, data_source)
+        .git_receive_pack(req, work_dir, &state.stotage_type)
         .await
 }
 
