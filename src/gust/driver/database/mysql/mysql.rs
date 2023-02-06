@@ -1,14 +1,16 @@
+use async_trait::async_trait;
 use sea_orm::ActiveValue::NotSet;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, InsertResult, Set};
 
 use crate::gateway::api::lib::StorageType;
 use crate::git::object::base::BaseObject;
 use crate::gust::driver::database::entity::{object_content, object_info};
-use crate::gust::driver::{ObjectStorage, BasicObject};
+use crate::gust::driver::{BasicObject, ObjectStorage};
 
 #[derive(Debug, Default)]
 pub struct Mysql {}
 
+#[async_trait]
 impl ObjectStorage for Mysql {
     fn search_child_objects(
         &self,
@@ -18,7 +20,7 @@ impl ObjectStorage for Mysql {
         todo!()
     }
 
-    fn save_objects(
+    async fn save_objects(
         &self,
         storage: &StorageType,
         objects: Vec<BasicObject>,
@@ -43,16 +45,8 @@ impl ObjectStorage for Mysql {
             };
             infos.push(object_info)
         }
-        println!("start saving1");
-        // write data to multiple tables
-        let res = async {
-            println!("{:?}", contents);
-            println!("{:?}", infos);
-            save_objects(conn, contents).await.unwrap();
-            save_objects(conn, infos).await.unwrap();
-            println!("end saving");
-        };
-        futures::executor::block_on(res);
+        save_objects(conn, contents).await.unwrap();
+        save_objects(conn, infos).await.unwrap();
         Ok(true)
     }
 }
@@ -72,6 +66,7 @@ where
             .exec(conn)
             .await
             .unwrap();
+        // println!("{:?}", save_result);
         result_vec.push(save_result);
     }
     Ok(result_vec)

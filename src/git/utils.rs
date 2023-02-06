@@ -3,8 +3,13 @@
 //!
 //!
 
-use std::{fs::File,
-          io::{self, Read, Seek, SeekFrom}, path::PathBuf, str::FromStr, vec};
+use std::{
+    fs::File,
+    io::{self, Read, Seek, SeekFrom},
+    path::PathBuf,
+    str::FromStr,
+    vec,
+};
 
 use flate2::read::ZlibDecoder;
 
@@ -221,13 +226,13 @@ pub fn get_offset(file: &mut File) -> io::Result<u64> {
     file.seek(SeekFrom::Current(0))
 }
 
-
 /// Call reader() to process a zlib stream from a file.
 /// Reset the file offset afterwards to the end of the zlib stream,
 /// since ZlibDecoder uses BufReader, which may consume extra bytes.
 #[allow(unused)]
 pub fn read_zlib_stream_exact<T, F>(file: &mut File, reader: F) -> Result<T, GitError>
-    where F: FnOnce(&mut ZlibDecoder<&mut File>) -> Result<T, GitError>
+where
+    F: FnOnce(&mut ZlibDecoder<&mut File>) -> Result<T, GitError>,
 {
     let offset = get_offset(file).unwrap();
     let mut decompressed = ZlibDecoder::new(file);
@@ -277,7 +282,6 @@ pub fn find_all_pack_file(pack_dir: &str) -> (Vec<PathBuf>, Vec<Hash>) {
     let mut hash_list = vec![];
     let mut object_root = std::path::PathBuf::from(pack_dir);
 
-
     let paths = std::fs::read_dir(&object_root).unwrap();
 
     for path in paths {
@@ -300,7 +304,6 @@ pub fn find_all_pack_file(pack_dir: &str) -> (Vec<PathBuf>, Vec<Hash>) {
 
     (file_path, hash_list)
 }
-
 
 #[cfg(test)]
 mod test {}

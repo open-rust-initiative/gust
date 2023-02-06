@@ -14,9 +14,8 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
-use crate::git::utils;
 use crate::git::pack::Pack;
-
+use crate::git::utils;
 
 ///
 #[allow(unused)]
@@ -151,7 +150,6 @@ impl Idx {
         self.pack_signature = Hash::from_row(&data[offset..offset + 20].to_vec());
         offset += 20;
         self.idx_signature = Hash::from_row(&data[offset..].to_vec());
-
 
         /// fill the item_hash map.
         for (index, item) in self.idx_items.iter().enumerate() {

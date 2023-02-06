@@ -4,9 +4,8 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
-
+use crate::git::object::metadata::MetaData;
 
 /// #### Build Cache Info for the decode packed object
 /// There are two hashmap for object ,<br>

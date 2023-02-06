@@ -9,12 +9,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::git::errors::GitError;
-use crate::git::utils;
 use crate::git::hash::Hash;
 use crate::git::idx::Idx;
 use crate::git::object::delta::*;
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::cache::PackObjectCache;
+use crate::git::utils;
 
 pub mod cache;
 pub mod decode;
@@ -52,7 +52,16 @@ impl Pack {
         // Init the cache for follow object parse
         let mut cache = PackObjectCache::default();
 
-        for _ in 0.._pack.number_of_objects {
+        for i in 0.._pack.number_of_objects {
+            if i % 1000 == 0 {
+                tracing::info!(
+                    "{}/{},{},{}",
+                    i,
+                    _pack.number_of_objects,
+                    cache.by_hash.len(),
+                    cache.by_offset.len()
+                );
+            }
             //update offset of the Object
             let offset = utils::get_offset(pack_file).unwrap();
             //Get the next Object by the Pack::next_object() func
@@ -106,8 +115,7 @@ impl Pack {
         Ok(_pack)
     }
 
-
-    /// Decode the pack file helped by the according decoded idx file 
+    /// Decode the pack file helped by the according decoded idx file
     #[allow(unused)]
     pub fn decode_by_idx(idx: &mut Idx, pack_file: &mut File) -> Result<Self, GitError> {
         let mut _pack = Self::check_header(pack_file)?;
@@ -313,7 +321,7 @@ mod tests {
         let mut pack_file = File::open(&Path::new(
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
         ))
-            .unwrap();
+        .unwrap();
         let (raw_pack, _raw_data) = Pack::decode_raw_data(&mut pack_file);
         assert_eq!(
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
@@ -327,11 +335,11 @@ mod tests {
         let mut pack_file = File::open(&Path::new(
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack",
         ))
-            .unwrap();
+        .unwrap();
         let idx_file = File::open(&Path::new(
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.idx",
         ))
-            .unwrap();
+        .unwrap();
         let mut reader = BufReader::new(idx_file);
         let mut buffer = Vec::new();
         reader.read_to_end(&mut buffer).ok();
@@ -353,14 +361,14 @@ mod tests {
         let pack_file = File::open(&Path::new(
             "./resources/friger/pack-6cf1ec1a89de3757f7ba776e4dc108b88367c460.pack",
         ))
-            .unwrap();
+        .unwrap();
         let metadata = pack_file.metadata().unwrap();
         print!("{:?}", metadata.created().unwrap());
 
         let pack_file = File::open(&Path::new(
             "./resources/friger/pack-040de05aef75a0d847bff37f8cacab22dae377c9.pack",
         ))
-            .unwrap();
+        .unwrap();
         let metadata = pack_file.metadata().unwrap();
         print!("{:?}", metadata.created().unwrap());
     }

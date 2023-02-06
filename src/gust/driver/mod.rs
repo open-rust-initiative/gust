@@ -1,13 +1,14 @@
 //!
 //!
 
-use crate::{git::object::base::BaseObject, gateway::api::lib::StorageType};
+use async_trait::async_trait;
+
+use crate::gateway::api::lib::StorageType; 
+use crate::{git::object::base::BaseObject};
 //！
 pub mod database;
-pub mod filesystem;
 
-
-
+#[async_trait]
 pub trait ObjectStorage {
     fn search_child_objects(
         &self,
@@ -15,7 +16,11 @@ pub trait ObjectStorage {
         parent: Box<dyn BaseObject>,
     ) -> Result<Vec<Box<dyn BaseObject>>, anyhow::Error>;
 
-    fn save_objects(&self, storage: &StorageType, objects: Vec<BasicObject>) -> Result<bool, anyhow::Error>;
+    async fn save_objects(
+        &self,
+        storage: &StorageType,
+        objects: Vec<BasicObject>,
+    ) -> Result<bool, anyhow::Error>;
 }
 
 #[derive(Default)]

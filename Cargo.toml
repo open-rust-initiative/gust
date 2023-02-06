@@ -35,8 +35,9 @@ bytes = "1.1.0"
 futures = "0.3.25"
 dirs = "4.0.0"
 clap = { version = "4.1.4", features = ["derive"] }
-sea-orm = { version = "0.10.6", features = [
+sea-orm = { version = "0.10.7", features = [
     "sqlx-mysql",
     "runtime-tokio-rustls",
     "macros",
 ] }
+async-trait = "0.1.64"

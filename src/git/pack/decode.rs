@@ -8,16 +8,15 @@ use std::sync::Arc;
 
 use colored::Colorize;
 
-use obj::base::{blob, commit, tag, tree};
 use obj::base::ObjectClass;
+use obj::base::{blob, commit, tag, tree};
 
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
-use crate::git::object::types::ObjectType;
 use crate::git::object as obj;
 use crate::git::object::metadata::MetaData;
+use crate::git::object::types::ObjectType;
 use crate::git::pack::cache::PackObjectCache;
-
 
 ///!对取出的object字段进行进一步解码与包装
 /// 用于存储解析出的object抽象对象的hashmap
@@ -166,8 +165,8 @@ impl Display for ObjDecodedMap {
 
 #[cfg(test)]
 mod tests {
-    use super::ObjDecodedMap;
     use super::super::Pack;
+    use super::ObjDecodedMap;
 
     #[test]
     pub fn test_map_new() {
@@ -184,7 +183,6 @@ mod tests {
         result.check_completeness().unwrap();
         result.print_vec();
     }
-
 
     // #[test]
     // fn test_object_dir_encod_temp() {

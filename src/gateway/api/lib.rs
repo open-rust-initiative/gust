@@ -11,7 +11,7 @@ use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{Response, StatusCode};
 use axum::routing::{get, post};
-use axum::{Extension, Router, Server};
+use axum::{Router, Server};
 use hyper::Request;
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ use crate::git::protocol::HttpProtocol;
 
 #[tokio::main]
 pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env::set_var("RUST_LOG", "info");
+    env::set_var("RUST_LOG", "debug");
     tracing_subscriber::fmt::init();
 
     dotenvy::dotenv().ok();
@@ -36,7 +36,7 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // max_connections is properly for double size of the cpu core
     opt.max_connections(32)
         .min_connections(8)
-        .acquire_timeout(Duration::from_secs(5 * 60))
+        .acquire_timeout(Duration::from_secs(30))
         .connect_timeout(Duration::from_secs(20))
         .idle_timeout(Duration::from_secs(8))
         .max_lifetime(Duration::from_secs(8))
@@ -51,14 +51,15 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ),
     };
 
-    let app = Router::new()
+    let git_routes = Router::new()
         .route("/:repo/info/refs", get(git_info_refs))
         .route("/:repo/git-upload-pack", post(git_upload_pack))
         .route("/:repo/git-receive-pack", post(git_receive_pack))
-        .route("/:repo/decode", post(decode_packfile))
-        .layer(
-            ServiceBuilder::new().layer(CookieManagerLayer::new()), // .layer(Extension(data_source)),
-        )
+        .route("/:repo/decode", post(decode_packfile));
+
+    let app = Router::new()
+        .nest("/:path", git_routes)
+        .layer(ServiceBuilder::new().layer(CookieManagerLayer::new()))
         .with_state(state);
 
     let addr = SocketAddr::from_str(&server_url).unwrap();
@@ -86,6 +87,7 @@ struct ServiceName {
 #[derive(Debug, Deserialize, Serialize)]
 struct Params {
     pub repo: String,
+    pub path: String,
 }
 
 /// Discovering Reference
@@ -93,14 +95,19 @@ async fn git_info_refs(
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
-    let mut work_dir =
+    let work_dir =
         PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
-    work_dir = work_dir.join(params.repo.replace(".git", "")).join(".git");
+    let repo_dir = work_dir.join(params.path).join(params.repo.replace(".git", ""));
+
     let http_protocol = HttpProtocol::default();
+
+    if !repo_dir.exists() {
+        tokio::fs::create_dir_all(&repo_dir).await.unwrap();
+    }
 
     let service_name = service.service;
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
-        http_protocol.git_info_refs(work_dir, service_name).await
+        http_protocol.git_info_refs(repo_dir, service_name).await
     } else {
         return Err((
             StatusCode::FORBIDDEN,

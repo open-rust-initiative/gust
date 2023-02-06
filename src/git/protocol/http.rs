@@ -9,6 +9,7 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use axum::body::Body;
+use axum::http::response::Builder;
 use axum::http::{Response, StatusCode};
 use bstr::ByteSlice;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -30,7 +31,7 @@ use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::HttpProtocol;
 use crate::gust::driver::database::mysql::mysql::Mysql;
-use crate::gust::driver::{ObjectStorage, BasicObject};
+use crate::gust::driver::{BasicObject, ObjectStorage};
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -65,7 +66,7 @@ impl HttpProtocol {
 
     pub async fn git_info_refs(
         &self,
-        work_dir: PathBuf,
+        repo_dir: PathBuf,
         service: String,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let mut headers = HashMap::new();
@@ -82,9 +83,9 @@ impl HttpProtocol {
         for (key, val) in headers {
             resp = resp.header(&key, val);
         }
-
-        let mut ref_list = add_head_to_ref_list(&work_dir).unwrap();
-        add_to_ref_list(&work_dir, &mut ref_list, String::from("refs/heads/"));
+        let repo_git_dir = repo_dir.join(".git");
+        let mut ref_list = add_head_to_ref_list(&repo_git_dir).unwrap();
+        add_to_ref_list(&repo_git_dir, &mut ref_list, String::from("refs/heads/"));
 
         let pkt_line_stream = build_smart_reply(&ref_list, service);
 
@@ -167,19 +168,7 @@ impl HttpProtocol {
             add_to_pkt_line(&mut buf, format!("ACK {} \n", have[have.len() - 1]));
         }
 
-        let mut headers = HashMap::new();
-        headers.insert(
-            "Content-Type".to_string(),
-            "application/x-git-upload-pack-result".to_string(),
-        );
-        headers.insert(
-            "Cache-Control".to_string(),
-            "no-cache, max-age=0, must-revalidate".to_string(),
-        );
-        let mut resp = Response::builder();
-        for (key, val) in headers {
-            resp = resp.header(&key, val);
-        }
+        let resp = build_res_header("application/x-git-upload-pack-result".to_owned());
 
         tracing::info!("send buf: {:?}", buf);
 
@@ -197,14 +186,16 @@ impl HttpProtocol {
         _work_dir: PathBuf,
         storage: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
-
         // this part need to be reused？
         match storage {
-            StorageType::Mysql(conn) => {
+            StorageType::Mysql(_) => {
                 let query = Mysql::default();
-                let res = query.save_objects(storage, vec![BasicObject::default()]).unwrap();
+                let res = query
+                    .save_objects(storage, vec![BasicObject::default()])
+                    .await
+                    .unwrap();
                 println!("{}", res);
-            },
+            }
             StorageType::Filesystem => todo!(),
         };
 
@@ -244,20 +235,7 @@ impl HttpProtocol {
         }
         buffer.flush().await.unwrap();
 
-        let mut headers = HashMap::new();
-        headers.insert(
-            "Content-Type".to_string(),
-            "application/x-git-receive-pack-result".to_string(),
-        );
-        headers.insert(
-            "Cache-Control".to_string(),
-            "no-cache, max-age=0, must-revalidate".to_string(),
-        );
-        let mut resp = Response::builder();
-
-        for (key, val) in headers {
-            resp = resp.header(&key, val);
-        }
+        let resp = build_res_header("application/x-git-receive-pack-result".to_owned());
 
         let mut buf = BytesMut::new();
         add_to_pkt_line(&mut buf, "unpack ok\n".to_owned());
@@ -413,14 +391,29 @@ fn add_head_to_ref_list(work_dir: &PathBuf) -> Result<Vec<String>, anyhow::Error
     let content = std::fs::read_to_string(work_dir.join("HEAD")).unwrap();
     let content = content.replace("ref: ", "");
     let content = content.strip_suffix('\n').unwrap();
-    let object_id = std::fs::read_to_string(work_dir.join(content)).unwrap();
+    tracing::debug!("{:?}", content);
+    //use zero_id when ref_list is empty
+    let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
+    let object_id = match std::fs::read_to_string(work_dir.join(content)) {
+        Ok(object_id) => object_id,
+        Err(_) => {
+            let mut object_id = zero_id.clone();
+            object_id.push('\n');
+            object_id
+        }
+    };
     let object_id = object_id.strip_suffix('\n').unwrap();
     // The stream MUST include capability declarations behind a NUL on the first ref.
+    let name = if object_id == zero_id {
+        "capabilities^{}"
+    } else {
+        "HEAD"
+    };
     let pkt_line = format!(
         "{}{}{}{}{}{}",
         object_id,
         HttpProtocol::SP,
-        "HEAD",
+        name,
         HttpProtocol::NUL,
         HttpProtocol::CAP_LIST,
         HttpProtocol::LF
@@ -479,6 +472,21 @@ fn read_pkt_line(bytes: &mut Bytes) -> (usize, Bytes) {
     let pkt_line = bytes.copy_to_bytes(pkt_length - 4);
 
     (pkt_length, pkt_line)
+}
+
+fn build_res_header(content_type: String) -> Builder {
+    let mut headers = HashMap::new();
+    headers.insert("Content-Type".to_string(), content_type);
+    headers.insert(
+        "Cache-Control".to_string(),
+        "no-cache, max-age=0, must-revalidate".to_string(),
+    );
+    let mut resp = Response::builder();
+
+    for (key, val) in headers {
+        resp = resp.header(&key, val);
+    }
+    resp
 }
 
 #[cfg(test)]
