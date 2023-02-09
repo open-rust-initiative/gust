@@ -58,7 +58,7 @@ use crate::gateway::api::lib;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    // custome configuration file
+    // custom configuration file
     #[arg(short, long, value_name = "FILE")]
     config: Option<PathBuf>,
 
