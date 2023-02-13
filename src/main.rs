@@ -21,16 +21,6 @@
 //!
 //! ## Trunk-based Development
 //!
-//!
-//! ## Collaboration
-//!
-//!
-//! ## Open Source Compliance
-//!
-//!
-//! ## Supply Chain Management
-//!
-//!
 //! ## References
 //!
 //! 1. [What is monorepo? (and should you use it?)](https://semaphoreci.com/blog/what-is-monorepo)
