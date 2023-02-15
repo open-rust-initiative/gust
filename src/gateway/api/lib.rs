@@ -13,13 +13,14 @@ use axum::http::{Response, StatusCode};
 use axum::routing::{get, post};
 use axum::{Router, Server};
 use hyper::Request;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use sea_orm::{ConnectOptions, Database};
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
 use crate::git::protocol::HttpProtocol;
+use crate::gust::driver::StorageType;
 
 #[tokio::main]
 pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -68,11 +69,7 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[derive(Clone)]
-pub enum StorageType {
-    Mysql(DatabaseConnection),
-    Filesystem,
-}
+
 
 #[derive(Clone)]
 struct AppState {
@@ -92,6 +89,7 @@ struct Params {
 
 /// Discovering Reference
 async fn git_info_refs(
+    state: State<AppState>,
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
@@ -107,7 +105,7 @@ async fn git_info_refs(
 
     let service_name = service.service;
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
-        http_protocol.git_info_refs(repo_dir, service_name).await
+        http_protocol.git_info_refs(repo_dir, service_name, &state.stotage_type).await
     } else {
         return Err((
             StatusCode::FORBIDDEN,

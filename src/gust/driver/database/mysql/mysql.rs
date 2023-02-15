@@ -1,35 +1,55 @@
+use std::path::PathBuf;
+
 use async_trait::async_trait;
 use sea_orm::ActiveValue::NotSet;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, InsertResult, Set};
 
-use crate::gateway::api::lib::StorageType;
 use crate::git::object::base::BaseObject;
 use crate::gust::driver::database::entity::{object_content, object_info};
-use crate::gust::driver::{BasicObject, ObjectStorage};
+use crate::gust::driver::{BasicObject, ObjectStorage, StorageType};
 
 #[derive(Debug, Default)]
-pub struct Mysql {}
+pub struct MysqlStorage {
+    pub connection: DatabaseConnection,
+}
+
+impl MysqlStorage {
+    pub fn new(storage: &StorageType) -> MysqlStorage {
+        if let StorageType::Mysql(connection) = storage {
+            return MysqlStorage {
+                connection: connection.to_owned(),
+            };
+        } else {
+            panic!("Not supported storage type");
+        };
+    }
+}
 
 #[async_trait]
-impl ObjectStorage for Mysql {
+impl ObjectStorage for MysqlStorage {
+    fn get_head_object_id(&self, _work_dir: &PathBuf) -> String {
+        let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
+        zero_id
+    }
+
     fn search_child_objects(
         &self,
-        storage: &StorageType,
-        parent: Box<dyn BaseObject>,
+        _storage: &StorageType,
+        _parent: Box<dyn BaseObject>,
     ) -> Result<Vec<Box<(dyn BaseObject + 'static)>>, anyhow::Error> {
         todo!()
     }
 
     async fn save_objects(
         &self,
-        storage: &StorageType,
+        _storage: &StorageType,
         objects: Vec<BasicObject>,
     ) -> Result<bool, anyhow::Error> {
-        let conn = check_storage(storage);
+        let conn = &self.connection;
         let mut contents = Vec::new();
         let mut infos = Vec::new();
         // converting types
-        for object in objects {
+        for _object in objects {
             let object_content = object_content::ActiveModel {
                 id: NotSet,
                 file: Set("file".to_owned()),
@@ -40,7 +60,6 @@ impl ObjectStorage for Mysql {
                 id: NotSet,
                 hash: Set("hash".to_owned()),
                 path: Set("path".to_owned()),
-                // obj_type: Set(object.get_object_type().to_string()),
                 obj_type: Set("commit".to_owned()),
             };
             infos.push(object_info)
@@ -70,12 +89,4 @@ where
         result_vec.push(save_result);
     }
     Ok(result_vec)
-}
-
-fn check_storage(storage: &StorageType) -> &DatabaseConnection {
-    if let StorageType::Mysql(conn) = storage {
-        return conn;
-    } else {
-        panic!("Not supported storage type");
-    };
 }

@@ -22,7 +22,6 @@ use tokio::{
     io::{AsyncReadExt, BufReader},
 };
 
-use crate::gateway::api::lib::StorageType;
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
 use crate::git::object::base::commit::Commit;
@@ -30,8 +29,8 @@ use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::HttpProtocol;
-use crate::gust::driver::database::mysql::mysql::Mysql;
-use crate::gust::driver::{BasicObject, ObjectStorage};
+use crate::gust::driver::database::mysql::mysql::MysqlStorage;
+use crate::gust::driver::{BasicObject, ObjectStorage, StorageType};
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -68,6 +67,7 @@ impl HttpProtocol {
         &self,
         repo_dir: PathBuf,
         service: String,
+        storage: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let mut headers = HashMap::new();
         headers.insert(
@@ -84,8 +84,15 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
         let repo_git_dir = repo_dir.join(".git");
-        let mut ref_list = add_head_to_ref_list(&repo_git_dir).unwrap();
-        add_to_ref_list(&repo_git_dir, &mut ref_list, String::from("refs/heads/"));
+        let mysql_storage = MysqlStorage::new(storage);
+
+        let mut ref_list = add_head_to_ref_list(&repo_git_dir, &mysql_storage).unwrap();
+        add_to_ref_list(
+            &repo_git_dir,
+            &mut ref_list,
+            String::from("refs/heads/"),
+            &mysql_storage,
+        );
 
         let pkt_line_stream = build_smart_reply(&ref_list, service);
 
@@ -189,7 +196,7 @@ impl HttpProtocol {
         // this part need to be reused？
         match storage {
             StorageType::Mysql(_) => {
-                let query = Mysql::default();
+                let query = MysqlStorage::default();
                 let res = query
                     .save_objects(storage, vec![BasicObject::default()])
                     .await
@@ -387,22 +394,13 @@ async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCod
     }
 }
 
-fn add_head_to_ref_list(work_dir: &PathBuf) -> Result<Vec<String>, anyhow::Error> {
-    let content = std::fs::read_to_string(work_dir.join("HEAD")).unwrap();
-    let content = content.replace("ref: ", "");
-    let content = content.strip_suffix('\n').unwrap();
-    tracing::debug!("{:?}", content);
+fn add_head_to_ref_list(
+    work_dir: &PathBuf,
+    object_storage: &dyn ObjectStorage,
+) -> Result<Vec<String>, anyhow::Error> {
+    let object_id = object_storage.get_head_object_id(work_dir);
     //use zero_id when ref_list is empty
     let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
-    let object_id = match std::fs::read_to_string(work_dir.join(content)) {
-        Ok(object_id) => object_id,
-        Err(_) => {
-            let mut object_id = zero_id.clone();
-            object_id.push('\n');
-            object_id
-        }
-    };
-    let object_id = object_id.strip_suffix('\n').unwrap();
     // The stream MUST include capability declarations behind a NUL on the first ref.
     let name = if object_id == zero_id {
         "capabilities^{}"
@@ -422,7 +420,12 @@ fn add_head_to_ref_list(work_dir: &PathBuf) -> Result<Vec<String>, anyhow::Error
     Ok(ref_list)
 }
 
-fn add_to_ref_list(work_dir: &PathBuf, ref_list: &mut Vec<String>, mut name: String) {
+fn add_to_ref_list(
+    work_dir: &PathBuf,
+    ref_list: &mut Vec<String>,
+    mut name: String,
+    _object_storage: &dyn ObjectStorage,
+) {
     //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
     let path = work_dir.join(&name);
     let paths = std::fs::read_dir(&path).unwrap();
