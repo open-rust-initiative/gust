@@ -5,6 +5,7 @@
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -67,7 +68,7 @@ impl HttpProtocol {
         &self,
         repo_dir: PathBuf,
         service: String,
-        storage: &StorageType,
+        storage_type: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let mut headers = HashMap::new();
         headers.insert(
@@ -83,12 +84,20 @@ impl HttpProtocol {
         for (key, val) in headers {
             resp = resp.header(&key, val);
         }
-        let repo_git_dir = repo_dir.join(".git");
-        let mysql_storage = MysqlStorage::new(storage);
+        let mysql_storage = MysqlStorage::new(storage_type);
 
-        let mut ref_list = add_head_to_ref_list(&repo_git_dir, &mysql_storage).unwrap();
+        // init repo: dir not exists or is empty
+        let init_repo = !repo_dir.exists();
+        // todo: replace git command
+        if init_repo {
+            Command::new("git")
+                .args(["init", "--bare", &repo_dir.to_str().unwrap()])
+                .output()
+                .expect("git init failed!");
+        }
+        let mut ref_list = add_head_to_ref_list(&repo_dir, &mysql_storage, init_repo).unwrap();
         add_to_ref_list(
-            &repo_git_dir,
+            &repo_dir,
             &mut ref_list,
             String::from("refs/heads/"),
             &mysql_storage,
@@ -194,17 +203,17 @@ impl HttpProtocol {
         storage: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         // this part need to be reused？
-        match storage {
-            StorageType::Mysql(_) => {
-                let query = MysqlStorage::default();
-                let res = query
-                    .save_objects(storage, vec![BasicObject::default()])
-                    .await
-                    .unwrap();
-                println!("{}", res);
-            }
-            StorageType::Filesystem => todo!(),
-        };
+        // match storage {
+        //     StorageType::Mysql(_) => {
+        //         let query = MysqlStorage::default();
+        //         let res = query
+        //             .save_objects(storage, vec![BasicObject::default()])
+        //             .await
+        //             .unwrap();
+        //         println!("{}", res);
+        //     }
+        //     StorageType::Filesystem => todo!(),
+        // };
 
         // not in memory
         let (_parts, mut body) = req.into_parts();
@@ -247,10 +256,10 @@ impl HttpProtocol {
         let mut buf = BytesMut::new();
         add_to_pkt_line(&mut buf, "unpack ok\n".to_owned());
         for res in ref_results {
-            let ref_res = format!("{} {}", res.result, res.ref_name);
+            let ref_res = format!("{} {}", res.result, res.ref_name.replace("\0", "\n"));
             add_to_pkt_line(&mut buf, ref_res);
         }
-        buf.put(&b"0000"[..]);
+        buf.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
 
         let body = Body::from(buf.freeze());
         tracing::info!("receive pack response {:?}", body);
@@ -394,14 +403,20 @@ async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCod
     }
 }
 
+// The stream SHOULD include the default ref named HEAD as the first ref
 fn add_head_to_ref_list(
     work_dir: &PathBuf,
     object_storage: &dyn ObjectStorage,
+    init_repo: bool,
 ) -> Result<Vec<String>, anyhow::Error> {
-    let object_id = object_storage.get_head_object_id(work_dir);
-    //use zero_id when ref_list is empty
+    // use zero_id if init_repo
     let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
     // The stream MUST include capability declarations behind a NUL on the first ref.
+    let object_id = if init_repo {
+        zero_id.clone()
+    } else {
+        object_storage.get_head_object_id(work_dir)
+    };
     let name = if object_id == zero_id {
         "capabilities^{}"
     } else {

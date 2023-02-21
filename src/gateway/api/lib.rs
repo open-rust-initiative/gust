@@ -99,10 +99,6 @@ async fn git_info_refs(
 
     let http_protocol = HttpProtocol::default();
 
-    if !repo_dir.exists() {
-        tokio::fs::create_dir_all(&repo_dir).await.unwrap();
-    }
-
     let service_name = service.service;
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
         http_protocol.git_info_refs(repo_dir, service_name, &state.stotage_type).await
@@ -114,7 +110,7 @@ async fn git_info_refs(
     }
 }
 
-/// Smart Service git-upload-pack
+/// Smart Service git-upload-pack, handle git pull and clone
 async fn git_upload_pack(
     Path(params): Path<Params>,
     req: Request<Body>,
@@ -127,7 +123,10 @@ async fn git_upload_pack(
     http_protocol.git_upload_pack(work_dir, req).await
 }
 
-/// Smart Service git-receive-pack
+
+// http://localhost:8000/org1/apps/App2.git
+// http://localhost:8000/org1/libs/lib1.git
+/// Smart Service git-receive-pack, handle git push
 async fn git_receive_pack(
     // Extension(ref data_source): Extension<DataSource>,
     state: State<AppState>,

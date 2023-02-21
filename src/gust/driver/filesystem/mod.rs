@@ -16,9 +16,11 @@ impl ObjectStorage for FileSystem {
         let content = std::fs::read_to_string(work_dir.join("HEAD")).unwrap();
         let content = content.replace("ref: ", "");
         let content = content.strip_suffix('\n').unwrap();
-        let object_id = std::fs::read_to_string(work_dir.join(content)).unwrap();
-        let object_id = object_id.strip_suffix('\n').unwrap();
-        object_id.to_owned()
+        let object_id = match std::fs::read_to_string(work_dir.join(content)) {
+            Ok(object_id) => object_id.strip_suffix('\n').unwrap().to_owned(),
+            _ => String::from_utf8_lossy(&vec![b'0'; 40]).to_string(),
+        };
+        object_id
     }
 
     fn search_child_objects(

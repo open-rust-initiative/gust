@@ -27,9 +27,16 @@ impl MysqlStorage {
 
 #[async_trait]
 impl ObjectStorage for MysqlStorage {
-    fn get_head_object_id(&self, _work_dir: &PathBuf) -> String {
-        let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
-        zero_id
+    fn get_head_object_id(&self, work_dir: &PathBuf) -> String {
+        // TODO update to mysql logic
+        let content = std::fs::read_to_string(work_dir.join("HEAD")).unwrap();
+        let content = content.replace("ref: ", "");
+        let content = content.strip_suffix('\n').unwrap();
+        let object_id = match std::fs::read_to_string(work_dir.join(content)) {
+            Ok(object_id) => object_id.strip_suffix('\n').unwrap().to_owned(),
+            _ => String::from_utf8_lossy(&vec![b'0'; 40]).to_string()
+        };
+        object_id
     }
 
     fn search_child_objects(
