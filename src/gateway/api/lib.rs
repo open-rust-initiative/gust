@@ -19,7 +19,7 @@ use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
-use crate::git::protocol::HttpProtocol;
+use crate::git::protocol::{AckMode, HttpProtocol, ServiceType};
 use crate::gust::driver::StorageType;
 
 #[tokio::main]
@@ -69,8 +69,6 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-
-
 #[derive(Clone)]
 struct AppState {
     stotage_type: StorageType,
@@ -87,21 +85,31 @@ struct Params {
     pub path: String,
 }
 
+impl Params {
+    pub fn get_repo_dir(&self) -> PathBuf {
+        let work_dir =
+            PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
+        work_dir
+            .join(self.path.clone())
+            .join(self.repo.replace(".git", ""))
+    }
+}
+
 /// Discovering Reference
 async fn git_info_refs(
     state: State<AppState>,
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
-    let work_dir =
-        PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
-    let repo_dir = work_dir.join(params.path).join(params.repo.replace(".git", ""));
-
-    let http_protocol = HttpProtocol::default();
-
     let service_name = service.service;
+    let http_protocol = HttpProtocol {
+        mode: AckMode::MultiAckDetailed,
+        repo_dir: params.get_repo_dir(),
+    };
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
-        http_protocol.git_info_refs(repo_dir, service_name, &state.stotage_type).await
+        http_protocol
+            .git_info_refs(ServiceType::new(&service_name), &state.stotage_type)
+            .await
     } else {
         return Err((
             StatusCode::FORBIDDEN,
@@ -116,13 +124,12 @@ async fn git_upload_pack(
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("{:?}", params.repo);
-    let http_protocol = HttpProtocol::default();
-    let mut work_dir =
-        PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
-    work_dir = work_dir.join(params.repo.replace(".git", ""));
-    http_protocol.git_upload_pack(work_dir, req).await
+    let http_protocol = HttpProtocol {
+        mode: AckMode::MultiAckDetailed,
+        repo_dir: params.get_repo_dir(),
+    };
+    http_protocol.git_upload_pack(req).await
 }
-
 
 // http://localhost:8000/org1/apps/App2.git
 // http://localhost:8000/org1/libs/lib1.git
@@ -134,13 +141,12 @@ async fn git_receive_pack(
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("req: {:?}", req);
-    let mut work_dir =
-        PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
-    work_dir = work_dir.join(params.repo.replace(".git", ""));
-
-    let http_protocol = HttpProtocol::default();
+    let http_protocol = HttpProtocol {
+        mode: AckMode::MultiAckDetailed,
+        repo_dir: params.get_repo_dir(),
+    };
     http_protocol
-        .git_receive_pack(req, work_dir, &state.stotage_type)
+        .git_receive_pack(req, &state.stotage_type)
         .await
 }
 

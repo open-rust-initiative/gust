@@ -11,6 +11,7 @@ pub mod ssh;
 
 pub struct HttpProtocol {
     pub mode: AckMode,
+    pub repo_dir: PathBuf,
 }
 
 ///
@@ -18,6 +19,29 @@ impl Default for HttpProtocol {
     fn default() -> Self {
         Self {
             mode: AckMode::MultiAckDetailed,
+            repo_dir: PathBuf::new(),
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum ServiceType {
+    UploadPack,
+    ReceivePack,
+}
+
+impl ServiceType {
+    pub fn new(service_name: &str) -> Self {
+        match service_name {
+            "git-upload-pack" => ServiceType::UploadPack,
+            "git-receive-pack" => ServiceType::ReceivePack,
+            _ => panic!("service type not supported")
+        }
+    }
+    pub fn to_string(&self) -> String {
+        match self {
+            ServiceType::UploadPack => "git-upload-pack".to_owned(),
+            ServiceType::ReceivePack => "git-receive-pack".to_owned(),
         }
     }
 }

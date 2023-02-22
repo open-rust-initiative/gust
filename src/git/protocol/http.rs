@@ -31,7 +31,9 @@ use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::HttpProtocol;
 use crate::gust::driver::database::mysql::mysql::MysqlStorage;
-use crate::gust::driver::{BasicObject, ObjectStorage, StorageType};
+use crate::gust::driver::{ObjectStorage, StorageType};
+
+use super::ServiceType;
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -51,7 +53,17 @@ impl RefResult {
 impl HttpProtocol {
     const PKT_LINE_END_MARKER: &[u8; 4] = b"0000";
 
-    const CAP_LIST: &str = "report-status report-status-v2 thin-pack side-band side-band-64k ofs-delta shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done object-format=sha1";
+    // The atomic, report-status, report-status-v2, delete-refs, quiet,
+    // and push-cert capabilities are sent and recognized by the receive-pack (push to server) process.
+    const RECEIVE_CAP_LIST: &str = "report-status report-status-v2 delete-refs quiet atomic ";
+
+    // The ofs-delta and side-band-64k capabilities are sent and recognized by both upload-pack and receive-pack protocols.
+    // The agent and session-id capabilities may optionally be sent in both protocols.
+    const CAP_LIST: &str = "side-band-64k ofs-delta object-format=sha1";
+
+    // All other capabilities are only recognized by the upload-pack (fetch from server) process.
+    const UPLOAD_CAP_LIST: &str =
+        "shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done ";
 
     const LF: char = '\n';
 
@@ -66,14 +78,13 @@ impl HttpProtocol {
 
     pub async fn git_info_refs(
         &self,
-        repo_dir: PathBuf,
-        service: String,
+        service_type: ServiceType,
         storage_type: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let mut headers = HashMap::new();
         headers.insert(
             "Content-Type".to_string(),
-            format!("application/x-{}-advertisement", service),
+            format!("application/x-{}-advertisement", service_type.to_string()),
         );
         headers.insert(
             "Cache-Control".to_string(),
@@ -86,24 +97,21 @@ impl HttpProtocol {
         }
         let mysql_storage = MysqlStorage::new(storage_type);
 
-        // init repo: dir not exists or is empty
-        let init_repo = !repo_dir.exists();
+        // init repo: if dir not exists or is empty
+        let init_repo = !self.repo_dir.exists();
         // todo: replace git command
         if init_repo {
             Command::new("git")
-                .args(["init", "--bare", &repo_dir.to_str().unwrap()])
+                .args(["init", "--bare", &self.repo_dir.to_str().unwrap()])
                 .output()
                 .expect("git init failed!");
         }
-        let mut ref_list = add_head_to_ref_list(&repo_dir, &mysql_storage, init_repo).unwrap();
-        add_to_ref_list(
-            &repo_dir,
-            &mut ref_list,
-            String::from("refs/heads/"),
-            &mysql_storage,
-        );
+        let mut ref_list = self
+            .add_head_to_ref_list(&mysql_storage, service_type, init_repo)
+            .unwrap();
+        self.add_to_ref_list(&mut ref_list, String::from("refs/heads/"), &mysql_storage);
 
-        let pkt_line_stream = build_smart_reply(&ref_list, service);
+        let pkt_line_stream = build_smart_reply(&ref_list, service_type.to_string());
 
         tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
         let body = Body::from(pkt_line_stream.freeze());
@@ -113,7 +121,6 @@ impl HttpProtocol {
 
     pub async fn git_upload_pack(
         &self,
-        work_dir: PathBuf,
         req: Request<Body>,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let (_parts, mut body) = req.into_parts();
@@ -154,7 +161,7 @@ impl HttpProtocol {
 
         tracing::info!("want commands: {:?}, have commans: {:?}", want, have);
 
-        let object_root = work_dir.join(".git/objects");
+        let object_root = self.repo_dir.join(".git/objects");
 
         let send_pack_data;
         let mut buf = BytesMut::new();
@@ -199,8 +206,7 @@ impl HttpProtocol {
     pub async fn git_receive_pack(
         &self,
         req: Request<Body>,
-        _work_dir: PathBuf,
-        storage: &StorageType,
+        _storage: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         // this part need to be reused？
         // match storage {
@@ -222,29 +228,29 @@ impl HttpProtocol {
         let mut buffer = BufWriter::new(file);
         let mut ref_results: Vec<RefResult> = vec![];
         while let Some(chunk) = body.next().await {
-            let mut bytes = chunk.unwrap();
+            let mut body_bytes = chunk.unwrap();
             if pkt_line_parsed {
-                let res = buffer.write(&bytes).await;
-                tracing::info!("write to PAKC: {:?}", res);
+                let res = buffer.write(&body_bytes).await;
+                tracing::debug!("write to PAKC: {:?}", res);
             } else {
-                tracing::info!("{:?}", bytes);
-                let (_pkt_length, pkt_line) = read_pkt_line(&mut bytes);
+                tracing::debug!("bytes from client: {:?}", body_bytes);
+                let (_pkt_length, pkt_line) = read_pkt_line(&mut body_bytes);
                 let pkt_vec: Vec<_> = pkt_line.to_str().unwrap().split(' ').collect();
+                tracing::debug!("pkt_line: {:?}", pkt_vec);
 
                 let mut ref_result = RefResult {
-                    ref_name: pkt_vec[2].to_string(),
                     from_id: pkt_vec[0].to_string(),
                     to_id: pkt_vec[1].to_string(),
+                    ref_name: pkt_vec[2].to_string(),
                     result: "ng".to_owned(),
                 };
                 ref_result.get_result();
                 ref_results.push(ref_result);
 
-                tracing::info!("pkt_line: {:?}", pkt_vec);
-                //TODO: don't know what to do with multiple refs
-                if bytes.copy_to_bytes(4).to_vec() == b"0000" {
-                    let res = buffer.write(&bytes).await;
-                    tracing::info!("write to PAKC: {:?}", res);
+                // todo: replace with db operations
+                if body_bytes.copy_to_bytes(4).to_vec() == b"0000" {
+                    let res = buffer.write(&body_bytes).await;
+                    tracing::debug!("write to PAKC file before parsed: {:?}", res);
                 }
                 pkt_line_parsed = true;
             }
@@ -253,16 +259,16 @@ impl HttpProtocol {
 
         let resp = build_res_header("application/x-git-receive-pack-result".to_owned());
 
+        // After receiving the pack data from the sender, the receiver sends a report
         let mut buf = BytesMut::new();
         add_to_pkt_line(&mut buf, "unpack ok\n".to_owned());
         for res in ref_results {
-            let ref_res = format!("{} {}", res.result, res.ref_name.replace("\0", "\n"));
+            let ref_res = format!("{} {}", res.result, res.ref_name);
             add_to_pkt_line(&mut buf, ref_res);
         }
         buf.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
-
         let body = Body::from(buf.freeze());
-        tracing::info!("receive pack response {:?}", body);
+        tracing::info!("report status:{:?}", body);
         let resp = resp.body(body).unwrap();
         Ok(resp)
     }
@@ -278,6 +284,79 @@ impl HttpProtocol {
         for meta in decoded_pack.result.by_hash.values() {
             let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
             tracing::info!("res:{:?}", res);
+        }
+    }
+
+    // The stream SHOULD include the default ref named HEAD as the first ref
+    fn add_head_to_ref_list(
+        &self,
+        object_storage: &dyn ObjectStorage,
+        service_type: ServiceType,
+        init_repo: bool,
+    ) -> Result<Vec<String>, anyhow::Error> {
+        // use zero_id if init_repo
+        let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
+        // The stream MUST include capability declarations behind a NUL on the first ref.
+        let object_id = if init_repo {
+            zero_id.clone()
+        } else {
+            object_storage.get_head_object_id(&self.repo_dir)
+        };
+        let name = if object_id == zero_id {
+            "capabilities^{}"
+        } else {
+            "HEAD"
+        };
+        let cap_list = if service_type == ServiceType::UploadPack {
+            format!(
+                "{}{}",
+                HttpProtocol::UPLOAD_CAP_LIST,
+                HttpProtocol::CAP_LIST
+            )
+        } else if service_type == ServiceType::ReceivePack {
+            format!(
+                "{}{}",
+                HttpProtocol::RECEIVE_CAP_LIST,
+                HttpProtocol::CAP_LIST
+            )
+        } else {
+            HttpProtocol::CAP_LIST.to_owned()
+        };
+        let pkt_line = format!(
+            "{}{}{}{}{}{}",
+            object_id,
+            HttpProtocol::SP,
+            name,
+            HttpProtocol::NUL,
+            cap_list,
+            HttpProtocol::LF
+        );
+        let ref_list = vec![pkt_line];
+        Ok(ref_list)
+    }
+
+    fn add_to_ref_list(
+        &self,
+        ref_list: &mut Vec<String>,
+        mut name: String,
+        _object_storage: &dyn ObjectStorage,
+    ) {
+        //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
+        let path = &self.repo_dir.join(&name);
+        let paths = std::fs::read_dir(&path).unwrap();
+        for ref_file in paths.flatten() {
+            name.push_str(ref_file.file_name().to_str().unwrap());
+            let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
+            let object_id = object_id.strip_suffix('\n').unwrap();
+            let pkt_line = format!(
+                "{}{}{}{}",
+                object_id,
+                HttpProtocol::SP,
+                name,
+                // HttpProtocol::NUL,
+                HttpProtocol::LF
+            );
+            ref_list.push(pkt_line);
         }
     }
 }
@@ -400,63 +479,6 @@ async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCod
         bytes_out.put(&mut temp);
         // println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
         sender.send_data(bytes_out.freeze()).await.unwrap();
-    }
-}
-
-// The stream SHOULD include the default ref named HEAD as the first ref
-fn add_head_to_ref_list(
-    work_dir: &PathBuf,
-    object_storage: &dyn ObjectStorage,
-    init_repo: bool,
-) -> Result<Vec<String>, anyhow::Error> {
-    // use zero_id if init_repo
-    let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
-    // The stream MUST include capability declarations behind a NUL on the first ref.
-    let object_id = if init_repo {
-        zero_id.clone()
-    } else {
-        object_storage.get_head_object_id(work_dir)
-    };
-    let name = if object_id == zero_id {
-        "capabilities^{}"
-    } else {
-        "HEAD"
-    };
-    let pkt_line = format!(
-        "{}{}{}{}{}{}",
-        object_id,
-        HttpProtocol::SP,
-        name,
-        HttpProtocol::NUL,
-        HttpProtocol::CAP_LIST,
-        HttpProtocol::LF
-    );
-    let ref_list = vec![pkt_line];
-    Ok(ref_list)
-}
-
-fn add_to_ref_list(
-    work_dir: &PathBuf,
-    ref_list: &mut Vec<String>,
-    mut name: String,
-    _object_storage: &dyn ObjectStorage,
-) {
-    //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
-    let path = work_dir.join(&name);
-    let paths = std::fs::read_dir(&path).unwrap();
-    for ref_file in paths.flatten() {
-        name.push_str(ref_file.file_name().to_str().unwrap());
-        let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
-        let object_id = object_id.strip_suffix('\n').unwrap();
-        let pkt_line = format!(
-            "{}{}{}{}",
-            object_id,
-            HttpProtocol::SP,
-            name,
-            // HttpProtocol::NUL,
-            HttpProtocol::LF
-        );
-        ref_list.push(pkt_line);
     }
 }
 
