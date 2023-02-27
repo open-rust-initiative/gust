@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use bstr::ByteSlice;
-use deflate::{Compression, write::ZlibEncoder};
+use deflate::{write::ZlibEncoder, Compression};
 use flate2::read::ZlibDecoder;
 
 use crate::errors::GustError;

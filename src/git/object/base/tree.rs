@@ -12,10 +12,10 @@ use bstr::ByteSlice;
 use colored::Colorize;
 
 use crate::git::errors::GitError;
-use crate::git::object::types::ObjectType;
-use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
 use crate::git::object::base::ObjectClass;
+use crate::git::object::metadata::MetaData;
+use crate::git::object::types::ObjectType;
 
 use super::BaseObject;
 
@@ -92,8 +92,7 @@ pub struct Tree {
     pub tree_name: String,
 }
 
-
-impl BaseObject for Tree { 
+impl BaseObject for Tree {
     fn get_object_type(&self) -> ObjectClass {
         ObjectClass::TREE(self.to_owned())
     }
@@ -175,7 +174,7 @@ impl Tree {
             let filename = String::from_utf8(
                 self.meta.data[index + mode_index + 1..index + *filename_index].to_vec(),
             )
-                .unwrap();
+            .unwrap();
 
             let id = Hash::from_row(
                 &self.meta.data[index + filename_index + 1..index + filename_index + 21].to_vec(),
@@ -228,9 +227,9 @@ mod tests {
     use crate::git::hash::Hash;
     use crate::git::hash::HashType;
 
+    use super::super::blob::Blob;
     use super::MetaData;
     use super::ObjectType;
-    use super::super::blob::Blob;
     use super::Tree;
     use super::TreeItemType;
 

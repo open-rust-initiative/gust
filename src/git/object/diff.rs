@@ -5,11 +5,11 @@
 //!
 use std::vec;
 
-use diffs::Diff;
 use diffs::myers;
+use diffs::Diff;
 
-use crate::git::utils;
 use crate::git::object::metadata::MetaData;
+use crate::git::utils;
 
 const DATA_INS_LEN: usize = 0x7f;
 
@@ -44,7 +44,8 @@ impl DeltaDiff {
             &new_md.data,
             0,
             new_md.data.len(),
-        ).unwrap();
+        )
+        .unwrap();
 
         delta_diff
     }
@@ -217,14 +218,7 @@ mod tests {
 
     use bstr::ByteSlice;
 
-    use crate::{
-        git::{
-            object::metadata::MetaData,
-            object::types::ObjectType,
-            pack::Pack,
-            utils,
-        },
-    };
+    use crate::git::{object::metadata::MetaData, object::types::ObjectType, pack::Pack, utils};
 
     use super::DeltaDiff;
 
@@ -244,10 +238,9 @@ mod tests {
         let mut m2_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         m2_path.push("resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3");
 
-        let m1 = MetaData::read_object_from_file(
-            m1_path.to_str().unwrap().to_string()).unwrap();
-        let mut m2 = MetaData::read_object_from_file(
-            m2_path.to_str().unwrap().to_string()).unwrap();
+        let m1 = MetaData::read_object_from_file(m1_path.to_str().unwrap().to_string()).unwrap();
+        let mut m2 =
+            MetaData::read_object_from_file(m2_path.to_str().unwrap().to_string()).unwrap();
 
         let diff = DeltaDiff::new(m1.clone(), m2.clone());
         let meta_vec1 = m1.convert_to_vec().unwrap();
@@ -281,10 +274,9 @@ mod tests {
         let mut m2_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         m2_path.push("resources/diff/bee0d45f981adf7c2926a0dc04deb7f006bcc3");
 
-        let m1 = MetaData::read_object_from_file(
-            m1_path.to_str().unwrap().to_string()).unwrap();
-        let mut m2 = MetaData::read_object_from_file(
-            m2_path.to_str().unwrap().to_string()).unwrap();
+        let m1 = MetaData::read_object_from_file(m1_path.to_str().unwrap().to_string()).unwrap();
+        let mut m2 =
+            MetaData::read_object_from_file(m2_path.to_str().unwrap().to_string()).unwrap();
 
         let diff = DeltaDiff::new(m1.clone(), m2.clone());
 

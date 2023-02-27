@@ -11,9 +11,9 @@ use std::str::FromStr;
 use flate2::read::ZlibDecoder;
 
 use crate::git::errors::GitError;
-use crate::git::utils;
-use crate::git::object::metadata::MetaData;
 use crate::git::hash::Hash;
+use crate::git::object::metadata::MetaData;
+use crate::git::utils;
 
 const COPY_INSTRUCTION_FLAG: u8 = 1 << 7;
 const COPY_OFFSET_BYTES: u8 = 4;
@@ -77,8 +77,10 @@ fn apply_delta_instruction<R: Read>(
     } else {
         // Copy instruction
         let mut nonzero_bytes = instruction;
-        let offset = utils::read_partial_int(stream, COPY_OFFSET_BYTES, &mut nonzero_bytes).unwrap();
-        let mut size = utils::read_partial_int(stream, COPY_SIZE_BYTES, &mut nonzero_bytes).unwrap();
+        let offset =
+            utils::read_partial_int(stream, COPY_OFFSET_BYTES, &mut nonzero_bytes).unwrap();
+        let mut size =
+            utils::read_partial_int(stream, COPY_SIZE_BYTES, &mut nonzero_bytes).unwrap();
         if size == 0 {
             // Copying 0 bytes doesn't make sense, so git assumes a different size
             size = COPY_ZERO_SIZE;

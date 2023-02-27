@@ -35,7 +35,7 @@ impl ServiceType {
         match service_name {
             "git-upload-pack" => ServiceType::UploadPack,
             "git-receive-pack" => ServiceType::ReceivePack,
-            _ => panic!("service type not supported")
+            _ => panic!("service type not supported"),
         }
     }
     pub fn to_string(&self) -> String {
@@ -54,6 +54,25 @@ pub enum AckMode {
     MultiAck,
     MultiAckDetailed,
     Neither,
+}
+
+pub enum SideBind {
+    // sideband 1 will contain packfile data,
+    PackfileData,
+    // sideband 2 will be used for progress information that the client will generally print to stderr and
+    ProgressInfo,
+    // sideband 3 is used for error information.
+    Error,
+}
+
+impl SideBind {
+    pub fn value(&self) -> u8 {
+        match self {
+            Self::PackfileData => b'\x01',
+            Self::ProgressInfo => b'\x02',
+            Self::Error => b'\x03',
+        }
+    }
 }
 
 ///

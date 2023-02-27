@@ -13,12 +13,11 @@ use crate::errors::GustError;
 
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
-use crate::git::object::types::ObjectType;
-use crate::git::object::metadata::MetaData;
 use crate::git::object::base::sign::AuthorSign;
+use crate::git::object::metadata::MetaData;
+use crate::git::object::types::ObjectType;
 
 use super::{BaseObject, ObjectClass};
-
 
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]

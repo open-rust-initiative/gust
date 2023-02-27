@@ -33,7 +33,7 @@ use crate::git::protocol::HttpProtocol;
 use crate::gust::driver::database::mysql::mysql::MysqlStorage;
 use crate::gust::driver::{ObjectStorage, StorageType};
 
-use super::ServiceType;
+use super::{ServiceType, SideBind};
 
 #[derive(Debug, Clone)]
 pub struct RefResult {
@@ -70,11 +70,6 @@ impl HttpProtocol {
     const SP: char = ' ';
 
     const NUL: char = '\0';
-
-    // sideband 1 will contain packfile data,
-    // sideband 2 will be used for progress information that the client will generally print to stderr and
-    // sideband 3 is used for error information.
-    const SIDE_BAND_BYTE_1: u8 = b'\x01';
 
     pub async fn git_info_refs(
         &self,
@@ -248,7 +243,7 @@ impl HttpProtocol {
                 ref_results.push(ref_result);
 
                 // todo: replace with db operations
-                if body_bytes.copy_to_bytes(4).to_vec() == b"0000" {
+                if body_bytes.copy_to_bytes(4).to_vec() == HttpProtocol::PKT_LINE_END_MARKER {
                     let res = buffer.write(&body_bytes).await;
                     tracing::debug!("write to PAKC file before parsed: {:?}", res);
                 }
@@ -260,13 +255,19 @@ impl HttpProtocol {
         let resp = build_res_header("application/x-git-receive-pack-result".to_owned());
 
         // After receiving the pack data from the sender, the receiver sends a report
-        let mut buf = BytesMut::new();
-        add_to_pkt_line(&mut buf, "unpack ok\n".to_owned());
+        let mut report_status = BytesMut::new();
+        add_to_pkt_line(&mut report_status, "unpack ok\n".to_owned());
         for res in ref_results {
             let ref_res = format!("{} {}", res.result, res.ref_name);
-            add_to_pkt_line(&mut buf, ref_res);
+            add_to_pkt_line(&mut report_status, ref_res);
         }
+        report_status.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+
+        let length = report_status.len();
+        let mut buf = BytesMut::new();
+        build_side_band_format(report_status, &mut buf, length);
         buf.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+
         let body = Body::from(buf.freeze());
         tracing::info!("report status:{:?}", body);
         let resp = resp.body(body).unwrap();
@@ -468,18 +469,23 @@ async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCod
     loop {
         let mut bytes_out = BytesMut::new();
         let mut temp = BytesMut::new();
-        let length = reader.read_buf(&mut temp).await.unwrap() + 5;
+        let length = reader.read_buf(&mut temp).await.unwrap();
         if temp.is_empty() {
-            bytes_out.put_slice(b"0000");
+            bytes_out.put_slice(HttpProtocol::PKT_LINE_END_MARKER);
             sender.send_data(bytes_out.freeze()).await.unwrap();
             return Ok(());
         }
-        bytes_out.put(Bytes::from(format!("{length:04x}")));
-        bytes_out.put_u8(HttpProtocol::SIDE_BAND_BYTE_1);
-        bytes_out.put(&mut temp);
+        build_side_band_format(temp, &mut bytes_out, length);
         // println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
         sender.send_data(bytes_out.freeze()).await.unwrap();
     }
+}
+
+fn build_side_band_format(from_bytes: BytesMut, to_bytes: &mut BytesMut, length: usize) {
+    let length = length + 5;
+    to_bytes.put(Bytes::from(format!("{length:04x}")));
+    to_bytes.put_u8(SideBind::PackfileData.value());
+    to_bytes.put(from_bytes);
 }
 
 fn build_smart_reply(ref_list: &Vec<String>, service: String) -> BytesMut {

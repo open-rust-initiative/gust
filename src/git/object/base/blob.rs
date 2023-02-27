@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use bstr::BString;
 
 use crate::git::errors::GitError;
-use crate::git::object::metadata::MetaData;
 use crate::git::object::base::tree::*;
 use crate::git::object::base::ObjectClass;
+use crate::git::object::metadata::MetaData;
 
 use super::BaseObject;
 
