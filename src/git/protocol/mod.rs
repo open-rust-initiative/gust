@@ -3,9 +3,11 @@
 //!
 //!
 
-use std::path::PathBuf;
+use std::{fs::File, path::PathBuf};
 
 use clap::Subcommand;
+
+use super::pack::Pack;
 pub mod http;
 pub mod ssh;
 
@@ -74,12 +76,75 @@ impl SideBind {
         }
     }
 }
+pub struct RefUpdateRequet {
+    pub comand_list: Vec<RefCommand>,
+}
 
+#[derive(Debug, Clone)]
+pub struct RefCommand {
+    pub ref_name: String,
+    pub old_id: String,
+    pub new_id: String,
+    pub status: String,
+    pub error_msg: String,
+}
+
+impl RefCommand {
+    const OK_STATUS: &str = "ok";
+
+    const FAILED_STATUS: &str = "ng";
+
+    pub fn new(old_id: String, new_id: String, ref_name: String) -> Self {
+        RefCommand {
+            ref_name,
+            old_id,
+            new_id,
+            status: RefCommand::OK_STATUS.to_owned(),
+            error_msg: "".to_owned(),
+        }
+    }
+
+    pub fn unpack(&mut self, pack_file: &mut File) -> Result<Pack, anyhow::Error> {
+        match Pack::decode(pack_file) {
+            Ok(decoded_pack) => {
+                self.status = RefCommand::OK_STATUS.to_owned();
+                Ok(decoded_pack)
+            }
+            Err(err) => {
+                self.status = RefCommand::FAILED_STATUS.to_owned();
+                self.error_msg = err.to_string();
+                Err(err.into())
+            }
+        }
+    }
+
+    pub fn status(&self) -> String {
+        let res = if RefCommand::OK_STATUS == self.status {
+            format!("{}{}{}", self.status, HttpProtocol::SP, self.ref_name,)
+        } else {
+            format!(
+                "{}{}{}{}{}",
+                self.status,
+                HttpProtocol::SP,
+                self.ref_name,
+                HttpProtocol::SP,
+                self.error_msg.clone()
+            )
+        };
+        res
+    }
+}
 ///
 ///
 ///
 #[allow(unused)]
 impl HttpProtocol {
+    const LF: char = '\n';
+
+    const SP: char = ' ';
+
+    const NUL: char = '\0';
+
     #[allow(unused)]
     pub fn value_in_ack_mode<'a>(mode: &AckMode) -> &'a str {
         match mode {

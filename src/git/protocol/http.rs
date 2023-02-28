@@ -17,11 +17,8 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::StreamExt;
 use hyper::body::Sender;
 use hyper::Request;
-use tokio::io::{AsyncWriteExt, BufWriter};
-use tokio::{
-    fs::File,
-    io::{AsyncReadExt, BufReader},
-};
+use tokio::fs::OpenOptions;
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
@@ -29,26 +26,11 @@ use crate::git::object::base::commit::Commit;
 use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
-use crate::git::protocol::HttpProtocol;
+use crate::git::protocol::{HttpProtocol, RefCommand};
 use crate::gust::driver::database::mysql::mysql::MysqlStorage;
 use crate::gust::driver::{ObjectStorage, StorageType};
 
 use super::{ServiceType, SideBind};
-
-#[derive(Debug, Clone)]
-pub struct RefResult {
-    pub ref_name: String,
-    pub from_id: String,
-    pub to_id: String,
-    pub result: String,
-}
-
-impl RefResult {
-    // TODO: according to the ref handle result, returns ok if pack file parsed success
-    pub fn get_result(&mut self) {
-        self.result = "ok".to_owned();
-    }
-}
 
 impl HttpProtocol {
     const PKT_LINE_END_MARKER: &[u8; 4] = b"0000";
@@ -64,12 +46,6 @@ impl HttpProtocol {
     // All other capabilities are only recognized by the upload-pack (fetch from server) process.
     const UPLOAD_CAP_LIST: &str =
         "shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done ";
-
-    const LF: char = '\n';
-
-    const SP: char = ' ';
-
-    const NUL: char = '\0';
 
     pub async fn git_info_refs(
         &self,
@@ -203,7 +179,7 @@ impl HttpProtocol {
         req: Request<Body>,
         _storage: &StorageType,
     ) -> Result<Response<Body>, (StatusCode, String)> {
-        // this part need to be reused？
+        // Is that part can be reused？
         // match storage {
         //     StorageType::Mysql(_) => {
         //         let query = MysqlStorage::default();
@@ -218,48 +194,58 @@ impl HttpProtocol {
 
         // not in memory
         let (_parts, mut body) = req.into_parts();
-        let mut pkt_line_parsed = false;
-        let file = File::create("./temp.pack").await.unwrap();
-        let mut buffer = BufWriter::new(file);
-        let mut ref_results: Vec<RefResult> = vec![];
+        // let mut ref_update_req = false;
+
+        let mut command_status: Vec<String> = vec![];
         while let Some(chunk) = body.next().await {
             let mut body_bytes = chunk.unwrap();
-            if pkt_line_parsed {
-                let res = buffer.write(&body_bytes).await;
-                tracing::debug!("write to PAKC: {:?}", res);
-            } else {
-                tracing::debug!("bytes from client: {:?}", body_bytes);
-                let (_pkt_length, pkt_line) = read_pkt_line(&mut body_bytes);
-                let pkt_vec: Vec<_> = pkt_line.to_str().unwrap().split(' ').collect();
-                tracing::debug!("pkt_line: {:?}", pkt_vec);
+            // if ref_update_req {
+            //     let res = buffer.write(&body_bytes).await;
+            //     tracing::debug!("write to PAKC: {:?}", res);
+            // } else {
+            tracing::debug!("bytes from client: {:?}", body_bytes);
+            let (_pkt_length, pkt_line) = read_pkt_line(&mut body_bytes);
+            let pkt_vec: Vec<_> = pkt_line.to_str().unwrap().split(' ').collect();
+            tracing::debug!("pkt_line: {:?}", pkt_vec);
 
-                let mut ref_result = RefResult {
-                    from_id: pkt_vec[0].to_string(),
-                    to_id: pkt_vec[1].to_string(),
-                    ref_name: pkt_vec[2].to_string(),
-                    result: "ng".to_owned(),
-                };
-                ref_result.get_result();
-                ref_results.push(ref_result);
+            let mut command = RefCommand::new(
+                pkt_vec[0].to_string(),
+                pkt_vec[1].to_string(),
+                pkt_vec[2].to_string(),
+            );
 
-                // todo: replace with db operations
-                if body_bytes.copy_to_bytes(4).to_vec() == HttpProtocol::PKT_LINE_END_MARKER {
-                    let res = buffer.write(&body_bytes).await;
-                    tracing::debug!("write to PAKC file before parsed: {:?}", res);
+            if body_bytes.copy_to_bytes(4).to_vec() == HttpProtocol::PKT_LINE_END_MARKER {
+                let file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .create(true)
+                    .open("./temp.pack")
+                    .await
+                    .unwrap();
+                let mut buffer = BufWriter::new(file);
+                buffer.write(&body_bytes).await.unwrap();
+                let decoded_pack = command
+                    .unpack(&mut buffer.into_inner().try_into_std().unwrap())
+                    .unwrap();
+
+                for meta in decoded_pack.result.by_hash.values() {
+                    //TODO DB options and fs options
+                    // let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
+                    tracing::info!("res:{:?}", meta);
                 }
-                pkt_line_parsed = true;
             }
+            command_status.push(command.status());
+            // ref_update_req = true;
+            // }
         }
-        buffer.flush().await.unwrap();
 
         let resp = build_res_header("application/x-git-receive-pack-result".to_owned());
 
         // After receiving the pack data from the sender, the receiver sends a report
         let mut report_status = BytesMut::new();
         add_to_pkt_line(&mut report_status, "unpack ok\n".to_owned());
-        for res in ref_results {
-            let ref_res = format!("{} {}", res.result, res.ref_name);
-            add_to_pkt_line(&mut report_status, ref_res);
+        for status in command_status {
+            add_to_pkt_line(&mut report_status, status);
         }
         report_status.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
 
@@ -515,6 +501,7 @@ fn read_pkt_line(bytes: &mut Bytes) -> (usize, Bytes) {
     if pkt_length == 0 {
         return (0, Bytes::new());
     }
+    // this operation will change the original bytes
     let pkt_line = bytes.copy_to_bytes(pkt_length - 4);
 
     (pkt_length, pkt_line)
