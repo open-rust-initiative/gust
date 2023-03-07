@@ -23,11 +23,11 @@ use crate::git::pack::cache::PackObjectCache;
 #[derive(Default, Clone)]
 pub struct ObjDecodedMap {
     pub _map_hash: HashMap<Hash, Arc<ObjectClass>>,
-    blobs: Vec<blob::Blob>,
-    trees: Vec<tree::Tree>,
-    tags: Vec<tag::Tag>,
-    commits: Vec<commit::Commit>,
-    name_map: HashMap<Hash, String>,
+    pub blobs: Vec<blob::Blob>,
+    pub trees: Vec<tree::Tree>,
+    pub tags: Vec<tag::Tag>,
+    pub commits: Vec<commit::Commit>,
+    pub name_map: HashMap<Hash, String>,
 }
 
 //在解析完object后执行的进一步的解码过程

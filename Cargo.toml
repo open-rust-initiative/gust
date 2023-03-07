@@ -42,3 +42,5 @@ sea-orm = { version = "0.10.7", features = [
 ] }
 async-trait = "0.1.64"
 chrono = "0.4.23"
+lru = "0.9.0"
+idgenerator = "2.0.0"

@@ -20,12 +20,14 @@ use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
 use crate::git::protocol::{AckMode, HttpProtocol, ServiceType};
+use crate::gust::driver::utils::id_generator;
 use crate::gust::driver::StorageType;
 
 #[tokio::main]
 pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env::set_var("RUST_LOG", "debug");
     tracing_subscriber::fmt::init();
+    id_generator::set_up_options().unwrap();
 
     dotenvy::dotenv().ok();
     let db_url = env::var("DATABASE_URL").expect("DATABASE_URL is not set in .env file");
@@ -111,10 +113,10 @@ async fn git_info_refs(
             .git_info_refs(ServiceType::new(&service_name), &state.stotage_type)
             .await
     } else {
-        return Err((
+        Err((
             StatusCode::FORBIDDEN,
             String::from("Operation not supported"),
-        ));
+        ))
     }
 }
 

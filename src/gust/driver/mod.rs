@@ -1,7 +1,7 @@
 //!
 //!
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use async_trait::async_trait;
 use sea_orm::DatabaseConnection;
@@ -10,6 +10,7 @@ use crate::git::object::base::BaseObject;
 //！
 pub mod database;
 pub mod filesystem;
+pub mod utils;
 
 #[derive(Clone)]
 pub enum StorageType {
@@ -25,7 +26,7 @@ pub struct BasicObject {
 
 #[async_trait]
 pub trait ObjectStorage {
-    fn get_head_object_id(&self, work_dir: &PathBuf) -> String;
+    fn get_head_object_id(&self, work_dir: &Path) -> String;
 
     fn search_child_objects(
         &self,

@@ -30,7 +30,7 @@ pub struct MetaData {
 
 /// Implement function for Metadata
 impl MetaData {
-    ///
+    /// optimize hash calculation with LRU cache
     pub fn hash(&self) -> Hash {
         Hash::from_meta(&self)
     }

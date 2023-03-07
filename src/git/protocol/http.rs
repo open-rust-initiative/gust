@@ -4,6 +4,8 @@
 //!
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str::FromStr;
@@ -14,11 +16,11 @@ use axum::http::response::Builder;
 use axum::http::{Response, StatusCode};
 use bstr::ByteSlice;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use chrono::Utc;
 use futures::StreamExt;
 use hyper::body::Sender;
 use hyper::Request;
-use tokio::fs::OpenOptions;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncReadExt, BufReader};
 
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
@@ -28,6 +30,7 @@ use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::{HttpProtocol, RefCommand};
 use crate::gust::driver::database::mysql::mysql::MysqlStorage;
+use crate::gust::driver::filesystem::nodes;
 use crate::gust::driver::{ObjectStorage, StorageType};
 
 use super::{ServiceType, SideBind};
@@ -145,9 +148,9 @@ impl HttpProtocol {
             add_to_pkt_line(&mut buf, String::from("NAK\n"));
         } else {
             let mut decoded_pack = Pack::default();
-            let mut _meta_map: HashMap<Hash, MetaData> = HashMap::new();
-            _meta_map = find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
-            send_pack_data = decoded_pack.encode(Some(_meta_map.into_values().collect()));
+            let meta_map: HashMap<Hash, MetaData> =
+                find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
+            send_pack_data = decoded_pack.encode(Some(meta_map.into_values().collect()));
 
             // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
             // it is ready to send data with ACK obj-id ready lines,
@@ -199,10 +202,6 @@ impl HttpProtocol {
         let mut command_status: Vec<String> = vec![];
         while let Some(chunk) = body.next().await {
             let mut body_bytes = chunk.unwrap();
-            // if ref_update_req {
-            //     let res = buffer.write(&body_bytes).await;
-            //     tracing::debug!("write to PAKC: {:?}", res);
-            // } else {
             tracing::debug!("bytes from client: {:?}", body_bytes);
             let (_pkt_length, pkt_line) = read_pkt_line(&mut body_bytes);
             let pkt_vec: Vec<_> = pkt_line.to_str().unwrap().split(' ').collect();
@@ -215,28 +214,26 @@ impl HttpProtocol {
             );
 
             if body_bytes.copy_to_bytes(4).to_vec() == HttpProtocol::PKT_LINE_END_MARKER {
-                let file = OpenOptions::new()
-                    .read(true)
+                tracing::debug!("{:?}", body_bytes);
+                let temp_file = format!("./temp-{}.pack", Utc::now().timestamp());
+                let mut file = OpenOptions::new()
                     .write(true)
                     .create(true)
-                    .open("./temp.pack")
-                    .await
+                    .open(&temp_file)
                     .unwrap();
-                let mut buffer = BufWriter::new(file);
-                buffer.write(&body_bytes).await.unwrap();
+                file.write(&body_bytes).unwrap();
                 let decoded_pack = command
-                    .unpack(&mut buffer.into_inner().try_into_std().unwrap())
+                    .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                     .unwrap();
-
-                for meta in decoded_pack.result.by_hash.values() {
-                    //TODO DB options and fs options
-                    // let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
-                    tracing::info!("res:{:?}", meta);
-                }
+                // let obj_vec = Vec::from_iter(decoded_pack.result.by_hash.values());
+                nodes::build_dir_tree(decoded_pack);
+                // for meta in decoded_pack.result.by_hash.values() {
+                //     //TODO DB options and fs options
+                //     // let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
+                // tracing::info!("res:{:?}, {}", meta.t, meta.id);
+                // }
             }
             command_status.push(command.status());
-            // ref_update_req = true;
-            // }
         }
 
         let resp = build_res_header("application/x-git-receive-pack-result".to_owned());
@@ -282,7 +279,7 @@ impl HttpProtocol {
         init_repo: bool,
     ) -> Result<Vec<String>, anyhow::Error> {
         // use zero_id if init_repo
-        let zero_id = String::from_utf8_lossy(&vec![b'0'; 40]).to_string();
+        let zero_id = String::from_utf8_lossy(&[b'0'; 40]).to_string();
         // The stream MUST include capability declarations behind a NUL on the first ref.
         let object_id = if init_repo {
             zero_id.clone()
@@ -329,7 +326,7 @@ impl HttpProtocol {
         _object_storage: &dyn ObjectStorage,
     ) {
         //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
-        let path = &self.repo_dir.join(&name);
+        let path = self.repo_dir.join(&name);
         let paths = std::fs::read_dir(&path).unwrap();
         for ref_file in paths.flatten() {
             name.push_str(ref_file.file_name().to_str().unwrap());
