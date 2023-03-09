@@ -4,25 +4,21 @@
 use std::path::Path;
 
 use async_trait::async_trait;
-use sea_orm::DatabaseConnection;
 
 use crate::git::object::base::BaseObject;
+
+use self::database::entity::node;
 //！
 pub mod database;
-pub mod filesystem;
+pub mod fs;
+pub mod structure;
 pub mod utils;
 
-#[derive(Clone)]
-pub enum StorageType {
-    Mysql(DatabaseConnection),
-    Filesystem,
-}
-
-#[derive(Default)]
-pub struct BasicObject {
-    pub file: String,
-    pub hash: String,
-}
+// #[derive(Clone)]
+// pub enum StorageType {
+//     Mysql(MysqlStorage),
+//     Filesystem,
+// }
 
 #[async_trait]
 pub trait ObjectStorage {
@@ -30,13 +26,11 @@ pub trait ObjectStorage {
 
     fn search_child_objects(
         &self,
-        storage: &StorageType,
         parent: Box<dyn BaseObject>,
     ) -> Result<Vec<Box<dyn BaseObject>>, anyhow::Error>;
 
-    async fn save_objects(
+    async fn persist_node_objects(
         &self,
-        storage: &StorageType,
-        objects: Vec<BasicObject>,
+        objects: Vec<node::ActiveModel>,
     ) -> Result<bool, anyhow::Error>;
 }

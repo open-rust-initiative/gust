@@ -20,8 +20,9 @@ use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
 use crate::git::protocol::{AckMode, HttpProtocol, ServiceType};
+use crate::gust::driver::database::mysql::mysql::MysqlStorage;
 use crate::gust::driver::utils::id_generator;
-use crate::gust::driver::StorageType;
+use crate::gust::driver::ObjectStorage;
 
 #[tokio::main]
 pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,7 +48,7 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sqlx_logging_level(log::LevelFilter::Error);
 
     let state = AppState {
-        stotage_type: StorageType::Mysql(
+        stotage_type: MysqlStorage::new(
             Database::connect(opt)
                 .await
                 .expect("Database connection failed"),
@@ -72,8 +73,8 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[derive(Clone)]
-struct AppState {
-    stotage_type: StorageType,
+struct AppState<T: ObjectStorage> {
+    stotage_type: T,
 }
 
 #[derive(Deserialize, Debug)]
@@ -98,8 +99,8 @@ impl Params {
 }
 
 /// Discovering Reference
-async fn git_info_refs(
-    state: State<AppState>,
+async fn git_info_refs<T: ObjectStorage>(
+    state: State<AppState<T>>,
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
@@ -136,9 +137,9 @@ async fn git_upload_pack(
 // http://localhost:8000/org1/apps/App2.git
 // http://localhost:8000/org1/libs/lib1.git
 /// Smart Service git-receive-pack, handle git push
-async fn git_receive_pack(
+async fn git_receive_pack<T: ObjectStorage>(
     // Extension(ref data_source): Extension<DataSource>,
-    state: State<AppState>,
+    state: State<AppState<T>>,
     Path(params): Path<Params>,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {

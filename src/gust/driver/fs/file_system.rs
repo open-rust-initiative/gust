@@ -1,13 +1,11 @@
-use std::path::Path;
-
 use async_trait::async_trait;
 
-use crate::git::object::base::BaseObject;
+use crate::{
+    git::object::base::BaseObject,
+    gust::driver::{database::entity::node, ObjectStorage, Path},
+};
 
-use super::{ObjectStorage, StorageType};
-
-pub mod nodes;
-
+#[derive(Debug, Default, Clone)]
 pub struct FileSystem;
 
 #[async_trait]
@@ -25,16 +23,14 @@ impl ObjectStorage for FileSystem {
 
     fn search_child_objects(
         &self,
-        storage: &StorageType,
+        // storage: &StorageType,
         parent: Box<dyn BaseObject>,
     ) -> Result<Vec<Box<dyn BaseObject>>, anyhow::Error> {
         todo!()
     }
-
-    async fn save_objects(
+    async fn persist_node_objects(
         &self,
-        storage: &StorageType,
-        objects: Vec<crate::gust::driver::BasicObject>,
+        objects: Vec<node::ActiveModel>,
     ) -> Result<bool, anyhow::Error> {
         todo!()
     }

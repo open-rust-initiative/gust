@@ -6,10 +6,7 @@ use crate::{
         object::base::tree::{Tree, TreeItemType},
         pack::{decode::ObjDecodedMap, Pack},
     },
-    gust::driver::{
-        utils::id_generator::{self, generate_id},
-        StorageType,
-    },
+    gust::driver::utils::id_generator::{self, generate_id},
 };
 
 // pub struct Repo {
@@ -43,6 +40,7 @@ pub struct TreeNode {
     pub object_id: Hash,
     pub content_sha1: Option<Hash>,
     pub name: String,
+    pub path: PathBuf,
     pub children: Vec<Box<dyn Node>>,
 }
 
@@ -61,7 +59,8 @@ pub struct FileNode {
     pub object_id: Hash,
     pub content_sha1: Option<Hash>,
     pub name: String,
-    pub data: Option<String>,
+    pub path: PathBuf,
+    pub data: Vec<u8>,
 }
 
 /// the clone process will be:
@@ -102,7 +101,7 @@ pub trait Node {
     fn as_any(&self) -> &dyn Any;
 
     //search in datasource by path
-    fn init_node_from_datasource(storage_type: StorageType, path: PathBuf) -> Option<Self>
+    fn init_node_from_datasource(path: PathBuf) -> Option<Self>
     where
         Self: Sized,
     {
@@ -137,6 +136,7 @@ impl Node for TreeNode {
         TreeNode {
             id: generate_id(),
             name,
+            path: PathBuf::new(),
             object_id: Hash::default(),
             content_sha1: None,
             children: Vec::new(),
@@ -177,10 +177,11 @@ impl Node for FileNode {
     fn new(name: String) -> Self {
         FileNode {
             id: generate_id(),
+            path: PathBuf::new(),
             name,
             object_id: Hash::default(),
             content_sha1: None,
-            data: Some("".to_owned()),
+            data: Vec::new(),
         }
     }
 
@@ -200,18 +201,21 @@ impl Node for FileNode {
         self
     }
 }
+
 pub fn init_root() -> Box<dyn Node> {
     let t_node = TreeNode {
         id: 0,
         object_id: Hash::default(),
         content_sha1: Some(Hash::default()),
         name: "ROOT".to_owned(),
+        path: PathBuf::from("/"),
         children: Vec::new(),
     };
     //TODO: load children
     Box::new(t_node)
 }
-pub fn build_dir_tree(decoded_pack: Pack) {
+
+pub fn persist_data(decoded_pack: Pack) {
     let mut result = ObjDecodedMap::default();
     result.update_from_cache(&decoded_pack.result);
     result.check_completeness().unwrap();
@@ -225,12 +229,14 @@ pub fn build_dir_tree(decoded_pack: Pack) {
         .collect();
     let mut root = init_root();
 
-    build_from_commit_tree(tree_map.get(&tree_id).unwrap(), &tree_map, &mut root);
+    build_from_root_tree(&tree_id, &tree_map, &mut root);
 
     print_root(&root, 0);
 }
 
-fn build_from_commit_tree(tree: &Tree, tree_map: &HashMap<Hash, Tree>, node: &mut Box<dyn Node>) {
+fn build_from_root_tree(tree_id: &Hash, tree_map: &HashMap<Hash, Tree>, node: &mut Box<dyn Node>) {
+    let tree = tree_map.get(tree_id).unwrap();
+
     for item in &tree.tree_items {
         if item.item_type == TreeItemType::Tree {
             let child_node: Box<dyn Node> = Box::new(TreeNode::new(item.filename.to_owned()));
@@ -240,9 +246,8 @@ fn build_from_commit_tree(tree: &Tree, tree_map: &HashMap<Hash, Tree>, node: &mu
                 Some(child) => child,
                 None => panic!("Something wrong!:{}", &item.filename),
             };
-            build_from_commit_tree(tree_map.get(&item.id).unwrap(), tree_map, child_node);
+            build_from_root_tree(&item.id, tree_map, child_node);
         } else {
-            println!("{}/{}", tree.tree_name, item.filename);
             node.add_child(Box::new(FileNode::new(item.filename.to_owned())));
         }
     }
@@ -273,7 +278,7 @@ mod test {
     use std::path::PathBuf;
 
     use crate::gust::driver::{
-        filesystem::nodes::{init_root, print_root, Node, TreeNode},
+        structure::nodes::{init_root, print_root, Node, TreeNode},
         utils::id_generator,
     };
 

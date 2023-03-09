@@ -130,7 +130,7 @@ impl PartialEq for Tree {
 impl Display for Tree {
     #[allow(unused)]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "Type: Tree");
+        writeln!(f, "Type: Tree: {}", self.meta.id);
         for item in &self.tree_items {
             writeln!(
                 f,
@@ -221,7 +221,6 @@ mod tests {
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
-    use std::sync::Arc;
     use std::vec;
 
     use crate::git::hash::Hash;

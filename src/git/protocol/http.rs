@@ -29,9 +29,8 @@ use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::{HttpProtocol, RefCommand};
-use crate::gust::driver::database::mysql::mysql::MysqlStorage;
-use crate::gust::driver::filesystem::nodes;
-use crate::gust::driver::{ObjectStorage, StorageType};
+use crate::gust::driver::structure::persist_pack_data;
+use crate::gust::driver::ObjectStorage;
 
 use super::{ServiceType, SideBind};
 
@@ -50,10 +49,10 @@ impl HttpProtocol {
     const UPLOAD_CAP_LIST: &str =
         "shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done ";
 
-    pub async fn git_info_refs(
+    pub async fn git_info_refs<T: ObjectStorage>(
         &self,
         service_type: ServiceType,
-        storage_type: &StorageType,
+        storage: &T,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let mut headers = HashMap::new();
         headers.insert(
@@ -69,21 +68,21 @@ impl HttpProtocol {
         for (key, val) in headers {
             resp = resp.header(&key, val);
         }
-        let mysql_storage = MysqlStorage::new(storage_type);
+        // let mysql_storage = MysqlStorage::new(storage_type);
 
         // init repo: if dir not exists or is empty
         let init_repo = !self.repo_dir.exists();
         // todo: replace git command
         if init_repo {
             Command::new("git")
-                .args(["init", "--bare", &self.repo_dir.to_str().unwrap()])
+                .args(["init", "--bare", self.repo_dir.to_str().unwrap()])
                 .output()
                 .expect("git init failed!");
         }
         let mut ref_list = self
-            .add_head_to_ref_list(&mysql_storage, service_type, init_repo)
+            .add_head_to_ref_list(storage, service_type, init_repo)
             .unwrap();
-        self.add_to_ref_list(&mut ref_list, String::from("refs/heads/"), &mysql_storage);
+        self.add_to_ref_list(&mut ref_list, String::from("refs/heads/"));
 
         let pkt_line_stream = build_smart_reply(&ref_list, service_type.to_string());
 
@@ -177,24 +176,11 @@ impl HttpProtocol {
         Ok(resp)
     }
 
-    pub async fn git_receive_pack(
+    pub async fn git_receive_pack<T: ObjectStorage>(
         &self,
         req: Request<Body>,
-        _storage: &StorageType,
+        storage: &T,
     ) -> Result<Response<Body>, (StatusCode, String)> {
-        // Is that part can be reused？
-        // match storage {
-        //     StorageType::Mysql(_) => {
-        //         let query = MysqlStorage::default();
-        //         let res = query
-        //             .save_objects(storage, vec![BasicObject::default()])
-        //             .await
-        //             .unwrap();
-        //         println!("{}", res);
-        //     }
-        //     StorageType::Filesystem => todo!(),
-        // };
-
         // not in memory
         let (_parts, mut body) = req.into_parts();
         // let mut ref_update_req = false;
@@ -226,7 +212,7 @@ impl HttpProtocol {
                     .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                     .unwrap();
                 // let obj_vec = Vec::from_iter(decoded_pack.result.by_hash.values());
-                nodes::build_dir_tree(decoded_pack);
+                persist_pack_data(decoded_pack, storage).await;
                 // for meta in decoded_pack.result.by_hash.values() {
                 //     //TODO DB options and fs options
                 //     // let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
@@ -272,9 +258,9 @@ impl HttpProtocol {
     }
 
     // The stream SHOULD include the default ref named HEAD as the first ref
-    fn add_head_to_ref_list(
+    fn add_head_to_ref_list<T: ObjectStorage>(
         &self,
-        object_storage: &dyn ObjectStorage,
+        storage: &T,
         service_type: ServiceType,
         init_repo: bool,
     ) -> Result<Vec<String>, anyhow::Error> {
@@ -284,7 +270,7 @@ impl HttpProtocol {
         let object_id = if init_repo {
             zero_id.clone()
         } else {
-            object_storage.get_head_object_id(&self.repo_dir)
+            storage.get_head_object_id(&self.repo_dir)
         };
         let name = if object_id == zero_id {
             "capabilities^{}"
@@ -323,7 +309,6 @@ impl HttpProtocol {
         &self,
         ref_list: &mut Vec<String>,
         mut name: String,
-        _object_storage: &dyn ObjectStorage,
     ) {
         //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
         let path = self.repo_dir.join(&name);

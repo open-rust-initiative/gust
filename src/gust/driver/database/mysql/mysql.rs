@@ -4,24 +4,21 @@ use async_trait::async_trait;
 use sea_orm::ActiveValue::NotSet;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, InsertResult, Set};
 
+use crate::git::object::base::blob::Blob;
+use crate::git::object::base::tree::Tree;
 use crate::git::object::base::BaseObject;
-use crate::gust::driver::database::entity::{object_content, object_info};
-use crate::gust::driver::{BasicObject, ObjectStorage, StorageType};
+use crate::gust::driver::database::entity::node;
+use crate::gust::driver::utils::id_generator;
+use crate::gust::driver::ObjectStorage;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct MysqlStorage {
     pub connection: DatabaseConnection,
 }
 
 impl MysqlStorage {
-    pub fn new(storage: &StorageType) -> MysqlStorage {
-        if let StorageType::Mysql(connection) = storage {
-            return MysqlStorage {
-                connection: connection.to_owned(),
-            };
-        } else {
-            panic!("Not supported storage type");
-        };
+    pub fn new(connection: DatabaseConnection) -> MysqlStorage {
+        MysqlStorage { connection }
     }
 }
 
@@ -41,44 +38,64 @@ impl ObjectStorage for MysqlStorage {
 
     fn search_child_objects(
         &self,
-        _storage: &StorageType,
         _parent: Box<dyn BaseObject>,
     ) -> Result<Vec<Box<(dyn BaseObject + 'static)>>, anyhow::Error> {
         todo!()
     }
 
-    async fn save_objects(
+    async fn persist_node_objects(
         &self,
-        _storage: &StorageType,
-        objects: Vec<BasicObject>,
+        objects: Vec<node::ActiveModel>,
     ) -> Result<bool, anyhow::Error> {
         let conn = &self.connection;
-        let mut contents = Vec::new();
-        let mut infos = Vec::new();
-        // converting types
-        for _object in objects {
-            let object_content = object_content::ActiveModel {
-                id: NotSet,
-                file: Set("file".to_owned()),
-                hash: Set("hash".to_owned()),
-            };
-            contents.push(object_content);
-            let object_info = object_info::ActiveModel {
-                id: NotSet,
-                hash: Set("hash".to_owned()),
-                path: Set("path".to_owned()),
-                obj_type: Set("commit".to_owned()),
-            };
-            infos.push(object_info)
-        }
-        save_objects(conn, contents).await.unwrap();
-        save_objects(conn, infos).await.unwrap();
+        batch_save_model(conn, objects).await.unwrap();
         Ok(true)
     }
 }
 
+pub trait GitNodeObject {
+    fn convert_to_model(&self) -> node::ActiveModel;
+
+    fn generate_id() -> i64 {
+        id_generator::generate_id()
+    }
+}
+
+impl GitNodeObject for Tree {
+    fn convert_to_model(&self) -> node::ActiveModel {
+        // tracing::debug!("{}", self.meta.id.to_string());
+        node::ActiveModel {
+            id: NotSet,
+            node_id: Set(Self::generate_id()),
+            object_id: Set(self.meta.id.to_plain_str()),
+            node_type: Set("tree".to_owned()),
+            content_sha1: NotSet,
+            name: Set(Some(self.tree_name.to_string())),
+            path: NotSet,
+            create_time: NotSet,
+            update_time: NotSet,
+        }
+    }
+}
+
+impl GitNodeObject for Blob {
+    fn convert_to_model(&self) -> node::ActiveModel {
+        node::ActiveModel {
+            id: NotSet,
+            node_id: Set(Self::generate_id()),
+            object_id: Set(self.meta.id.to_plain_str()),
+            node_type: Set("blob".to_owned()),
+            content_sha1: NotSet,
+            name: Set(Some(self.filename.to_string())),
+            path: NotSet,
+            create_time: NotSet,
+            update_time: NotSet,
+        }
+    }
+}
+
 // mysql sea_orm bathc insert
-async fn save_objects<E, A>(
+async fn batch_save_model<E, A>(
     conn: &DatabaseConnection,
     save_models: Vec<A>,
 ) -> Result<Vec<InsertResult<A>>, anyhow::Error>

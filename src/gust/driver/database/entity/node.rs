@@ -3,17 +3,18 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "object_info")]
+#[sea_orm(table_name = "node")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: String,
-    pub version: Option<i32>,
+    pub id: i64,
+    pub node_id: i64,
+    pub object_id: String,
+    pub content_sha1: Option<String>,
     pub name: Option<String>,
-    pub path: String,
-    pub obj_type: String,
-    pub pid: String,
-    pub git_hash: Option<String>,
-    pub file_hash: Option<String>,
+    pub path: Option<String>, // for example, ROOT/config.rs, ROOT/src/init.rs
+    pub node_type: String,
+    pub create_time: Option<DateTime>,
+    pub update_time: Option<DateTime>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

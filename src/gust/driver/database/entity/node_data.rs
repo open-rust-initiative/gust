@@ -3,13 +3,13 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "object_content")]
+#[sea_orm(table_name = "node_data")]
 pub struct Model {
-    #[sea_orm(primary_key)]
+    #[sea_orm(primary_key, auto_increment = false)]
     pub id: i64,
-    // #[sea_orm(column_type = "Custom(\"MEDIUMTEXT\".to_owned())")]
-    // pub file: String,
-    pub hash: String,
+    pub node_id: Option<i64>,
+    pub object_id: Option<String>,
+    pub data: Option<Vec<u8>>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
