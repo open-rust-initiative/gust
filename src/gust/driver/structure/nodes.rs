@@ -1,13 +1,21 @@
 use std::{any::Any, collections::HashMap, path::PathBuf};
 
+use sea_orm::{ActiveValue::NotSet, Set};
+
 use crate::{
     git::{
         hash::Hash,
         object::base::tree::{Tree, TreeItemType},
         pack::{decode::ObjDecodedMap, Pack},
     },
-    gust::driver::utils::id_generator::{self, generate_id},
+    gust::driver::{
+        database::entity::node,
+        utils::id_generator::{self, generate_id},
+        ObjectStorage,
+    },
 };
+
+use super::GitNodeObject;
 
 // pub struct Repo {
 //     pub root: TreeNode,
@@ -25,38 +33,21 @@ use crate::{
 //     pub author: String,
 // }
 
-// common base struct share properties wtith TreeNode and FileNode
-// pub struct BaseNode {
-//     pub id: String,
-//     pub object_id: Hash,
-//     pub content_sha1: Option<Hash>,
-//     pub name: String,
-//     pub ctime: DateTime<Utc>,
-//     pub mtime: DateTime<Utc>,
-// }
-
 pub struct TreeNode {
-    pub id: i64,
-    pub object_id: Hash,
+    pub nid: i64,
+    pub pid: i64,
+    pub oid: Hash,
     pub content_sha1: Option<Hash>,
     pub name: String,
     pub path: PathBuf,
     pub children: Vec<Box<dyn Node>>,
 }
 
-// pub struct Contents {
-//     pub id: String,
-//     pub object_id: Hash,
-//     pub content_sha1: Option<Hash>,
-//     pub name: String,
-//     pub file_type: String,
-//     pub size: usize,
-// }
-
 #[derive(Debug, Clone)]
 pub struct FileNode {
-    pub id: i64,
-    pub object_id: Hash,
+    pub nid: i64,
+    pub pid: i64,
+    pub oid: Hash,
     pub content_sha1: Option<Hash>,
     pub name: String,
     pub path: PathBuf,
@@ -88,7 +79,7 @@ pub trait Node {
         id_generator::generate_id()
     }
 
-    fn new(name: String) -> Self
+    fn new(name: String, pid: i64) -> Self
     where
         Self: Sized;
 
@@ -117,11 +108,13 @@ pub trait Node {
     fn convert_to_objects(&self) {
         todo!()
     }
+
+    fn convert_to_model(&self) -> node::ActiveModel;
 }
 
 impl Node for TreeNode {
     fn get_id(&self) -> i64 {
-        self.id
+        self.nid
     }
 
     fn get_name(&self) -> &str {
@@ -132,19 +125,34 @@ impl Node for TreeNode {
         &self.children
     }
 
-    fn new(name: String) -> TreeNode {
+    fn new(name: String, pid: i64) -> TreeNode {
         TreeNode {
-            id: generate_id(),
-            name,
+            nid: generate_id(),
+            pid,
+            name: name,
             path: PathBuf::new(),
-            object_id: Hash::default(),
+            oid: Hash::default(),
             content_sha1: None,
             children: Vec::new(),
         }
     }
 
+    fn convert_to_model(&self) -> node::ActiveModel {
+        node::ActiveModel {
+            id: NotSet,
+            pid: Set(self.pid),
+            node_id: Set(self.nid),
+            oid: Set(self.oid.to_plain_str()),
+            node_type: Set("tree".to_owned()),
+            content_sha1: NotSet,
+            name: Set(Some(self.name.to_string())),
+            path: NotSet,
+            created_at: Set(chrono::Utc::now().naive_utc()),
+            updated_at: Set(chrono::Utc::now().naive_utc()),
+        }
+    }
+
     fn find_child(&mut self, name: &str) -> Option<&mut Box<dyn Node>> {
-        println!("{} find_child:  {}", self.name, name);
         self.children.iter_mut().find(|c| c.get_name() == name)
     }
 
@@ -163,7 +171,7 @@ impl Node for TreeNode {
 
 impl Node for FileNode {
     fn get_id(&self) -> i64 {
-        self.id
+        self.nid
     }
 
     fn get_name(&self) -> &str {
@@ -174,14 +182,30 @@ impl Node for FileNode {
         panic!("not supported")
     }
 
-    fn new(name: String) -> Self {
+    fn new(name: String, pid: i64) -> Self {
         FileNode {
-            id: generate_id(),
+            nid: generate_id(),
+            pid,
             path: PathBuf::new(),
             name,
-            object_id: Hash::default(),
+            oid: Hash::default(),
             content_sha1: None,
             data: Vec::new(),
+        }
+    }
+
+    fn convert_to_model(&self) -> node::ActiveModel {
+        node::ActiveModel {
+            id: NotSet,
+            pid: Set(self.pid),
+            node_id: Set(self.nid),
+            oid: Set(self.oid.to_plain_str()),
+            node_type: Set("blob".to_owned()),
+            content_sha1: NotSet,
+            name: Set(Some(self.name.to_string())),
+            path: NotSet,
+            created_at: Set(chrono::Utc::now().naive_utc()),
+            updated_at: Set(chrono::Utc::now().naive_utc()),
         }
     }
 
@@ -204,8 +228,9 @@ impl Node for FileNode {
 
 pub fn init_root() -> Box<dyn Node> {
     let t_node = TreeNode {
-        id: 0,
-        object_id: Hash::default(),
+        nid: 0,
+        pid: 0,
+        oid: Hash::default(),
         content_sha1: Some(Hash::default()),
         name: "ROOT".to_owned(),
         path: PathBuf::from("/"),
@@ -215,7 +240,11 @@ pub fn init_root() -> Box<dyn Node> {
     Box::new(t_node)
 }
 
-pub fn persist_data(decoded_pack: Pack) {
+/// this method is used to persist tree and blob objects to database
+/// 解析成tree，
+/// 检查数据库是否存在该数据，不存在save
+///
+pub fn build_from_pack(decoded_pack: Pack) -> Vec<node::ActiveModel> {
     let mut result = ObjDecodedMap::default();
     result.update_from_cache(&decoded_pack.result);
     result.check_completeness().unwrap();
@@ -231,15 +260,18 @@ pub fn persist_data(decoded_pack: Pack) {
 
     build_from_root_tree(&tree_id, &tree_map, &mut root);
 
-    print_root(&root, 0);
+    let mut save_models: Vec<node::ActiveModel> = Vec::new();
+    traverse_node(root.as_ref(), 0, &mut save_models);
+    save_models
 }
 
+/// convert TreeItem to Node and build node tree
 fn build_from_root_tree(tree_id: &Hash, tree_map: &HashMap<Hash, Tree>, node: &mut Box<dyn Node>) {
     let tree = tree_map.get(tree_id).unwrap();
 
     for item in &tree.tree_items {
         if item.item_type == TreeItemType::Tree {
-            let child_node: Box<dyn Node> = Box::new(TreeNode::new(item.filename.to_owned()));
+            let child_node: Box<dyn Node> = item.convert_to_node(node.get_id());
             node.add_child(child_node);
 
             let child_node = match node.find_child(&item.filename) {
@@ -248,13 +280,24 @@ fn build_from_root_tree(tree_id: &Hash, tree_map: &HashMap<Hash, Tree>, node: &m
             };
             build_from_root_tree(&item.id, tree_map, child_node);
         } else {
-            node.add_child(Box::new(FileNode::new(item.filename.to_owned())));
+            node.add_child(item.convert_to_node(node.get_id()));
         }
     }
 }
 
-// A function to print a node with format.
-pub fn print_root(node: &Box<dyn Node>, depth: u32) {
+/// conver Node to db entity and for later persistent
+pub fn traverse_node(node: &dyn Node, depth: u32, model_list: &mut Vec<node::ActiveModel>) {
+    print_node(node, depth);
+    model_list.push(node.convert_to_model());
+    if node.is_a_directory() {
+        for child in node.get_children().iter() {
+            traverse_node(child.as_ref(), depth + 1, model_list);
+        }
+    }
+}
+
+/// Print a node with format.
+pub fn print_node(node: &dyn Node, depth: u32) {
     if depth == 0 {
         println!("{}", node.get_name());
     } else {
@@ -266,11 +309,6 @@ pub fn print_root(node: &Box<dyn Node>, depth: u32) {
             indent = ((depth as usize) - 1) * 4
         );
     }
-    if node.is_a_directory() {
-        for child in node.get_children().iter() {
-            print_root(child, depth + 1)
-        }
-    }
 }
 
 #[cfg(test)]
@@ -278,7 +316,8 @@ mod test {
     use std::path::PathBuf;
 
     use crate::gust::driver::{
-        structure::nodes::{init_root, print_root, Node, TreeNode},
+        database::entity::node,
+        structure::nodes::{init_root, traverse_node, Node, TreeNode},
         utils::id_generator,
     };
 
@@ -299,7 +338,10 @@ mod test {
         for path in paths.iter() {
             build_tree(&mut root, path, 0)
         }
-        print_root(&root, 0);
+
+        let mut save_models: Vec<node::ActiveModel> = Vec::new();
+
+        traverse_node(root.as_ref(), 0, &mut save_models);
     }
 
     fn build_tree(node: &mut Box<dyn Node>, path: &PathBuf, depth: usize) {
@@ -312,9 +354,9 @@ mod test {
                 Some(child) => child,
                 None => {
                     if path.is_file() {
-                        node.add_child(Box::new(FileNode::new(child_name.to_owned())));
+                        node.add_child(Box::new(FileNode::new(child_name.to_owned(), 0)));
                     } else {
-                        node.add_child(Box::new(TreeNode::new(child_name.to_owned())));
+                        node.add_child(Box::new(TreeNode::new(child_name.to_owned(), 0)));
                     };
                     match node.find_child(&child_name) {
                         Some(child) => child,

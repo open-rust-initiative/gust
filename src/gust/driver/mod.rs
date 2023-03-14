@@ -1,36 +1,34 @@
 //!
 //!
+//！
 
 use std::path::Path;
 
 use async_trait::async_trait;
 
-use crate::git::object::base::BaseObject;
+use crate::git::object::base::{commit::Commit, BaseObject};
 
 use self::database::entity::node;
-//！
+
 pub mod database;
 pub mod fs;
 pub mod structure;
 pub mod utils;
 
-// #[derive(Clone)]
-// pub enum StorageType {
-//     Mysql(MysqlStorage),
-//     Filesystem,
-// }
-
 #[async_trait]
 pub trait ObjectStorage {
-    fn get_head_object_id(&self, work_dir: &Path) -> String;
+    async fn get_head_object_id(&self, repo_path: &Path) -> String;
 
     fn search_child_objects(
         &self,
         parent: Box<dyn BaseObject>,
     ) -> Result<Vec<Box<dyn BaseObject>>, anyhow::Error>;
 
-    async fn persist_node_objects(
+    async fn save_nodes(&self, objects: Vec<node::ActiveModel>) -> Result<bool, anyhow::Error>;
+
+    async fn save_commits(
         &self,
-        objects: Vec<node::ActiveModel>,
+        commits: &Vec<Commit>,
+        repo_path: &str,
     ) -> Result<bool, anyhow::Error>;
 }

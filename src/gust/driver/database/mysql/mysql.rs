@@ -2,13 +2,13 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use sea_orm::ActiveValue::NotSet;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, InsertResult, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, InsertResult, QueryFilter, Set,
+};
 
-use crate::git::object::base::blob::Blob;
-use crate::git::object::base::tree::Tree;
+use crate::git::object::base::commit::Commit;
 use crate::git::object::base::BaseObject;
-use crate::gust::driver::database::entity::node;
-use crate::gust::driver::utils::id_generator;
+use crate::gust::driver::database::entity::{commit, node};
 use crate::gust::driver::ObjectStorage;
 
 #[derive(Debug, Default, Clone)]
@@ -24,73 +24,55 @@ impl MysqlStorage {
 
 #[async_trait]
 impl ObjectStorage for MysqlStorage {
-    fn get_head_object_id(&self, work_dir: &Path) -> String {
-        // TODO update to mysql logic
-        let content = std::fs::read_to_string(work_dir.join("HEAD")).unwrap();
-        let content = content.replace("ref: ", "");
-        let content = content.strip_suffix('\n').unwrap();
-        let object_id = match std::fs::read_to_string(work_dir.join(content)) {
-            Ok(object_id) => object_id.strip_suffix('\n').unwrap().to_owned(),
-            _ => String::from_utf8_lossy(&[b'0'; 40]).to_string(),
-        };
-        object_id
+    async fn get_head_object_id(&self, repo_path: &Path) -> String {
+        let commit: commit::Model = commit::Entity::find()
+            .filter(commit::Column::IsHead.eq(true))
+            .one(&self.connection)
+            .await
+            .unwrap()
+            .unwrap();
+        commit.oid
     }
 
     fn search_child_objects(
         &self,
         _parent: Box<dyn BaseObject>,
-    ) -> Result<Vec<Box<(dyn BaseObject + 'static)>>, anyhow::Error> {
+    ) -> Result<Vec<Box<dyn BaseObject>>, anyhow::Error> {
         todo!()
     }
 
-    async fn persist_node_objects(
-        &self,
-        objects: Vec<node::ActiveModel>,
-    ) -> Result<bool, anyhow::Error> {
+    async fn save_nodes(&self, objects: Vec<node::ActiveModel>) -> Result<bool, anyhow::Error> {
         let conn = &self.connection;
         batch_save_model(conn, objects).await.unwrap();
         Ok(true)
     }
-}
 
-pub trait GitNodeObject {
-    fn convert_to_model(&self) -> node::ActiveModel;
-
-    fn generate_id() -> i64 {
-        id_generator::generate_id()
-    }
-}
-
-impl GitNodeObject for Tree {
-    fn convert_to_model(&self) -> node::ActiveModel {
-        // tracing::debug!("{}", self.meta.id.to_string());
-        node::ActiveModel {
-            id: NotSet,
-            node_id: Set(Self::generate_id()),
-            object_id: Set(self.meta.id.to_plain_str()),
-            node_type: Set("tree".to_owned()),
-            content_sha1: NotSet,
-            name: Set(Some(self.tree_name.to_string())),
-            path: NotSet,
-            create_time: NotSet,
-            update_time: NotSet,
+    async fn save_commits(
+        &self,
+        commits: &Vec<Commit>,
+        repo_path: &str,
+    ) -> Result<bool, anyhow::Error> {
+        let conn = &self.connection;
+        let mut save_models: Vec<commit::ActiveModel> = Vec::new();
+        for commit in commits {
+            let commit_model = commit::ActiveModel {
+                id: NotSet,
+                oid: Set(commit.meta.id.to_plain_str()),
+                tree: Set(commit.tree_id.to_plain_str()),
+                pid: NotSet,
+                is_head: Set(false),
+                repo_path: Set(repo_path.to_string()),
+                author: NotSet,
+                committer: NotSet,
+                content: NotSet,
+                created_at: Set(chrono::Utc::now().naive_utc()),
+                updated_at: Set(chrono::Utc::now().naive_utc()),
+            };
+            save_models.push(commit_model);
         }
-    }
-}
-
-impl GitNodeObject for Blob {
-    fn convert_to_model(&self) -> node::ActiveModel {
-        node::ActiveModel {
-            id: NotSet,
-            node_id: Set(Self::generate_id()),
-            object_id: Set(self.meta.id.to_plain_str()),
-            node_type: Set("blob".to_owned()),
-            content_sha1: NotSet,
-            name: Set(Some(self.filename.to_string())),
-            path: NotSet,
-            create_time: NotSet,
-            update_time: NotSet,
-        }
+        tracing::info!("Commits saved{:?}", save_models);
+        batch_save_model(conn, save_models).await.unwrap();
+        Ok(true)
     }
 }
 

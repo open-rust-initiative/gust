@@ -3,17 +3,18 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "node")]
+#[sea_orm(table_name = "commit")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    pub id: i64,
-    pub pid: i64,
-    pub node_id: i64,
+    pub id: i32,
     pub oid: String,
-    pub content_sha1: Option<String>,
-    pub name: Option<String>,
-    pub path: Option<String>, // for example, ROOT/config.rs, ROOT/src/init.rs
-    pub node_type: String,
+    pub tree: String,
+    pub pid: Vec<u8>,
+    pub is_head: bool,
+    pub repo_path: String,
+    pub author: String,
+    pub committer: String,
+    pub content: String,
     #[sea_orm(column_type = "Timestamp")]
     pub created_at: chrono::NaiveDateTime,
     #[sea_orm(column_type = "Timestamp")]
@@ -24,3 +25,4 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+

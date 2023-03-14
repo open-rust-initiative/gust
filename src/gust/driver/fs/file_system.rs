@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use async_trait::async_trait;
 
 use crate::{
@@ -6,15 +8,17 @@ use crate::{
 };
 
 #[derive(Debug, Default, Clone)]
-pub struct FileSystem;
+pub struct FileSystem {
+    pub work_dir: PathBuf
+}
 
 #[async_trait]
 impl ObjectStorage for FileSystem {
-    fn get_head_object_id(&self, work_dir: &Path) -> String {
-        let content = std::fs::read_to_string(work_dir.join("HEAD")).unwrap();
+    fn get_head_object_id(&self) -> String {
+        let content = std::fs::read_to_string(self.work_dir.join("HEAD")).unwrap();
         let content = content.replace("ref: ", "");
         let content = content.strip_suffix('\n').unwrap();
-        let object_id = match std::fs::read_to_string(work_dir.join(content)) {
+        let object_id = match std::fs::read_to_string(self.work_dir.join(content)) {
             Ok(object_id) => object_id.strip_suffix('\n').unwrap().to_owned(),
             _ => String::from_utf8_lossy(&[b'0'; 40]).to_string(),
         };

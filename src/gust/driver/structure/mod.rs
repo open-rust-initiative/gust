@@ -1,49 +1,75 @@
-use crate::git::hash::Hash;
-use std::collections::HashMap;
-
-use crate::git::{
-    object::base::tree::Tree,
-    pack::{decode::ObjDecodedMap, Pack},
+use crate::git::object::base::{
+    blob::Blob,
+    tree::{TreeItem, TreeItemType},
 };
+use std::path::PathBuf;
 
-use super::database::entity::node;
-use super::database::mysql::mysql::GitNodeObject;
+use crate::git::object::base::tree::Tree;
 
-use super::ObjectStorage;
+use self::nodes::{FileNode, Node, TreeNode};
+
+use super::utils::id_generator;
 
 pub mod nodes;
 
-pub async fn persist_pack_data<T: ObjectStorage>(decoded_pack: Pack, storage: &T) {
-    let mut result = ObjDecodedMap::default();
-    result.update_from_cache(&decoded_pack.result);
-    result.check_completeness().unwrap();
+pub trait GitNodeObject {
+    fn convert_to_node(&self, pid: i64) -> Box<dyn Node>;
 
-    let commit = &result.commits[0];
-    let tree_id = commit.tree_id;
-
-    let ObjDecodedMap {
-        commits: _,
-        blobs,
-        tags: _,
-        trees,
-        _map_hash: _,
-        name_map: _,
-    } = result;
-
-    // persist_objects(commits);
-    // persist_objects(tags);
-
-    convert_and_save(&blobs, storage).await;
-    convert_and_save(&trees, storage).await;
-
-    let tree_map: HashMap<Hash, Tree> =
-        trees.into_iter().map(|tree| (tree.meta.id, tree)).collect();
+    fn generate_id(&self) -> i64 {
+        id_generator::generate_id()
+    }
 }
 
-pub async fn convert_and_save<E: GitNodeObject, T: ObjectStorage>(objects: &Vec<E>, storage: &T) {
-    let mut save_models: Vec<node::ActiveModel> = Vec::new();
-    for obj in objects {
-        save_models.push(obj.convert_to_model());
+impl GitNodeObject for Tree {
+    fn convert_to_node(&self, pid: i64) -> Box<dyn Node> {
+        Box::new(TreeNode {
+            nid: self.generate_id(),
+            pid,
+            oid: self.meta.id,
+            name: self.tree_name.clone(),
+            content_sha1: None,
+            path: PathBuf::new(),
+            children: Vec::new(),
+        })
     }
-    storage.persist_node_objects(save_models).await.unwrap();
+}
+
+impl GitNodeObject for Blob {
+    fn convert_to_node(&self, pid: i64) -> Box<dyn Node> {
+        Box::new(FileNode {
+            nid: self.generate_id(),
+            pid,
+            oid: self.meta.id,
+            path: PathBuf::new(),
+            name: self.filename.clone(),
+            content_sha1: None,
+            data: Vec::new(),
+        })
+    }
+}
+
+impl GitNodeObject for TreeItem {
+    fn convert_to_node(&self, pid: i64) -> Box<dyn Node> {
+        match self.item_type {
+            TreeItemType::Blob => Box::new(FileNode {
+                nid: self.generate_id(),
+                pid,
+                oid: self.id,
+                path: PathBuf::new(),
+                name: self.filename.clone(),
+                content_sha1: None,
+                data: Vec::new(),
+            }),
+            TreeItemType::Tree => Box::new(TreeNode {
+                nid: self.generate_id(),
+                pid,
+                oid: self.id,
+                name: self.filename.clone(),
+                content_sha1: None,
+                path: PathBuf::new(),
+                children: Vec::new(),
+            }),
+            _ => panic!("not supported type"),
+        }
+    }
 }

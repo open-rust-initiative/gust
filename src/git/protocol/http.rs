@@ -29,7 +29,7 @@ use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::{HttpProtocol, RefCommand};
-use crate::gust::driver::structure::persist_pack_data;
+use crate::gust::driver::structure::nodes::build_from_pack;
 use crate::gust::driver::ObjectStorage;
 
 use super::{ServiceType, SideBind};
@@ -68,7 +68,6 @@ impl HttpProtocol {
         for (key, val) in headers {
             resp = resp.header(&key, val);
         }
-        // let mysql_storage = MysqlStorage::new(storage_type);
 
         // init repo: if dir not exists or is empty
         let init_repo = !self.repo_dir.exists();
@@ -80,7 +79,7 @@ impl HttpProtocol {
                 .expect("git init failed!");
         }
         let mut ref_list = self
-            .add_head_to_ref_list(storage, service_type, init_repo)
+            .add_head_to_ref_list(storage, service_type, init_repo).await
             .unwrap();
         self.add_to_ref_list(&mut ref_list, String::from("refs/heads/"));
 
@@ -183,7 +182,6 @@ impl HttpProtocol {
     ) -> Result<Response<Body>, (StatusCode, String)> {
         // not in memory
         let (_parts, mut body) = req.into_parts();
-        // let mut ref_update_req = false;
 
         let mut command_status: Vec<String> = vec![];
         while let Some(chunk) = body.next().await {
@@ -211,15 +209,13 @@ impl HttpProtocol {
                 let decoded_pack = command
                     .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                     .unwrap();
-                // let obj_vec = Vec::from_iter(decoded_pack.result.by_hash.values());
-                persist_pack_data(decoded_pack, storage).await;
-                // for meta in decoded_pack.result.by_hash.values() {
-                //     //TODO DB options and fs options
-                //     // let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
-                // tracing::info!("res:{:?}, {}", meta.t, meta.id);
-                // }
+                let save_models = build_from_pack(decoded_pack);
+                let save_result = storage.save_nodes(save_models).await.unwrap();
+                if !save_result {
+                    command.failed(String::from("db operation failed"));
+                }
             }
-            command_status.push(command.status());
+            command_status.push(command.get_status());
         }
 
         let resp = build_res_header("application/x-git-receive-pack-result".to_owned());
@@ -258,7 +254,7 @@ impl HttpProtocol {
     }
 
     // The stream SHOULD include the default ref named HEAD as the first ref
-    fn add_head_to_ref_list<T: ObjectStorage>(
+    async fn add_head_to_ref_list<T: ObjectStorage>(
         &self,
         storage: &T,
         service_type: ServiceType,
@@ -270,7 +266,7 @@ impl HttpProtocol {
         let object_id = if init_repo {
             zero_id.clone()
         } else {
-            storage.get_head_object_id(&self.repo_dir)
+            storage.get_head_object_id(&self.repo_dir).await
         };
         let name = if object_id == zero_id {
             "capabilities^{}"
@@ -305,11 +301,7 @@ impl HttpProtocol {
         Ok(ref_list)
     }
 
-    fn add_to_ref_list(
-        &self,
-        ref_list: &mut Vec<String>,
-        mut name: String,
-    ) {
+    fn add_to_ref_list(&self, ref_list: &mut Vec<String>, mut name: String) {
         //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
         let path = self.repo_dir.join(&name);
         let paths = std::fs::read_dir(&path).unwrap();

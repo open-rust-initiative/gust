@@ -118,7 +118,7 @@ impl RefCommand {
         }
     }
 
-    pub fn status(&self) -> String {
+    pub fn get_status(&self) -> String {
         let res = if RefCommand::OK_STATUS == self.status {
             format!("{}{}{}", self.status, HttpProtocol::SP, self.ref_name,)
         } else {
@@ -132,6 +132,11 @@ impl RefCommand {
             )
         };
         res
+    }
+
+    pub fn failed(&mut self, msg: String) {
+        self.status = RefCommand::FAILED_STATUS.to_owned();
+        self.error_msg = msg;
     }
 }
 ///
