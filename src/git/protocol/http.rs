@@ -7,7 +7,6 @@ use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -29,7 +28,6 @@ use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
 use crate::git::protocol::{HttpProtocol, RefCommand};
-use crate::gust::driver::structure::nodes::build_from_pack;
 use crate::gust::driver::ObjectStorage;
 
 use super::{ServiceType, SideBind};
@@ -69,19 +67,11 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
 
-        // init repo: if dir not exists or is empty
-        let init_repo = !self.repo_dir.exists();
-        // todo: replace git command
-        if init_repo {
-            Command::new("git")
-                .args(["init", "--bare", self.repo_dir.to_str().unwrap()])
-                .output()
-                .expect("git init failed!");
-        }
         let mut ref_list = self
-            .add_head_to_ref_list(storage, service_type, init_repo).await
+            .add_head_to_ref_list(storage, service_type)
+            .await
             .unwrap();
-        self.add_to_ref_list(&mut ref_list, String::from("refs/heads/"));
+        self.add_to_ref_list(&mut ref_list);
 
         let pkt_line_stream = build_smart_reply(&ref_list, service_type.to_string());
 
@@ -91,9 +81,10 @@ impl HttpProtocol {
         Ok(resp)
     }
 
-    pub async fn git_upload_pack(
+    pub async fn git_upload_pack<T: ObjectStorage>(
         &self,
         req: Request<Body>,
+        storage: &T,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let (_parts, mut body) = req.into_parts();
 
@@ -133,21 +124,19 @@ impl HttpProtocol {
 
         tracing::info!("want commands: {:?}, have commans: {:?}", want, have);
 
-        let object_root = self.repo_dir.join(".git/objects");
+        let object_root = self.path.repo_dir.join(".git/objects");
 
         let send_pack_data;
         let mut buf = BytesMut::new();
 
         if have.is_empty() {
-            let loose_vec = Pack::find_all_loose(object_root.to_str().unwrap());
-            let (mut _loose_pack, loose_data) =
-                Pack::pack_loose(loose_vec, object_root.to_str().unwrap());
-            send_pack_data = loose_data;
+            send_pack_data = storage.get_full_pack_data(&self.path).await;
             add_to_pkt_line(&mut buf, String::from("NAK\n"));
         } else {
+            // TODO storage.handle_pull_pack_data(&self.path).await;
             let mut decoded_pack = Pack::default();
             let meta_map: HashMap<Hash, MetaData> =
-                find_common_base(Hash::from_str(&want[0]).unwrap(), object_root, &have);
+                find_common_base(Hash::from_str(&want[0]).unwrap(), &object_root, &have);
             send_pack_data = decoded_pack.encode(Some(meta_map.into_values().collect()));
 
             // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
@@ -182,7 +171,6 @@ impl HttpProtocol {
     ) -> Result<Response<Body>, (StatusCode, String)> {
         // not in memory
         let (_parts, mut body) = req.into_parts();
-
         let mut command_status: Vec<String> = vec![];
         while let Some(chunk) = body.next().await {
             let mut body_bytes = chunk.unwrap();
@@ -209,8 +197,10 @@ impl HttpProtocol {
                 let decoded_pack = command
                     .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                     .unwrap();
-                let save_models = build_from_pack(decoded_pack);
-                let save_result = storage.save_nodes(save_models).await.unwrap();
+                let save_result = storage
+                    .save_packfile(decoded_pack, &self.path.repo_path)
+                    .await
+                    .unwrap();
                 if !save_result {
                     command.failed(String::from("db operation failed"));
                 }
@@ -258,16 +248,11 @@ impl HttpProtocol {
         &self,
         storage: &T,
         service_type: ServiceType,
-        init_repo: bool,
     ) -> Result<Vec<String>, anyhow::Error> {
         // use zero_id if init_repo
         let zero_id = String::from_utf8_lossy(&[b'0'; 40]).to_string();
         // The stream MUST include capability declarations behind a NUL on the first ref.
-        let object_id = if init_repo {
-            zero_id.clone()
-        } else {
-            storage.get_head_object_id(&self.repo_dir).await
-        };
+        let object_id = storage.get_head_object_id(&self.path.repo_path).await;
         let name = if object_id == zero_id {
             "capabilities^{}"
         } else {
@@ -301,9 +286,10 @@ impl HttpProtocol {
         Ok(ref_list)
     }
 
-    fn add_to_ref_list(&self, ref_list: &mut Vec<String>, mut name: String) {
+    fn add_to_ref_list(&self, ref_list: &mut Vec<String>) {
+        let mut name = String::from("refs/heads/");
         //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
-        let path = self.repo_dir.join(&name);
+        let path = self.path.repo_dir.join(&name);
         let paths = std::fs::read_dir(&path).unwrap();
         for ref_file in paths.flatten() {
             name.push_str(ref_file.file_name().to_str().unwrap());
@@ -324,7 +310,7 @@ impl HttpProtocol {
 
 fn find_common_base(
     mut obj_id: Hash,
-    object_root: PathBuf,
+    object_root: &Path,
     have: &[String],
 ) -> HashMap<Hash, MetaData> {
     let mut result: HashMap<Hash, MetaData> = HashMap::new();

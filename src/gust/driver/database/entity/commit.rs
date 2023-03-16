@@ -7,14 +7,15 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: i32,
-    pub oid: String,
+    pub git_id: String,
     pub tree: String,
-    pub pid: Vec<u8>,
-    pub is_head: bool,
+    pub pid: Option<String>,
+    pub meta: Vec<u8>,
+    // pub is_head: bool,
     pub repo_path: String,
-    pub author: String,
-    pub committer: String,
-    pub content: String,
+    pub author: Option<String>,
+    pub committer: Option<String>,
+    pub content: Option<String>,
     #[sea_orm(column_type = "Timestamp")]
     pub created_at: chrono::NaiveDateTime,
     #[sea_orm(column_type = "Timestamp")]

@@ -7,13 +7,22 @@ use std::{fs::File, path::PathBuf};
 
 use clap::Subcommand;
 
+use crate::gateway::api::lib::Params;
+
 use super::pack::Pack;
 pub mod http;
 pub mod ssh;
 
 pub struct HttpProtocol {
     pub mode: AckMode,
+    pub path: ProjectPath,
+}
+
+pub struct ProjectPath {
+    // this params was used to search file in fs, format example: work_dir/path/repo/
     pub repo_dir: PathBuf,
+    // this param was used to search in db, format example: path/repo/
+    pub repo_path: String,
 }
 
 ///
@@ -21,7 +30,10 @@ impl Default for HttpProtocol {
     fn default() -> Self {
         Self {
             mode: AckMode::MultiAckDetailed,
-            repo_dir: PathBuf::new(),
+            path: ProjectPath {
+                repo_dir: PathBuf::new(),
+                repo_path: "".to_owned(),
+            },
         }
     }
 }
@@ -149,6 +161,18 @@ impl HttpProtocol {
     const SP: char = ' ';
 
     const NUL: char = '\0';
+
+    pub fn new(params: Params) -> Self {
+        tracing::info!("incoming req:{:?}", params);
+        let repo_dir = params.get_repo_dir();
+        HttpProtocol {
+            mode: AckMode::MultiAckDetailed,
+            path: ProjectPath {
+                repo_dir: repo_dir.clone(),
+                repo_path: format!("{}/{}", params.path, params.repo),
+            },
+        }
+    }
 
     #[allow(unused)]
     pub fn value_in_ack_mode<'a>(mode: &AckMode) -> &'a str {

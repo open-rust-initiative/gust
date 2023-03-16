@@ -19,7 +19,7 @@ use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
-use crate::git::protocol::{AckMode, HttpProtocol, ServiceType};
+use crate::git::protocol::{HttpProtocol, ServiceType};
 use crate::gust::driver::database::mysql::mysql::MysqlStorage;
 use crate::gust::driver::utils::id_generator;
 use crate::gust::driver::ObjectStorage;
@@ -48,7 +48,7 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .sqlx_logging_level(log::LevelFilter::Error);
 
     let state = AppState {
-        stotage_type: MysqlStorage::new(
+        storage: MysqlStorage::new(
             Database::connect(opt)
                 .await
                 .expect("Database connection failed"),
@@ -74,7 +74,7 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[derive(Clone)]
 struct AppState<T: ObjectStorage> {
-    stotage_type: T,
+    storage: T,
 }
 
 #[derive(Deserialize, Debug)]
@@ -83,7 +83,7 @@ struct ServiceName {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Params {
+pub struct Params {
     pub repo: String,
     pub path: String,
 }
@@ -105,13 +105,10 @@ async fn git_info_refs<T: ObjectStorage>(
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let service_name = service.service;
-    let http_protocol = HttpProtocol {
-        mode: AckMode::MultiAckDetailed,
-        repo_dir: params.get_repo_dir(),
-    };
+    let http_protocol = HttpProtocol::new(params);
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
         http_protocol
-            .git_info_refs(ServiceType::new(&service_name), &state.stotage_type)
+            .git_info_refs(ServiceType::new(&service_name), &state.storage)
             .await
     } else {
         Err((
@@ -122,16 +119,14 @@ async fn git_info_refs<T: ObjectStorage>(
 }
 
 /// Smart Service git-upload-pack, handle git pull and clone
-async fn git_upload_pack(
+async fn git_upload_pack<T: ObjectStorage>(
+    state: State<AppState<T>>,
     Path(params): Path<Params>,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("{:?}", params.repo);
-    let http_protocol = HttpProtocol {
-        mode: AckMode::MultiAckDetailed,
-        repo_dir: params.get_repo_dir(),
-    };
-    http_protocol.git_upload_pack(req).await
+    let http_protocol = HttpProtocol::new(params);
+    http_protocol.git_upload_pack(req, &state.storage).await
 }
 
 // http://localhost:8000/org1/apps/App2.git
@@ -144,13 +139,8 @@ async fn git_receive_pack<T: ObjectStorage>(
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("req: {:?}", req);
-    let http_protocol = HttpProtocol {
-        mode: AckMode::MultiAckDetailed,
-        repo_dir: params.get_repo_dir(),
-    };
-    http_protocol
-        .git_receive_pack(req, &state.stotage_type)
-        .await
+    let http_protocol = HttpProtocol::new(params);
+    http_protocol.git_receive_pack(req, &state.storage).await
 }
 
 /// try to unpack all object from pack file

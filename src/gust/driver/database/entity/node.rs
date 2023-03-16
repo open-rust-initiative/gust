@@ -9,10 +9,9 @@ pub struct Model {
     pub id: i64,
     pub pid: i64,
     pub node_id: i64,
-    pub oid: String,
-    pub content_sha1: Option<String>,
+    pub git_id: String,
     pub name: Option<String>,
-    pub path: Option<String>, // for example, ROOT/config.rs, ROOT/src/init.rs
+    pub path: String, // for example, ROOT/config.rs, ROOT/src/init.rs
     pub node_type: String,
     #[sea_orm(column_type = "Timestamp")]
     pub created_at: chrono::NaiveDateTime,
