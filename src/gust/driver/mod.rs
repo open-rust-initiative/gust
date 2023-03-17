@@ -2,8 +2,6 @@
 //!
 //！
 
-use std::path::Path;
-
 use async_trait::async_trait;
 
 use crate::git::{object::base::BaseObject, pack::Pack, protocol::ProjectPath};
@@ -31,6 +29,4 @@ pub trait ObjectStorage {
     async fn get_full_pack_data(&self, path: &ProjectPath) -> Vec<u8>;
 
     async fn handle_pull_pack_data(&self, path: &ProjectPath) -> Vec<u8>;
-
-
 }

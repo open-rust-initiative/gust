@@ -11,7 +11,7 @@ use crate::git::object::base::BaseObject;
 use crate::git::pack::decode::ObjDecodedMap;
 use crate::git::pack::Pack;
 use crate::gust::driver::database::entity::{commit, node, node_data};
-use crate::gust::driver::structure::nodes::{build_node_tree, SaveModel};
+use crate::gust::driver::structure::nodes::{build_node_tree, model_to_tree, SaveModel};
 use crate::gust::driver::ObjectStorage;
 
 #[derive(Debug, Default, Clone)]
@@ -38,7 +38,7 @@ impl ObjectStorage for MysqlStorage {
             String::from_utf8_lossy(&[b'0'; 40]).to_string()
         } else {
             // todo filter one result
-            commits[1].git_id.clone()
+            commits[0].git_id.clone()
         }
     }
 
@@ -76,7 +76,26 @@ impl ObjectStorage for MysqlStorage {
         for commit in commits.iter() {
             metadata_vec.push(MetaData::new(ObjectType::Commit, &commit.meta));
         }
-        // TODO: added tree and blob
+        let blob_models: Vec<node_data::Model> = node_data::Entity::find()
+            .all(&self.connection)
+            .await
+            .unwrap();
+        for b in blob_models {
+            metadata_vec.push(MetaData::new(ObjectType::Blob, &b.data));
+        }
+        let node_models: Vec<node::Model> = node::Entity::find()
+            .filter(node::Column::Path.eq(&path.repo_path))
+            .all(&self.connection)
+            .await
+            .unwrap();
+        let root: node::Model = node::Entity::find()
+            .filter(node::Column::Path.eq(&path.repo_path))
+            .filter(node::Column::Pid.eq(0))
+            .one(&self.connection)
+            .await
+            .unwrap()
+            .unwrap();
+        model_to_tree(&node_models, &root, &mut metadata_vec);
 
         let result: Vec<u8> = Pack::default().encode(Some(metadata_vec));
         result

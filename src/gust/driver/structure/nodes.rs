@@ -5,9 +5,12 @@ use sea_orm::{ActiveValue::NotSet, Set};
 use crate::{
     git::{
         hash::Hash,
-        object::base::{
-            blob::Blob,
-            tree::{Tree, TreeItemType},
+        object::{
+            base::{
+                blob::Blob,
+                tree::{Tree, TreeItem, TreeItemType},
+            },
+            metadata::MetaData,
         },
         pack::decode::ObjDecodedMap,
     },
@@ -39,9 +42,9 @@ pub struct TreeNode {
     pub nid: i64,
     pub pid: i64,
     pub git_id: Hash,
-    pub content_sha1: Option<Hash>,
     pub name: String,
     pub path: PathBuf,
+    pub mode: Vec<u8>,
     pub children: Vec<Box<dyn Node>>,
 }
 
@@ -50,9 +53,9 @@ pub struct FileNode {
     pub nid: i64,
     pub pid: i64,
     pub git_id: Hash,
-    pub content_sha1: Option<Hash>,
     pub name: String,
     pub path: PathBuf,
+    pub mode: Vec<u8>,
     pub data: Vec<u8>,
 }
 
@@ -71,9 +74,13 @@ pub struct FileNode {
 pub trait Node {
     fn get_id(&self) -> i64;
 
+    fn get_pid(&self) -> i64;
+
     fn get_git_id(&self) -> Hash;
 
     fn get_name(&self) -> &str;
+
+    fn get_mode(&self) -> Vec<u8>;
 
     fn get_children(&self) -> &Vec<Box<dyn Node>>;
 
@@ -112,17 +119,29 @@ pub trait Node {
     }
 
     fn convert_to_model(&self) -> node::ActiveModel;
+
+    fn convert_from_model(node: node::Model, children: Vec<Box<dyn Node>>) -> Box<dyn Node>
+    where
+        Self: Sized;
 }
 
 impl Node for TreeNode {
     fn get_id(&self) -> i64 {
         self.nid
     }
+    fn get_pid(&self) -> i64 {
+        self.pid
+    }
+
     fn get_git_id(&self) -> Hash {
         self.git_id
     }
     fn get_name(&self) -> &str {
         &self.name
+    }
+
+    fn get_mode(&self) -> Vec<u8> {
+        self.mode.clone()
     }
 
     fn get_children(&self) -> &Vec<Box<dyn Node>> {
@@ -135,8 +154,8 @@ impl Node for TreeNode {
             pid,
             name: name,
             path: PathBuf::new(),
+            mode: Vec::new(),
             git_id: Hash::default(),
-            content_sha1: None,
             children: Vec::new(),
         }
     }
@@ -148,8 +167,9 @@ impl Node for TreeNode {
             node_id: Set(self.nid),
             git_id: Set(self.git_id.to_plain_str()),
             node_type: Set("tree".to_owned()),
-            name: Set(Some(self.name.to_string())),
+            name: Set(self.name.to_string()),
             path: Set(self.path.to_str().unwrap().to_owned()),
+            mode: Set(self.mode.clone()),
             created_at: Set(chrono::Utc::now().naive_utc()),
             updated_at: Set(chrono::Utc::now().naive_utc()),
         }
@@ -170,12 +190,29 @@ impl Node for TreeNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn convert_from_model(node: node::Model, children: Vec<Box<dyn Node>>) -> Box<dyn Node> {
+        Box::new(TreeNode {
+            nid: node.node_id,
+            pid: node.pid,
+            git_id: Hash::from_bytes(node.git_id.as_bytes()).unwrap(),
+            name: node.name,
+            path: PathBuf::from(node.path),
+            mode: node.mode,
+            children: children,
+        })
+    }
 }
 
 impl Node for FileNode {
     fn get_id(&self) -> i64 {
         self.nid
     }
+
+    fn get_pid(&self) -> i64 {
+        self.pid
+    }
+
     fn get_git_id(&self) -> Hash {
         self.git_id
     }
@@ -183,19 +220,23 @@ impl Node for FileNode {
         &self.name
     }
 
+    fn get_mode(&self) -> Vec<u8> {
+        self.mode.clone()
+    }
+
     fn get_children(&self) -> &Vec<Box<dyn Node>> {
         panic!("not supported")
     }
 
-    fn new(name: String, pid: i64) -> Self {
+    fn new(name: String, pid: i64) -> FileNode {
         FileNode {
             nid: generate_id(),
             pid,
             path: PathBuf::new(),
             name,
             git_id: Hash::default(),
-            content_sha1: None,
             data: Vec::new(),
+            mode: Vec::new(),
         }
     }
 
@@ -206,8 +247,9 @@ impl Node for FileNode {
             node_id: Set(self.nid),
             git_id: Set(self.git_id.to_plain_str()),
             node_type: Set("blob".to_owned()),
-            name: Set(Some(self.name.to_string())),
+            name: Set(self.name.to_string()),
             path: Set(self.path.to_str().unwrap().to_owned()),
+            mode: Set(self.mode.clone()),
             created_at: Set(chrono::Utc::now().naive_utc()),
             updated_at: Set(chrono::Utc::now().naive_utc()),
         }
@@ -228,16 +270,43 @@ impl Node for FileNode {
     fn as_any(&self) -> &dyn Any {
         self
     }
+
+    fn convert_from_model(node: node::Model, _: Vec<Box<dyn Node>>) -> Box<dyn Node> {
+        Box::new(FileNode {
+            nid: node.node_id,
+            pid: node.pid,
+            git_id: Hash::from_bytes(node.git_id.as_bytes()).unwrap(),
+            name: node.name,
+            path: PathBuf::from(node.path),
+            mode: node.mode,
+            data: Vec::new(),
+        })
+    }
 }
 
-pub fn init_repo(tree: &Tree, req_path: &str) -> Box<dyn Node> {
+impl TreeNode {
+    // since root tree doesn't have name, we can only use node id to build it.
+    pub fn get_root_from_nid(nid: i64) -> Box<dyn Node> {
+        Box::new(TreeNode {
+            nid: nid,
+            pid: 0,
+            git_id: Hash::default(),
+            name: "".to_owned(),
+            path: PathBuf::from("/"),
+            mode: Vec::new(),
+            children: Vec::new(),
+        })
+    }
+}
+
+pub fn init_root(tree: &Tree, req_path: &str) -> Box<dyn Node> {
     let t_node = TreeNode {
         nid: generate_id(),
         pid: 0,
         git_id: tree.meta.id,
-        content_sha1: Some(Hash::default()),
         name: tree.tree_name.clone(),
         path: PathBuf::from(req_path),
+        mode: Vec::new(),
         children: Vec::new(),
     };
     //TODO: load children
@@ -271,7 +340,7 @@ pub async fn build_node_tree(
         .map(|b| (b.meta.id, b))
         .collect();
 
-    let mut root = init_repo(tree_map.get(&tree_id).unwrap(), req_path);
+    let mut root = init_root(tree_map.get(&tree_id).unwrap(), req_path);
     build_from_root_tree(&tree_id, &tree_map, &mut root, req_path);
     let mut save_model = SaveModel {
         nodes: Vec::new(),
@@ -304,6 +373,43 @@ pub fn build_from_root_tree(
             node.add_child(item.convert_to_node(node.get_id(), req_path));
         }
     }
+}
+
+// Model => Node => Tree ?
+pub fn model_to_node(nodes_model: &Vec<node::Model>, pid: i64) -> Vec<Box<dyn Node>> {
+    let mut nodes: Vec<Box<dyn Node>> = Vec::new();
+    for model in nodes_model {
+        if model.pid == pid {
+            if model.node_type == "blob" {
+                nodes.push(FileNode::convert_from_model(model.clone(), Vec::new()));
+            } else {
+                let childs = model_to_node(nodes_model, model.node_id);
+                nodes.push(TreeNode::convert_from_model(model.clone(), childs));
+            }
+        }
+    }
+    nodes
+}
+
+// Model => Tree
+pub fn model_to_tree(
+    nodes_model: &Vec<node::Model>,
+    root: &node::Model,
+    results: &mut Vec<MetaData>,
+) {
+    let mut tree_items: Vec<TreeItem> = Vec::new();
+    for model in nodes_model {
+        if model.pid == root.node_id {
+            tree_items.push(TreeItem::convert_from_model(model.clone()));
+            if model.node_type == "tree" {
+                model_to_tree(nodes_model, model, results);
+            }
+        }
+    }
+    let mut t = Tree::convert_from_model(root);
+    t.tree_items = tree_items;
+    let meta = t.encode_metadata().unwrap();
+    results.push(meta);
 }
 
 /// conver Node to db entity and for later persistent

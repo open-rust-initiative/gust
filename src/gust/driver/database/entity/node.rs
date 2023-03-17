@@ -10,7 +10,8 @@ pub struct Model {
     pub pid: i64,
     pub node_id: i64,
     pub git_id: String,
-    pub name: Option<String>,
+    pub mode: Vec<u8>,
+    pub name: String,
     pub path: String, // for example, ROOT/config.rs, ROOT/src/init.rs
     pub node_type: String,
     #[sea_orm(column_type = "Timestamp")]

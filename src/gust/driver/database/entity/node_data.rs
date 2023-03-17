@@ -9,8 +9,12 @@ pub struct Model {
     pub id: i64,
     pub node_id: i64,
     pub git_id: String,
-    pub content_sha1: Option<String>,
+    pub content_sha: Option<String>,
     pub data: Vec<u8>,
+    #[sea_orm(column_type = "Timestamp")]
+    pub created_at: chrono::NaiveDateTime,
+    #[sea_orm(column_type = "Timestamp")]
+    pub updated_at: chrono::NaiveDateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
