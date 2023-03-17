@@ -20,7 +20,7 @@ use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
 use crate::git::protocol::{HttpProtocol, ServiceType};
-use crate::gust::driver::database::mysql::mysql::MysqlStorage;
+use crate::gust::driver::database::mysql::storage::MysqlStorage;
 use crate::gust::driver::utils::id_generator;
 use crate::gust::driver::ObjectStorage;
 

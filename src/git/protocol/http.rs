@@ -344,7 +344,7 @@ fn find_common_base(
 
     // init basic hashset by common base commit
     parse_tree(
-        &object_root,
+        object_root,
         common_base_commit.tree_id,
         &mut result,
         &mut basic_objects,
@@ -353,7 +353,7 @@ fn find_common_base(
     for commit in commits.iter().rev() {
         let tree_id = commit.tree_id;
         parse_tree(
-            &object_root,
+            object_root,
             tree_id,
             &mut result,
             &mut basic_objects,

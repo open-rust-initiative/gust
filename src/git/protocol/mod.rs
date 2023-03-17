@@ -50,7 +50,7 @@ impl ServiceType {
             "git-upload-pack" => ServiceType::UploadPack,
             "git-receive-pack" => ServiceType::ReceivePack,
             _ => panic!("service type not supported"),
-        }
+        } 
     }
     pub fn to_string(&self) -> String {
         match self {
@@ -131,7 +131,7 @@ impl RefCommand {
     }
 
     pub fn get_status(&self) -> String {
-        let res = if RefCommand::OK_STATUS == self.status {
+        if RefCommand::OK_STATUS == self.status {
             format!("{}{}{}", self.status, HttpProtocol::SP, self.ref_name,)
         } else {
             format!(
@@ -142,8 +142,7 @@ impl RefCommand {
                 HttpProtocol::SP,
                 self.error_msg.clone()
             )
-        };
-        res
+        }
     }
 
     pub fn failed(&mut self, msg: String) {
@@ -168,7 +167,7 @@ impl HttpProtocol {
         HttpProtocol {
             mode: AckMode::MultiAckDetailed,
             path: ProjectPath {
-                repo_dir: repo_dir.clone(),
+                repo_dir,
                 repo_path: format!("{}/{}", params.path, params.repo),
             },
         }

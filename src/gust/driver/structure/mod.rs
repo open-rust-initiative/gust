@@ -82,7 +82,7 @@ impl TreeItem {
         };
         TreeItem {
             mode: model.mode,
-            item_type: item_type,
+            item_type,
             id: Hash::from_bytes(model.git_id.as_bytes()).unwrap(),
             filename: model.name,
         }

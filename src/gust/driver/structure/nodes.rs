@@ -152,7 +152,7 @@ impl Node for TreeNode {
         TreeNode {
             nid: generate_id(),
             pid,
-            name: name,
+            name,
             path: PathBuf::new(),
             mode: Vec::new(),
             git_id: Hash::default(),
@@ -199,7 +199,7 @@ impl Node for TreeNode {
             name: node.name,
             path: PathBuf::from(node.path),
             mode: node.mode,
-            children: children,
+            children,
         })
     }
 }
@@ -288,7 +288,7 @@ impl TreeNode {
     // since root tree doesn't have name, we can only use node id to build it.
     pub fn get_root_from_nid(nid: i64) -> Box<dyn Node> {
         Box::new(TreeNode {
-            nid: nid,
+            nid,
             pid: 0,
             git_id: Hash::default(),
             name: "".to_owned(),
