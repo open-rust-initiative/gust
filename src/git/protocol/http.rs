@@ -3,10 +3,9 @@
 //!
 //!
 use std::collections::{HashMap, HashSet};
-use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -48,11 +47,11 @@ impl HttpProtocol {
         "shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done ";
 
     pub async fn git_info_refs<T: ObjectStorage>(
-        &self,
-        service_type: ServiceType,
+        &mut self,
         storage: &T,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let mut headers = HashMap::new();
+        let service_type = self.service_type.unwrap();
         headers.insert(
             "Content-Type".to_string(),
             format!("application/x-{}-advertisement", service_type.to_string()),
@@ -67,13 +66,10 @@ impl HttpProtocol {
             resp = resp.header(&key, val);
         }
 
-        let mut ref_list = self
-            .add_head_to_ref_list(storage, service_type)
-            .await
-            .unwrap();
-        self.add_to_ref_list(&mut ref_list);
+        self.add_head_to_ref_list(storage).await.unwrap();
+        self.update_ref_list(storage).await;
 
-        let pkt_line_stream = build_smart_reply(&ref_list, service_type.to_string());
+        let pkt_line_stream = build_smart_reply(&self.ref_list, service_type.to_string());
 
         tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
         let body = Body::from(pkt_line_stream.freeze());
@@ -124,13 +120,13 @@ impl HttpProtocol {
 
         tracing::info!("want commands: {:?}, have commans: {:?}", want, have);
 
-        let object_root = self.path.repo_dir.join(".git/objects");
+        let object_root = storage.get_path().join(".git/objects");
 
         let send_pack_data;
         let mut buf = BytesMut::new();
 
         if have.is_empty() {
-            send_pack_data = storage.get_full_pack_data(&self.path).await;
+            send_pack_data = storage.get_full_pack_data().await;
             add_to_pkt_line(&mut buf, String::from("NAK\n"));
         } else {
             // TODO storage.handle_pull_pack_data(&self.path).await;
@@ -165,7 +161,7 @@ impl HttpProtocol {
     }
 
     pub async fn git_receive_pack<T: ObjectStorage>(
-        &self,
+        &mut self,
         req: Request<Body>,
         storage: &T,
     ) -> Result<Response<Body>, (StatusCode, String)> {
@@ -197,10 +193,7 @@ impl HttpProtocol {
                 let decoded_pack = command
                     .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                     .unwrap();
-                let save_result = storage
-                    .save_packfile(decoded_pack, &self.path.repo_path)
-                    .await
-                    .unwrap();
+                let save_result = storage.save_packfile(decoded_pack).await.unwrap();
                 if !save_result {
                     command.failed(String::from("db operation failed"));
                 }
@@ -229,49 +222,32 @@ impl HttpProtocol {
         Ok(resp)
     }
 
-    pub async fn decode_packfile(&self) {
-        let work_dir =
-            PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
-        let object_root = work_dir.join("crates.io-index/.git/objects");
-        let pack_path = object_root.join("pack/pack-db444c5a50d3ff97f514825f419bc8b02f18fc7f.pack");
-        let mut origin_pack_file = std::fs::File::open(pack_path).unwrap();
-
-        let decoded_pack = Pack::decode(&mut origin_pack_file).unwrap();
-        for meta in decoded_pack.result.by_hash.values() {
-            let res = meta.write_to_file(object_root.to_str().unwrap().to_owned());
-            tracing::info!("res:{:?}", res);
-        }
-    }
-
     // The stream SHOULD include the default ref named HEAD as the first ref
     async fn add_head_to_ref_list<T: ObjectStorage>(
-        &self,
+        &mut self,
         storage: &T,
-        service_type: ServiceType,
-    ) -> Result<Vec<String>, anyhow::Error> {
+    ) -> Result<bool, anyhow::Error> {
         // use zero_id if init_repo
         let zero_id = String::from_utf8_lossy(&[b'0'; 40]).to_string();
         // The stream MUST include capability declarations behind a NUL on the first ref.
-        let object_id = storage.get_head_object_id(&self.path.repo_path).await;
+        let object_id = storage.get_head_object_id().await;
         let name = if object_id == zero_id {
             "capabilities^{}"
         } else {
             "HEAD"
         };
-        let cap_list = if service_type == ServiceType::UploadPack {
-            format!(
+        let cap_list = match self.service_type.unwrap() {
+            ServiceType::UploadPack => format!(
                 "{}{}",
                 HttpProtocol::UPLOAD_CAP_LIST,
                 HttpProtocol::CAP_LIST
-            )
-        } else if service_type == ServiceType::ReceivePack {
-            format!(
+            ),
+            ServiceType::ReceivePack => format!(
                 "{}{}",
                 HttpProtocol::RECEIVE_CAP_LIST,
                 HttpProtocol::CAP_LIST
-            )
-        } else {
-            HttpProtocol::CAP_LIST.to_owned()
+            ),
+            _ => HttpProtocol::CAP_LIST.to_owned(),
         };
         let pkt_line = format!(
             "{}{}{}{}{}{}",
@@ -282,19 +258,14 @@ impl HttpProtocol {
             cap_list,
             HttpProtocol::LF
         );
-        let ref_list = vec![pkt_line];
-        Ok(ref_list)
+        self.ref_list = vec![pkt_line];
+        Ok(true)
     }
 
-    fn add_to_ref_list(&self, ref_list: &mut Vec<String>) {
-        let mut name = String::from("refs/heads/");
-        //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
-        let path = self.path.repo_dir.join(&name);
-        let paths = std::fs::read_dir(&path).unwrap();
-        for ref_file in paths.flatten() {
-            name.push_str(ref_file.file_name().to_str().unwrap());
-            let object_id = std::fs::read_to_string(ref_file.path()).unwrap();
-            let object_id = object_id.strip_suffix('\n').unwrap();
+    /// add other ref objecid and name to ref_list
+    async fn update_ref_list<T: ObjectStorage>(&mut self, storage: &T) {
+        let obj_ids = storage.get_ref_object_id().await;
+        for (object_id, name) in obj_ids {
             let pkt_line = format!(
                 "{}{}{}{}",
                 object_id,
@@ -303,7 +274,7 @@ impl HttpProtocol {
                 // HttpProtocol::NUL,
                 HttpProtocol::LF
             );
-            ref_list.push(pkt_line);
+            self.ref_list.push(pkt_line);
         }
     }
 }
@@ -352,13 +323,7 @@ fn find_common_base(
     );
     for commit in commits.iter().rev() {
         let tree_id = commit.tree_id;
-        parse_tree(
-            object_root,
-            tree_id,
-            &mut result,
-            &mut basic_objects,
-            false,
-        );
+        parse_tree(object_root, tree_id, &mut result, &mut basic_objects, false);
     }
     result
 }

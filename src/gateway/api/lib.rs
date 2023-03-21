@@ -19,7 +19,7 @@ use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 use tracing::log::{self};
 
-use crate::git::protocol::{HttpProtocol, ServiceType};
+use crate::git::protocol::HttpProtocol;
 use crate::gust::driver::database::mysql::storage::MysqlStorage;
 use crate::gust::driver::utils::id_generator;
 use crate::gust::driver::ObjectStorage;
@@ -58,11 +58,10 @@ pub(crate) async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let git_routes = Router::new()
         .route("/:repo/info/refs", get(git_info_refs))
         .route("/:repo/git-upload-pack", post(git_upload_pack))
-        .route("/:repo/git-receive-pack", post(git_receive_pack))
-        .route("/:repo/decode", post(decode_packfile));
+        .route("/:repo/git-receive-pack", post(git_receive_pack));
 
     let app = Router::new()
-        .nest("/:path", git_routes)
+        .nest("/:path/:path2", git_routes)
         .layer(ServiceBuilder::new().layer(CookieManagerLayer::new()))
         .with_state(state);
 
@@ -84,8 +83,9 @@ struct ServiceName {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Params {
-    pub repo: String,
     pub path: String,
+    pub path2: String,
+    pub repo: String,
 }
 
 impl Params {
@@ -94,22 +94,25 @@ impl Params {
             PathBuf::from(env::var("WORK_DIR").expect("WORK_DIR is not set in .env file"));
         work_dir
             .join(self.path.clone())
-            .join(self.repo.replace(".git", ""))
+            .join(self.path2.clone())
+            .join(self.repo.trim_end_matches(".git"))
     }
 }
 
 /// Discovering Reference
 async fn git_info_refs<T: ObjectStorage>(
-    state: State<AppState<T>>,
+    mut state: State<AppState<T>>,
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let service_name = service.service;
-    let http_protocol = HttpProtocol::new(params);
+    let mut http_protocol = HttpProtocol::new();
+
+    tracing::info!("{:?}", http_protocol);
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
-        http_protocol
-            .git_info_refs(ServiceType::new(&service_name), &state.storage)
-            .await
+        state.storage.set_path(params);
+        http_protocol.service_type(&service_name);
+        http_protocol.git_info_refs(&state.storage).await
     } else {
         Err((
             StatusCode::FORBIDDEN,
@@ -120,12 +123,12 @@ async fn git_info_refs<T: ObjectStorage>(
 
 /// Smart Service git-upload-pack, handle git pull and clone
 async fn git_upload_pack<T: ObjectStorage>(
-    state: State<AppState<T>>,
+    mut state: State<AppState<T>>,
     Path(params): Path<Params>,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
-    tracing::info!("{:?}", params.repo);
-    let http_protocol = HttpProtocol::new(params);
+    state.storage.set_path(params);
+    let http_protocol = HttpProtocol::new();
     http_protocol.git_upload_pack(req, &state.storage).await
 }
 
@@ -134,18 +137,12 @@ async fn git_upload_pack<T: ObjectStorage>(
 /// Smart Service git-receive-pack, handle git push
 async fn git_receive_pack<T: ObjectStorage>(
     // Extension(ref data_source): Extension<DataSource>,
-    state: State<AppState<T>>,
+    mut state: State<AppState<T>>,
     Path(params): Path<Params>,
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     tracing::info!("req: {:?}", req);
-    let http_protocol = HttpProtocol::new(params);
+    state.storage.set_path(params);
+    let mut http_protocol = HttpProtocol::new();
     http_protocol.git_receive_pack(req, &state.storage).await
-}
-
-/// try to unpack all object from pack file
-async fn decode_packfile() {
-    let http_protocol = HttpProtocol::default();
-
-    http_protocol.decode_packfile().await
 }

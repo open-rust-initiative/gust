@@ -7,22 +7,22 @@ use std::{fs::File, path::PathBuf};
 
 use clap::Subcommand;
 
-use crate::gateway::api::lib::Params;
+use crate::{
+    gateway::api::lib::Params,
+    gust::driver::{database::mysql::storage, ObjectStorage},
+};
 
 use super::pack::Pack;
 pub mod http;
 pub mod ssh;
 
+#[derive(Debug)]
 pub struct HttpProtocol {
     pub mode: AckMode,
-    pub path: ProjectPath,
-}
-
-pub struct ProjectPath {
-    // this params was used to search file in fs, format example: work_dir/path/repo/
-    pub repo_dir: PathBuf,
-    // this param was used to search in db, format example: path/repo/
-    pub repo_path: String,
+    //TODO ProjectPath parameter should be distributed to the two implementations of object storage
+    // pub path: ProjectPath,
+    pub ref_list: Vec<String>,
+    pub service_type: Option<ServiceType>,
 }
 
 ///
@@ -30,15 +30,13 @@ impl Default for HttpProtocol {
     fn default() -> Self {
         Self {
             mode: AckMode::MultiAckDetailed,
-            path: ProjectPath {
-                repo_dir: PathBuf::new(),
-                repo_path: "".to_owned(),
-            },
+            ref_list: Vec::new(),
+            service_type: None,
         }
     }
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ServiceType {
     UploadPack,
     ReceivePack,
@@ -50,7 +48,7 @@ impl ServiceType {
             "git-upload-pack" => ServiceType::UploadPack,
             "git-receive-pack" => ServiceType::ReceivePack,
             _ => panic!("service type not supported"),
-        } 
+        }
     }
     pub fn to_string(&self) -> String {
         match self {
@@ -64,6 +62,7 @@ impl ServiceType {
 ///
 ///
 #[allow(unused)]
+#[derive(Debug)]
 pub enum AckMode {
     MultiAck,
     MultiAckDetailed,
@@ -161,16 +160,16 @@ impl HttpProtocol {
 
     const NUL: char = '\0';
 
-    pub fn new(params: Params) -> Self {
-        tracing::info!("incoming req:{:?}", params);
-        let repo_dir = params.get_repo_dir();
+    pub fn new() -> Self {
         HttpProtocol {
             mode: AckMode::MultiAckDetailed,
-            path: ProjectPath {
-                repo_dir,
-                repo_path: format!("{}/{}", params.path, params.repo),
-            },
+            ref_list: Vec::new(),
+            service_type: None,
         }
+    }
+
+    pub fn service_type(&mut self, service_name: &str) {
+        self.service_type = Some(ServiceType::new(&service_name));
     }
 
     #[allow(unused)]

@@ -1,4 +1,8 @@
-use std::{any::Any, collections::HashMap, path::PathBuf};
+use std::{
+    any::Any,
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use sea_orm::{ActiveValue::NotSet, Set};
 
@@ -22,12 +26,14 @@ use crate::{
 
 use super::GitNodeObject;
 
-// pub struct Repo {
-//     pub root: TreeNode,
-//     pub storage_type: StorageType,
-//     // todo: limit the size of the cache
-//     pub cache: LruCache<String, FileNode>,
-// }
+pub struct Repo {
+    // pub repo_root: Box<dyn Node>,
+    pub tree_map: HashMap<Hash, Tree>,
+    pub blob_map: HashMap<Hash, Blob>,
+    // pub repo_path: PathBuf,
+    // todo: limit the size of the cache
+    // pub cache: LruCache<String, FileNode>,
+}
 
 // pub struct Commit {
 //     pub id: String,
@@ -99,14 +105,6 @@ pub trait Node {
     fn is_a_directory(&self) -> bool;
 
     fn as_any(&self) -> &dyn Any;
-
-    //search in datasource by path
-    fn init_node_from_datasource(path: PathBuf) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
 
     // since we use lazy load, need manually fetch data, and might need to use a LRU cache to store the data?
     fn read_data(&self) -> String {
@@ -299,31 +297,17 @@ impl TreeNode {
     }
 }
 
-pub fn init_root(tree: &Tree, req_path: &str) -> Box<dyn Node> {
-    let t_node = TreeNode {
-        nid: generate_id(),
-        pid: 0,
-        git_id: tree.meta.id,
-        name: tree.tree_name.clone(),
-        path: PathBuf::from(req_path),
-        mode: Vec::new(),
-        children: Vec::new(),
-    };
-    //TODO: load children
-    Box::new(t_node)
-}
-
 pub struct SaveModel {
     pub nodes: Vec<node::ActiveModel>,
     pub nodes_data: Vec<node_data::ActiveModel>,
 }
 
-/// this method is used to build node tree and persist node data to database. Convert sequence:
-/// 1. TreeItem => Node => Model
-/// 2. Blob => Model
+/// this method is used to build node tree and persist node data to database. Conversion order:
+/// 1. Git TreeItem => Struct Node => DB Model
+/// 2. Git Blob => DB Model
 pub async fn build_node_tree(
     result: &ObjDecodedMap,
-    req_path: &str,
+    repo_path: &mut PathBuf,
 ) -> Result<SaveModel, anyhow::Error> {
     let commit = &result.commits[0];
     let tree_id = commit.tree_id;
@@ -340,37 +324,70 @@ pub async fn build_node_tree(
         .map(|b| (b.meta.id, b))
         .collect();
 
-    let mut root = init_root(tree_map.get(&tree_id).unwrap(), req_path);
-    build_from_root_tree(&tree_id, &tree_map, &mut root, req_path);
+    let repo = Repo { tree_map, blob_map };
+
+    let tree = repo.tree_map.get(&tree_id).unwrap();
+    let mut repo_root = tree.convert_to_node(repo_path);
+
+    repo.build_from_root_tree(tree, &mut repo_root, repo_path);
     let mut save_model = SaveModel {
         nodes: Vec::new(),
         nodes_data: Vec::new(),
     };
-    traverse_node(root.as_ref(), 0, &mut save_model, &blob_map);
+    repo.traverse_node(repo_root.as_ref(), 0, &mut save_model, &repo.blob_map);
     Ok(save_model)
 }
 
-/// convert TreeItem to Node and build node tree
-pub fn build_from_root_tree(
-    tree_id: &Hash,
-    tree_map: &HashMap<Hash, Tree>,
-    node: &mut Box<dyn Node>,
-    req_path: &str,
-) {
-    let tree = tree_map.get(tree_id).unwrap();
-
-    for item in &tree.tree_items {
-        if item.item_type == TreeItemType::Tree {
-            let child_node: Box<dyn Node> = item.convert_to_node(node.get_id(), req_path);
-            node.add_child(child_node);
-
-            let child_node = match node.find_child(&item.filename) {
-                Some(child) => child,
-                None => panic!("Something wrong!:{}", &item.filename),
-            };
-            build_from_root_tree(&item.id, tree_map, child_node, req_path);
+impl Repo {
+    /// convert Git TreeItem => Struct Node and build node tree
+    pub fn build_from_root_tree(
+        &self,
+        tree: &Tree,
+        node: &mut Box<dyn Node>,
+        repo_path: &mut PathBuf,
+    ) {
+        for item in &tree.tree_items {
+            if item.item_type == TreeItemType::Tree {
+                repo_path.push(item.filename.clone());
+                let child_node: Box<dyn Node> = item.convert_to_node(node.get_id(), repo_path);
+                node.add_child(child_node);
+                let child_node = match node.find_child(&item.filename) {
+                    Some(child) => child,
+                    None => panic!("Something wrong!:{}", &item.filename),
+                };
+                self.build_from_root_tree(
+                    self.tree_map.get(&item.id).unwrap(),
+                    child_node,
+                    repo_path,
+                );
+                repo_path.pop();
+            } else {
+                node.add_child(item.convert_to_node(node.get_id(), repo_path));
+            }
+        }
+    }
+    /// conver Node to db entity and for later persistent
+    pub fn traverse_node(
+        &self,
+        node: &dyn Node,
+        depth: u32,
+        save_model: &mut SaveModel,
+        blob_map: &HashMap<Hash, Blob>,
+    ) {
+        print_node(node, depth);
+        let SaveModel { nodes, nodes_data } = save_model;
+        nodes.push(node.convert_to_model());
+        if node.is_a_directory() {
+            for child in node.get_children().iter() {
+                self.traverse_node(child.as_ref(), depth + 1, save_model, blob_map);
+            }
         } else {
-            node.add_child(item.convert_to_node(node.get_id(), req_path));
+            nodes_data.push(
+                blob_map
+                    .get(&node.get_git_id())
+                    .unwrap()
+                    .convert_to_model(node.get_id()),
+            );
         }
     }
 }
@@ -412,30 +429,6 @@ pub fn model_to_tree(
     results.push(meta);
 }
 
-/// conver Node to db entity and for later persistent
-pub fn traverse_node(
-    node: &dyn Node,
-    depth: u32,
-    save_model: &mut SaveModel,
-    blob_map: &HashMap<Hash, Blob>,
-) {
-    print_node(node, depth);
-    let SaveModel { nodes, nodes_data } = save_model;
-    nodes.push(node.convert_to_model());
-    if node.is_a_directory() {
-        for child in node.get_children().iter() {
-            traverse_node(child.as_ref(), depth + 1, save_model, blob_map);
-        }
-    } else {
-        nodes_data.push(
-            blob_map
-                .get(&node.get_git_id())
-                .unwrap()
-                .convert_to_model(node.get_id()),
-        );
-    }
-}
-
 /// Print a node with format.
 pub fn print_node(node: &dyn Node, depth: u32) {
     if depth == 0 {
@@ -457,7 +450,7 @@ mod test {
 
     use crate::gust::driver::{
         database::entity::node,
-        structure::nodes::{traverse_node, Node, TreeNode},
+        structure::nodes::{Node, TreeNode},
         utils::id_generator,
     };
 
