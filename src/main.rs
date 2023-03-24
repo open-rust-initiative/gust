@@ -37,11 +37,13 @@ pub mod git;
 pub mod gust;
 pub mod utils;
 
+use std::env;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{command, Parser};
 use git::protocol::ServeCommand;
+use gust::driver::utils::id_generator;
 
 use crate::gateway::api::lib;
 
@@ -67,14 +69,15 @@ struct Cli {
 /// 1. Add `clap` to parse command line arguments, don't start gateway service directly in the main function.
 /// 2. Add `log` function and initialization to log the application's running status.
 /// 3. Add `config` function to load the configuration file when the application running.
-pub fn main() -> Result<()> {
+#[tokio::main]
+pub async fn main() -> Result<()> {
+    env::set_var("RUST_LOG", "debug");
+    tracing_subscriber::fmt::init();
+    id_generator::set_up_options().unwrap();
+    dotenvy::dotenv().ok();
+
     // let cli = Cli::parse();
-    lib::main().unwrap();
-
-    // tracing_subscriber::fmt()
-    // .with_max_level(tracing::Level::DEBUG)
-    // .with_test_writer()
-    // .init();
-
+    // lib::http_server().await.unwrap();
+    lib::ssh_server().await.unwrap();
     Ok(())
 }

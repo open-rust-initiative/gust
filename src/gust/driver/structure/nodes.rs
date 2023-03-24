@@ -305,9 +305,11 @@ pub struct SaveModel {
 /// this method is used to build node tree and persist node data to database. Conversion order:
 /// 1. Git TreeItem => Struct Node => DB Model
 /// 2. Git Blob => DB Model
+/// current: protocol => storage => structure
+/// new: protocol => structure => storage
 pub async fn build_node_tree(
     result: &ObjDecodedMap,
-    repo_path: &mut PathBuf,
+    repo_path: &PathBuf,
 ) -> Result<SaveModel, anyhow::Error> {
     let commit = &result.commits[0];
     let tree_id = commit.tree_id;
@@ -329,7 +331,7 @@ pub async fn build_node_tree(
     let tree = repo.tree_map.get(&tree_id).unwrap();
     let mut repo_root = tree.convert_to_node(repo_path);
 
-    repo.build_from_root_tree(tree, &mut repo_root, repo_path);
+    repo.build_from_root_tree(tree, &mut repo_root, &mut repo_path.clone());
     let mut save_model = SaveModel {
         nodes: Vec::new(),
         nodes_data: Vec::new(),

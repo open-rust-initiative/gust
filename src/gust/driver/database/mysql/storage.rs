@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::gateway::api::lib::Params;
 use crate::git::object::base::commit::Commit;
-use crate::git::object::base::BaseObject;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 use crate::git::pack::decode::ObjDecodedMap;
@@ -20,22 +18,17 @@ use sea_orm::{
 #[derive(Debug, Default, Clone)]
 pub struct MysqlStorage {
     pub connection: DatabaseConnection,
-    pub repo_path: PathBuf,
 }
 
 impl MysqlStorage {
     pub fn new(connection: DatabaseConnection) -> MysqlStorage {
-        MysqlStorage {
-            connection,
-            repo_path: PathBuf::new(),
-        }
+        MysqlStorage { connection }
     }
 }
 
 #[async_trait]
 impl ObjectStorage for MysqlStorage {
-    async fn get_head_object_id(&self) -> String {
-        let repo_path = &self.repo_path;
+    async fn get_head_object_id(&self, repo_path: &PathBuf) -> String {
         let path_str = repo_path.to_str().unwrap();
         // consider a search condition: root/repotest2/src
         let commits: Vec<commit::Model> = commit::Entity::find()
@@ -67,19 +60,15 @@ impl ObjectStorage for MysqlStorage {
         }
     }
 
-    async fn get_ref_object_id(&self) -> HashMap<String, String> {
+    async fn get_ref_object_id(&self, repo_path: &PathBuf) -> HashMap<String, String> {
         HashMap::new()
     }
 
-    fn search_child_objects(
+    async fn save_packfile(
         &self,
-        _parent: Box<dyn BaseObject>,
-    ) -> Result<Vec<Box<dyn BaseObject>>, anyhow::Error> {
-        todo!()
-    }
-
-    async fn save_packfile(&self, decoded_pack: Pack) -> Result<bool, anyhow::Error> {
-        let repo_path = &mut self.repo_path.clone();
+        decoded_pack: Pack,
+        repo_path: &PathBuf,
+    ) -> Result<bool, anyhow::Error> {
         let mut result = ObjDecodedMap::default();
         result.update_from_cache(&decoded_pack.result);
         result.check_completeness().unwrap();
@@ -92,8 +81,7 @@ impl ObjectStorage for MysqlStorage {
         Ok(data_result && node_result && commit_result)
     }
 
-    async fn get_full_pack_data(&self) -> Vec<u8> {
-        // let mut repo_path = &mut self.repo_path;
+    async fn get_full_pack_data(&self, repo_path: &PathBuf) -> Vec<u8> {
         let mut metadata_vec: Vec<MetaData> = Vec::new();
         let blob_models: Vec<node_data::Model> = node_data::Entity::find()
             .all(&self.connection)
@@ -103,15 +91,15 @@ impl ObjectStorage for MysqlStorage {
             metadata_vec.push(MetaData::new(ObjectType::Blob, &b.data));
         }
         let node_models: Vec<node::Model> = node::Entity::find()
-            .filter(node::Column::Path.contains(self.repo_path.to_str().unwrap()))
+            .filter(node::Column::Path.contains(repo_path.to_str().unwrap()))
             .all(&self.connection)
             .await
             .unwrap();
-        let root = self.search_root_by_path(&self.repo_path).await.unwrap();
+        let root = self.search_root_by_path(repo_path).await.unwrap();
         model_to_tree(&node_models, &root, &mut metadata_vec);
 
         let commit: commit::Model = commit::Entity::find()
-            .filter(commit::Column::RepoPath.eq(self.repo_path.to_str()))
+            .filter(commit::Column::RepoPath.eq(repo_path.to_str()))
             .one(&self.connection)
             .await
             .unwrap()
@@ -126,14 +114,12 @@ impl ObjectStorage for MysqlStorage {
         todo!();
     }
 
-    fn get_path(&self) -> PathBuf {
-        self.repo_path.clone()
-    }
-    fn set_path(&mut self, params: Params) {
-        self.repo_path = PathBuf::from(
-            params.path + "/" + &params.path2 + "/" + params.repo.trim_end_matches(".git"),
-        );
-    }
+    // fn get_path(&self) -> PathBuf {
+    //     self.repo_path.clone()
+    // }
+    // fn set_path(&mut self, params: Params) {
+    //     self.repo_path = params.get_repo_path();
+    // }
 }
 
 impl MysqlStorage {

@@ -31,56 +31,47 @@ use crate::gust::driver::ObjectStorage;
 
 use super::{ServiceType, SideBind};
 
-impl HttpProtocol {
-    const PKT_LINE_END_MARKER: &[u8; 4] = b"0000";
 
-    // The atomic, report-status, report-status-v2, delete-refs, quiet,
-    // and push-cert capabilities are sent and recognized by the receive-pack (push to server) process.
-    const RECEIVE_CAP_LIST: &str = "report-status report-status-v2 delete-refs quiet atomic ";
+const LF: char = '\n';
 
-    // The ofs-delta and side-band-64k capabilities are sent and recognized by both upload-pack and receive-pack protocols.
-    // The agent and session-id capabilities may optionally be sent in both protocols.
-    const CAP_LIST: &str = "side-band-64k ofs-delta object-format=sha1";
+const SP: char = ' ';
 
-    // All other capabilities are only recognized by the upload-pack (fetch from server) process.
-    const UPLOAD_CAP_LIST: &str =
-        "shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done ";
+const NUL: char = '\0';
 
-    pub async fn git_info_refs<T: ObjectStorage>(
-        &mut self,
-        storage: &T,
-    ) -> Result<Response<Body>, (StatusCode, String)> {
-        let mut headers = HashMap::new();
+const PKT_LINE_END_MARKER: &[u8; 4] = b"0000";
+
+// The atomic, report-status, report-status-v2, delete-refs, quiet,
+// and push-cert capabilities are sent and recognized by the receive-pack (push to server) process.
+const RECEIVE_CAP_LIST: &str = "report-status report-status-v2 delete-refs quiet atomic ";
+
+// The ofs-delta and side-band-64k capabilities are sent and recognized by both upload-pack and receive-pack protocols.
+// The agent and session-id capabilities may optionally be sent in both protocols.
+const CAP_LIST: &str = "side-band-64k ofs-delta object-format=sha1";
+
+// All other capabilities are only recognized by the upload-pack (fetch from server) process.
+const UPLOAD_CAP_LIST: &str =
+    "shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done ";
+
+
+impl<T: ObjectStorage> HttpProtocol<T> {
+
+    pub async fn git_info_refs(&mut self) -> BytesMut {
         let service_type = self.service_type.unwrap();
-        headers.insert(
-            "Content-Type".to_string(),
-            format!("application/x-{}-advertisement", service_type.to_string()),
-        );
-        headers.insert(
-            "Cache-Control".to_string(),
-            "no-cache, max-age=0, must-revalidate".to_string(),
-        );
-        tracing::info!("headers: {:?}", headers);
-        let mut resp = Response::builder();
-        for (key, val) in headers {
-            resp = resp.header(&key, val);
-        }
 
-        self.add_head_to_ref_list(storage).await.unwrap();
-        self.update_ref_list(storage).await;
+        self.add_head_to_ref_list().await.unwrap();
+        self.update_ref_list().await;
 
         let pkt_line_stream = build_smart_reply(&self.ref_list, service_type.to_string());
 
         tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
-        let body = Body::from(pkt_line_stream.freeze());
-        let resp = resp.body(body).unwrap();
-        Ok(resp)
+
+        pkt_line_stream
     }
 
-    pub async fn git_upload_pack<T: ObjectStorage>(
+    pub async fn git_upload_pack(
         &self,
         req: Request<Body>,
-        storage: &T,
+        // storage: &T,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         let (_parts, mut body) = req.into_parts();
 
@@ -120,15 +111,14 @@ impl HttpProtocol {
 
         tracing::info!("want commands: {:?}, have commans: {:?}", want, have);
 
-        let object_root = storage.get_path().join(".git/objects");
-
         let send_pack_data;
         let mut buf = BytesMut::new();
 
         if have.is_empty() {
-            send_pack_data = storage.get_full_pack_data().await;
+            send_pack_data = self.storage.get_full_pack_data(&self.path).await;
             add_to_pkt_line(&mut buf, String::from("NAK\n"));
         } else {
+            let object_root = self.path.join(".git/objects");
             // TODO storage.handle_pull_pack_data(&self.path).await;
             let mut decoded_pack = Pack::default();
             let meta_map: HashMap<Hash, MetaData> =
@@ -160,10 +150,10 @@ impl HttpProtocol {
         Ok(resp)
     }
 
-    pub async fn git_receive_pack<T: ObjectStorage>(
-        &mut self,
+    pub async fn git_receive_pack(
+        &self,
         req: Request<Body>,
-        storage: &T,
+        // storage: &T,
     ) -> Result<Response<Body>, (StatusCode, String)> {
         // not in memory
         let (_parts, mut body) = req.into_parts();
@@ -181,7 +171,7 @@ impl HttpProtocol {
                 pkt_vec[2].to_string(),
             );
 
-            if body_bytes.copy_to_bytes(4).to_vec() == HttpProtocol::PKT_LINE_END_MARKER {
+            if body_bytes.copy_to_bytes(4).to_vec() == PKT_LINE_END_MARKER {
                 tracing::debug!("{:?}", body_bytes);
                 let temp_file = format!("./temp-{}.pack", Utc::now().timestamp());
                 let mut file = OpenOptions::new()
@@ -193,7 +183,10 @@ impl HttpProtocol {
                 let decoded_pack = command
                     .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                     .unwrap();
-                let save_result = storage.save_packfile(decoded_pack).await.unwrap();
+                let save_result = self.storage
+                    .save_packfile(decoded_pack, &self.path)
+                    .await
+                    .unwrap();
                 if !save_result {
                     command.failed(String::from("db operation failed"));
                 }
@@ -209,12 +202,12 @@ impl HttpProtocol {
         for status in command_status {
             add_to_pkt_line(&mut report_status, status);
         }
-        report_status.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+        report_status.put(&PKT_LINE_END_MARKER[..]);
 
         let length = report_status.len();
         let mut buf = BytesMut::new();
         build_side_band_format(report_status, &mut buf, length);
-        buf.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+        buf.put(&PKT_LINE_END_MARKER[..]);
 
         let body = Body::from(buf.freeze());
         tracing::info!("report status:{:?}", body);
@@ -223,14 +216,14 @@ impl HttpProtocol {
     }
 
     // The stream SHOULD include the default ref named HEAD as the first ref
-    async fn add_head_to_ref_list<T: ObjectStorage>(
+    async fn add_head_to_ref_list(
         &mut self,
-        storage: &T,
+        // storage: &T,
     ) -> Result<bool, anyhow::Error> {
         // use zero_id if init_repo
         let zero_id = String::from_utf8_lossy(&[b'0'; 40]).to_string();
         // The stream MUST include capability declarations behind a NUL on the first ref.
-        let object_id = storage.get_head_object_id().await;
+        let object_id = self.storage.get_head_object_id(&self.path).await;
         let name = if object_id == zero_id {
             "capabilities^{}"
         } else {
@@ -239,40 +232,40 @@ impl HttpProtocol {
         let cap_list = match self.service_type.unwrap() {
             ServiceType::UploadPack => format!(
                 "{}{}",
-                HttpProtocol::UPLOAD_CAP_LIST,
-                HttpProtocol::CAP_LIST
+                UPLOAD_CAP_LIST,
+                CAP_LIST
             ),
             ServiceType::ReceivePack => format!(
                 "{}{}",
-                HttpProtocol::RECEIVE_CAP_LIST,
-                HttpProtocol::CAP_LIST
+                RECEIVE_CAP_LIST,
+                CAP_LIST
             ),
-            _ => HttpProtocol::CAP_LIST.to_owned(),
+            _ => CAP_LIST.to_owned(),
         };
         let pkt_line = format!(
             "{}{}{}{}{}{}",
             object_id,
-            HttpProtocol::SP,
+            SP,
             name,
-            HttpProtocol::NUL,
+            NUL,
             cap_list,
-            HttpProtocol::LF
+            LF
         );
         self.ref_list = vec![pkt_line];
         Ok(true)
     }
 
     /// add other ref objecid and name to ref_list
-    async fn update_ref_list<T: ObjectStorage>(&mut self, storage: &T) {
-        let obj_ids = storage.get_ref_object_id().await;
+    async fn update_ref_list(&mut self) {
+        let obj_ids = self.storage.get_ref_object_id(&self.path).await;
         for (object_id, name) in obj_ids {
             let pkt_line = format!(
                 "{}{}{}{}",
                 object_id,
-                HttpProtocol::SP,
+                SP,
                 name,
-                // HttpProtocol::NUL,
-                HttpProtocol::LF
+                // NUL,
+                LF
             );
             self.ref_list.push(pkt_line);
         }
@@ -382,7 +375,7 @@ async fn send_pack(mut sender: Sender, result: Vec<u8>) -> Result<(), (StatusCod
         let mut temp = BytesMut::new();
         let length = reader.read_buf(&mut temp).await.unwrap();
         if temp.is_empty() {
-            bytes_out.put_slice(HttpProtocol::PKT_LINE_END_MARKER);
+            bytes_out.put_slice(PKT_LINE_END_MARKER);
             sender.send_data(bytes_out.freeze()).await.unwrap();
             return Ok(());
         }
@@ -402,12 +395,12 @@ fn build_side_band_format(from_bytes: BytesMut, to_bytes: &mut BytesMut, length:
 fn build_smart_reply(ref_list: &Vec<String>, service: String) -> BytesMut {
     let mut pkt_line_stream = BytesMut::new();
     add_to_pkt_line(&mut pkt_line_stream, format!("# service={}\n", service));
-    pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+    pkt_line_stream.put(&PKT_LINE_END_MARKER[..]);
 
     for ref_line in ref_list {
         add_to_pkt_line(&mut pkt_line_stream, ref_line.to_string());
     }
-    pkt_line_stream.put(&HttpProtocol::PKT_LINE_END_MARKER[..]);
+    pkt_line_stream.put(&PKT_LINE_END_MARKER[..]);
     pkt_line_stream
 }
 

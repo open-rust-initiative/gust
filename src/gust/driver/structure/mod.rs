@@ -47,7 +47,6 @@ impl Blob {
 
 impl Commit {
     pub fn build_from_model_and_root(model: &commit::Model, root: node::Model) -> Commit {
-        // let commit = Commit::new(MetaData::new(ObjectType::Commit, &model.meta));
         let mut c = Commit::new(MetaData::new(ObjectType::Commit, &model.meta));
         c.tree_id = Hash::from_str(&root.git_id).unwrap();
         c.meta = c.encode_metadata().unwrap();

@@ -7,33 +7,20 @@ use std::{fs::File, path::PathBuf};
 
 use clap::Subcommand;
 
-use crate::{
-    gateway::api::lib::Params,
-    gust::driver::{database::mysql::storage, ObjectStorage},
-};
+use crate::{gateway::api::lib::Params, gust::driver::ObjectStorage};
 
 use super::pack::Pack;
 pub mod http;
 pub mod ssh;
 
+/// todo: rename to transfer protocol
 #[derive(Debug)]
-pub struct HttpProtocol {
+pub struct HttpProtocol<T: ObjectStorage> {
     pub mode: AckMode,
-    //TODO ProjectPath parameter should be distributed to the two implementations of object storage
-    // pub path: ProjectPath,
+    pub path: PathBuf,
     pub ref_list: Vec<String>,
     pub service_type: Option<ServiceType>,
-}
-
-///
-impl Default for HttpProtocol {
-    fn default() -> Self {
-        Self {
-            mode: AckMode::MultiAckDetailed,
-            ref_list: Vec::new(),
-            service_type: None,
-        }
-    }
+    pub storage: T,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -131,14 +118,14 @@ impl RefCommand {
 
     pub fn get_status(&self) -> String {
         if RefCommand::OK_STATUS == self.status {
-            format!("{}{}{}", self.status, HttpProtocol::SP, self.ref_name,)
+            format!("{}{}{}", self.status, SP, self.ref_name,)
         } else {
             format!(
                 "{}{}{}{}{}",
                 self.status,
-                HttpProtocol::SP,
+                SP,
                 self.ref_name,
-                HttpProtocol::SP,
+                SP,
                 self.error_msg.clone()
             )
         }
@@ -149,28 +136,35 @@ impl RefCommand {
         self.error_msg = msg;
     }
 }
-///
-///
-///
+
+const LF: char = '\n';
+
+const SP: char = ' ';
+
+const NUL: char = '\0';
+
 #[allow(unused)]
-impl HttpProtocol {
-    const LF: char = '\n';
+impl<T: ObjectStorage> HttpProtocol<T> {
 
-    const SP: char = ' ';
 
-    const NUL: char = '\0';
-
-    pub fn new() -> Self {
+    pub fn new(path: PathBuf, service_name: &str, storage: T) -> Self {
+        let service_type = if service_name.is_empty() {
+            None
+        } else {
+            Some(ServiceType::new(service_name))
+        };
         HttpProtocol {
             mode: AckMode::MultiAckDetailed,
             ref_list: Vec::new(),
-            service_type: None,
+            service_type,
+            path,
+            storage,
         }
     }
 
-    pub fn service_type(&mut self, service_name: &str) {
-        self.service_type = Some(ServiceType::new(&service_name));
-    }
+    // pub fn service_type(&mut self, service_name: &str) {
+    //     self.service_type = Some(ServiceType::new(&service_name));
+    // }
 
     #[allow(unused)]
     pub fn value_in_ack_mode<'a>(mode: &AckMode) -> &'a str {

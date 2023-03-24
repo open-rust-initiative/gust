@@ -1,23 +1,15 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use crate::{git::pack::Pack, gust::driver::ObjectStorage};
 use async_trait::async_trait;
-// use crate::gust::driver::Params
-use crate::{
-    gateway::api::lib::Params,
-    git::{object::base::BaseObject, pack::Pack},
-    gust::driver::ObjectStorage,
-};
 
 #[derive(Debug, Default, Clone)]
-pub struct FileSystem {
-    // this params was used to search file in fs, format example: work_dir/path/repo
-    pub repo_dir: PathBuf,
-}
+pub struct FileSystem {}
 
 #[async_trait]
 impl ObjectStorage for FileSystem {
-    async fn get_head_object_id(&self) -> String {
-        let base_path = self.repo_dir.join(".git");
+    async fn get_head_object_id(&self, repo_dir: &PathBuf) -> String {
+        let base_path = repo_dir.join(".git");
         let content = std::fs::read_to_string(base_path.join("HEAD")).unwrap();
         let content = content.replace("ref: ", "");
         let content = content.strip_suffix('\n').unwrap();
@@ -38,20 +30,16 @@ impl ObjectStorage for FileSystem {
         object_id
     }
 
-    fn search_child_objects(
+    async fn save_packfile(
         &self,
-        // storage: &StorageType,
-        parent: Box<dyn BaseObject>,
-    ) -> Result<Vec<Box<dyn BaseObject>>, anyhow::Error> {
+        decoded_pack: Pack,
+        repo_dir: &PathBuf,
+    ) -> Result<bool, anyhow::Error> {
         todo!()
     }
 
-    async fn save_packfile(&self, decoded_pack: Pack) -> Result<bool, anyhow::Error> {
-        todo!()
-    }
-
-    async fn get_full_pack_data(&self) -> Vec<u8> {
-        let object_root = self.repo_dir.join(".git/objects");
+    async fn get_full_pack_data(&self, repo_dir: &PathBuf) -> Vec<u8> {
+        let object_root = repo_dir.join(".git/objects");
         let loose_vec = Pack::find_all_loose(object_root.to_str().unwrap());
         let (mut _loose_pack, loose_data) =
             Pack::pack_loose(loose_vec, object_root.to_str().unwrap());
@@ -62,10 +50,10 @@ impl ObjectStorage for FileSystem {
         todo!();
     }
 
-    async fn get_ref_object_id(&self) -> HashMap<String, String> {
+    async fn get_ref_object_id(&self, repo_dir: &PathBuf) -> HashMap<String, String> {
         let mut name = String::from(".git/refs/heads/");
         //TOOD: need to read from .git/packed-refs after run git gc, check how git show-ref command work
-        let path = self.repo_dir.join(&name);
+        let path = repo_dir.join(&name);
         let paths = std::fs::read_dir(&path).unwrap();
         let mut res = HashMap::new();
         for ref_file in paths.flatten() {
@@ -75,13 +63,5 @@ impl ObjectStorage for FileSystem {
             res.insert(object_id.to_owned(), name.to_owned());
         }
         res
-    }
-
-    fn get_path(&self) -> PathBuf {
-        self.repo_dir.clone()
-    }
-
-    fn set_path(&mut self, params: Params) {
-        self.repo_dir = params.get_repo_dir();
     }
 }
