@@ -3,11 +3,11 @@
 //!
 //!
 
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 use clap::Subcommand;
 
-use crate::{gateway::api::lib::Params, gust::driver::ObjectStorage};
+use crate::{git::protocol::http::SP, gust::driver::ObjectStorage};
 
 use super::pack::Pack;
 pub mod http;
@@ -18,9 +18,8 @@ pub mod ssh;
 pub struct HttpProtocol<T: ObjectStorage> {
     pub mode: AckMode,
     pub path: PathBuf,
-    pub ref_list: Vec<String>,
     pub service_type: Option<ServiceType>,
-    pub storage: T,
+    pub storage: Arc<T>,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -137,17 +136,9 @@ impl RefCommand {
     }
 }
 
-const LF: char = '\n';
-
-const SP: char = ' ';
-
-const NUL: char = '\0';
-
 #[allow(unused)]
 impl<T: ObjectStorage> HttpProtocol<T> {
-
-
-    pub fn new(path: PathBuf, service_name: &str, storage: T) -> Self {
+    pub fn new(path: PathBuf, service_name: &str, storage: Arc<T>) -> Self {
         let service_type = if service_name.is_empty() {
             None
         } else {
@@ -155,7 +146,7 @@ impl<T: ObjectStorage> HttpProtocol<T> {
         };
         HttpProtocol {
             mode: AckMode::MultiAckDetailed,
-            ref_list: Vec::new(),
+            // ref_list: Vec::new(),
             service_type,
             path,
             storage,

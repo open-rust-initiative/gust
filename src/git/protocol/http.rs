@@ -31,10 +31,9 @@ use crate::gust::driver::ObjectStorage;
 
 use super::{ServiceType, SideBind};
 
-
 const LF: char = '\n';
 
-const SP: char = ' ';
+pub const SP: char = ' ';
 
 const NUL: char = '\0';
 
@@ -52,19 +51,36 @@ const CAP_LIST: &str = "side-band-64k ofs-delta object-format=sha1";
 const UPLOAD_CAP_LIST: &str =
     "shallow deepen-since deepen-not deepen-relative multi_ack_detailed no-done ";
 
-
-impl<T: ObjectStorage> HttpProtocol<T> {
-
+impl<T> HttpProtocol<T>
+where
+    T: ObjectStorage + Send + Sync + Clone,
+{
     pub async fn git_info_refs(&mut self) -> BytesMut {
         let service_type = self.service_type.unwrap();
+        // use zero_id if init_repo
+        let zero_id = String::from_utf8_lossy(&[b'0'; 40]).to_string();
+        // The stream MUST include capability declarations behind a NUL on the first ref.
+        let object_id = self.storage.get_head_object_id(&self.path).await;
+        let name = if object_id == zero_id {
+            "capabilities^{}"
+        } else {
+            "HEAD"
+        };
+        let cap_list = match self.service_type {
+            Some(ServiceType::UploadPack) => format!("{}{}", UPLOAD_CAP_LIST, CAP_LIST),
+            Some(ServiceType::ReceivePack) => format!("{}{}", RECEIVE_CAP_LIST, CAP_LIST),
+            _ => CAP_LIST.to_owned(),
+        };
+        let pkt_line = format!("{}{}{}{}{}{}", object_id, SP, name, NUL, cap_list, LF);
+        let mut ref_list = vec![pkt_line];
 
-        self.add_head_to_ref_list().await.unwrap();
-        self.update_ref_list().await;
-
-        let pkt_line_stream = build_smart_reply(&self.ref_list, service_type.to_string());
-
+        let obj_ids = self.storage.get_ref_object_id(&self.path).await;
+        for (object_id, name) in obj_ids {
+            let pkt_line = format!("{}{}{}{}", object_id, SP, name, LF);
+            ref_list.push(pkt_line);
+        }
+        let pkt_line_stream = build_smart_reply(&ref_list, service_type.to_string());
         tracing::info!("git_info_refs response: {:?}", pkt_line_stream);
-
         pkt_line_stream
     }
 
@@ -183,7 +199,8 @@ impl<T: ObjectStorage> HttpProtocol<T> {
                 let decoded_pack = command
                     .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                     .unwrap();
-                let save_result = self.storage
+                let save_result = self
+                    .storage
                     .save_packfile(decoded_pack, &self.path)
                     .await
                     .unwrap();
@@ -213,62 +230,6 @@ impl<T: ObjectStorage> HttpProtocol<T> {
         tracing::info!("report status:{:?}", body);
         let resp = resp.body(body).unwrap();
         Ok(resp)
-    }
-
-    // The stream SHOULD include the default ref named HEAD as the first ref
-    async fn add_head_to_ref_list(
-        &mut self,
-        // storage: &T,
-    ) -> Result<bool, anyhow::Error> {
-        // use zero_id if init_repo
-        let zero_id = String::from_utf8_lossy(&[b'0'; 40]).to_string();
-        // The stream MUST include capability declarations behind a NUL on the first ref.
-        let object_id = self.storage.get_head_object_id(&self.path).await;
-        let name = if object_id == zero_id {
-            "capabilities^{}"
-        } else {
-            "HEAD"
-        };
-        let cap_list = match self.service_type.unwrap() {
-            ServiceType::UploadPack => format!(
-                "{}{}",
-                UPLOAD_CAP_LIST,
-                CAP_LIST
-            ),
-            ServiceType::ReceivePack => format!(
-                "{}{}",
-                RECEIVE_CAP_LIST,
-                CAP_LIST
-            ),
-            _ => CAP_LIST.to_owned(),
-        };
-        let pkt_line = format!(
-            "{}{}{}{}{}{}",
-            object_id,
-            SP,
-            name,
-            NUL,
-            cap_list,
-            LF
-        );
-        self.ref_list = vec![pkt_line];
-        Ok(true)
-    }
-
-    /// add other ref objecid and name to ref_list
-    async fn update_ref_list(&mut self) {
-        let obj_ids = self.storage.get_ref_object_id(&self.path).await;
-        for (object_id, name) in obj_ids {
-            let pkt_line = format!(
-                "{}{}{}{}",
-                object_id,
-                SP,
-                name,
-                // NUL,
-                LF
-            );
-            self.ref_list.push(pkt_line);
-        }
     }
 }
 

@@ -19,9 +19,9 @@ min-max = "0.1"
 colored = "2.0.0"
 crc = "3.0.0"
 diffs = "0.4.1"
-tokio = { version = "1.25.0", features = ["full"] }
+tokio = { version = "1.26.0", features = ["full"] }
 hyper = { version = "0.14.24", features = ["full"] }
-axum = "0.6.6"
+axum = "0.6.11"
 tower = "0.4.13"
 tower-cookies = "0.9.0"
 dotenvy = "0.15.6"
@@ -43,3 +43,5 @@ async-trait = "0.1.64"
 chrono = "0.4.23"
 lru = "0.9.0"
 idgenerator = "2.0.0"
+russh = "0.37.1"
+russh-keys = "0.37.1"

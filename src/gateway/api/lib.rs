@@ -2,6 +2,7 @@
 //!
 //!
 use std::collections::HashMap;
+use std::fs::File;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -14,8 +15,8 @@ use axum::http::{Response, StatusCode};
 use axum::routing::{get, post};
 use axum::{Router, Server};
 use hyper::Request;
+use russh_keys::key::KeyPair;
 use serde::{Deserialize, Serialize};
-use tokio::runtime::{Runtime, Handle};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 
@@ -51,29 +52,36 @@ pub async fn http_server() -> Result<(), Box<dyn std::error::Error>> {
 
 /// start a ssh server
 pub async fn ssh_server() -> Result<(), std::io::Error> {
-    // let mut host_key = Vec::new();
-    // let mut file = File::open("/path/to/host/key").unwrap();
-    // file.read_to_end(&mut host_key).unwrap();
-    // let host_key = PrivateKey::decode_ssh_private_key(&host_key, None).unwrap();
+    let ssh_root = env::var("SSH_ROOT").expect("WORK_DIR is not set in .env file");
+    let file_name = PathBuf::from(ssh_root).join("id_ed25519");
+    let client_key: KeyPair = match File::open(&file_name) {
+        Ok(_) => russh_keys::load_secret_key(file_name, None).unwrap(),
+        Err(err) => match err.kind() {
+            // ErrorKind::NotFound => {
+            //     tracing::info!("key not found: {:?}, init a new one", file_name);
+            //     let client_key = russh_keys::key::KeyPair::generate_ed25519().unwrap();
+            //     let pub_key = client_key.clone_public_key().unwrap();
+            //     write_public_key_base64(File::create(&file_name).unwrap(), &pub_key).unwrap();
+            //     client_key
+            // }
+            _ => panic!("Error opening key: {:?}, {}", file_name, err),
+        },
+    };
+    let client_pubkey = Arc::new(client_key.clone_public_key().unwrap());
 
-    let client_key = thrussh_keys::key::KeyPair::generate_ed25519().unwrap();
-    let client_pubkey = Arc::new(client_key.clone_public_key());
-
-    let mut config = thrussh::server::Config::default();
+    let mut config = russh::server::Config::default();
     config.connection_timeout = Some(std::time::Duration::from_secs(5));
     config.auth_rejection_time = std::time::Duration::from_secs(3);
-    config
-        .keys
-        .push(thrussh_keys::key::KeyPair::generate_ed25519().unwrap());
+    config.keys.push(client_key);
+
     let config = Arc::new(config);
     let sh = SshServer {
         client_pubkey,
         clients: Arc::new(Mutex::new(HashMap::new())),
         id: 0,
         storage: mysql::init().await,
-        handle: Handle::current(),
     };
-    thrussh::server::run(config, "0.0.0.0:2222", sh).await
+    russh::server::run(config, "0.0.0.0:2222", sh).await
 }
 
 #[derive(Clone)]
@@ -86,14 +94,14 @@ struct ServiceName {
     pub service: String,
 }
 
+//TODO update this
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Params {
     pub path: String,
     pub path2: String,
     pub repo: String,
 }
-/// http: url => params(Struct) => path 
-/// ssh: url => command(String) => path
+
 impl Params {
     pub fn get_path(&self) -> PathBuf {
         PathBuf::from(
@@ -107,18 +115,25 @@ async fn git_info_refs<T>(
     state: State<AppState<T>>,
     Query(service): Query<ServiceName>,
     Path(params): Path<Params>,
-) -> Result<Response<Body>, (StatusCode, String)> 
-where T: ObjectStorage + Clone {
+) -> Result<Response<Body>, (StatusCode, String)>
+where
+    T: ObjectStorage + Clone + Send + Sync,
+{
     let service_name = service.service;
 
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
-        let mut http_protocol = HttpProtocol::new(params.get_path(), &service_name, state.storage.clone());
-        // http_protocol.service_type(&service_name);
-
+        let mut http_protocol = HttpProtocol::new(
+            params.get_path(),
+            &service_name,
+            Arc::new(state.storage.clone()),
+        );
         let mut headers = HashMap::new();
         headers.insert(
             "Content-Type".to_string(),
-            format!("application/x-{}-advertisement", http_protocol.service_type.unwrap().to_string()),
+            format!(
+                "application/x-{}-advertisement",
+                http_protocol.service_type.unwrap().to_string()
+            ),
         );
         headers.insert(
             "Cache-Control".to_string(),
@@ -146,10 +161,11 @@ async fn git_upload_pack<T>(
     state: State<AppState<T>>,
     Path(params): Path<Params>,
     req: Request<Body>,
-) -> Result<Response<Body>, (StatusCode, String)> 
-where T: ObjectStorage + Clone {
-    // state.storage.set_path(params);
-    let http_protocol = HttpProtocol::new(params.get_path(), "", state.storage.clone());
+) -> Result<Response<Body>, (StatusCode, String)>
+where
+    T: ObjectStorage + Clone + Send + Sync,
+{
+    let http_protocol = HttpProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
     http_protocol.git_upload_pack(req).await
 }
 
@@ -160,9 +176,11 @@ async fn git_receive_pack<T>(
     state: State<AppState<T>>,
     Path(params): Path<Params>,
     req: Request<Body>,
-) -> Result<Response<Body>, (StatusCode, String)> 
-where T: ObjectStorage + Clone {
+) -> Result<Response<Body>, (StatusCode, String)>
+where
+    T: ObjectStorage + Clone + Send + Sync,
+{
     tracing::info!("req: {:?}", req);
-    let http_protocol = HttpProtocol::new(params.get_path(), "", state.storage.clone());
+    let http_protocol = HttpProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
     http_protocol.git_receive_pack(req).await
 }
