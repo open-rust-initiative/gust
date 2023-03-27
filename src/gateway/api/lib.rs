@@ -21,9 +21,37 @@ use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 
 use crate::git::protocol::ssh::SshServer;
-use crate::git::protocol::HttpProtocol;
+use crate::git::protocol::{http, PackProtocol};
 use crate::gust::driver::database::mysql;
 use crate::gust::driver::ObjectStorage;
+
+#[derive(Clone)]
+struct AppState<T: ObjectStorage> {
+    storage: T,
+}
+
+#[derive(Deserialize, Debug)]
+struct ServiceName {
+    pub service: String,
+}
+
+//TODO update this
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Params {
+    pub path: String,
+    // pub path2: String,
+    pub repo: String,
+}
+
+impl Params {
+    pub fn get_path(&self) -> PathBuf {
+        PathBuf::from(
+            self.path.clone())
+            // .join(&self.path2)
+            .join(self.repo.trim_end_matches(".git"),
+        )
+    }
+}
 
 pub async fn http_server() -> Result<(), Box<dyn std::error::Error>> {
     let host = env::var("HOST").expect("HOST is not set in .env file");
@@ -40,7 +68,7 @@ pub async fn http_server() -> Result<(), Box<dyn std::error::Error>> {
         .route("/:repo/git-receive-pack", post(git_receive_pack));
 
     let app = Router::new()
-        .nest("/:path/:path2", git_routes)
+        .nest("/:path", git_routes)
         .layer(ServiceBuilder::new().layer(CookieManagerLayer::new()))
         .with_state(state);
 
@@ -84,32 +112,6 @@ pub async fn ssh_server() -> Result<(), std::io::Error> {
     russh::server::run(config, "0.0.0.0:2222", sh).await
 }
 
-#[derive(Clone)]
-struct AppState<T: ObjectStorage> {
-    storage: T,
-}
-
-#[derive(Deserialize, Debug)]
-struct ServiceName {
-    pub service: String,
-}
-
-//TODO update this
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Params {
-    pub path: String,
-    pub path2: String,
-    pub repo: String,
-}
-
-impl Params {
-    pub fn get_path(&self) -> PathBuf {
-        PathBuf::from(
-            self.path.clone() + "/" + &self.path2 + "/" + self.repo.trim_end_matches(".git"),
-        )
-    }
-}
-
 /// Discovering Reference
 async fn git_info_refs<T>(
     state: State<AppState<T>>,
@@ -117,12 +119,12 @@ async fn git_info_refs<T>(
     Path(params): Path<Params>,
 ) -> Result<Response<Body>, (StatusCode, String)>
 where
-    T: ObjectStorage + Clone + Send + Sync,
+    T: ObjectStorage,
 {
     let service_name = service.service;
 
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
-        let mut http_protocol = HttpProtocol::new(
+        let mut pack_protocol = PackProtocol::new(
             params.get_path(),
             &service_name,
             Arc::new(state.storage.clone()),
@@ -132,7 +134,7 @@ where
             "Content-Type".to_string(),
             format!(
                 "application/x-{}-advertisement",
-                http_protocol.service_type.unwrap().to_string()
+                pack_protocol.service_type.unwrap().to_string()
             ),
         );
         headers.insert(
@@ -145,7 +147,7 @@ where
             resp = resp.header(&key, val);
         }
 
-        let pkt_line_stream = http_protocol.git_info_refs().await;
+        let pkt_line_stream = pack_protocol.git_info_refs().await;
         let body = Body::from(pkt_line_stream.freeze());
         Ok(resp.body(body).unwrap())
     } else {
@@ -163,10 +165,11 @@ async fn git_upload_pack<T>(
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)>
 where
-    T: ObjectStorage + Clone + Send + Sync,
+    T: ObjectStorage + 'static,
 {
-    let http_protocol = HttpProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
-    http_protocol.git_upload_pack(req).await
+    let pack_protocol = PackProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
+
+    http::git_upload_pack(req, pack_protocol).await
 }
 
 // http://localhost:8000/org1/apps/App2.git
@@ -178,9 +181,9 @@ async fn git_receive_pack<T>(
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)>
 where
-    T: ObjectStorage + Clone + Send + Sync,
+    T: ObjectStorage,
 {
     tracing::info!("req: {:?}", req);
-    let http_protocol = HttpProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
-    http_protocol.git_receive_pack(req).await
+    let pack_protocol = PackProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
+    pack_protocol.git_receive_pack(req).await
 }

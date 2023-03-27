@@ -3,23 +3,33 @@
 //!
 //!
 
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{fs::File, path::PathBuf, sync::Arc, clone};
 
 use clap::Subcommand;
 
-use crate::{git::protocol::http::SP, gust::driver::ObjectStorage};
+use crate::{git::protocol::pack::SP, gust::driver::ObjectStorage};
 
 use super::pack::Pack;
 pub mod http;
+pub mod pack;
 pub mod ssh;
 
-/// todo: rename to transfer protocol
-#[derive(Debug)]
-pub struct HttpProtocol<T: ObjectStorage> {
-    pub mode: AckMode,
+#[derive(Debug, Clone)]
+pub struct PackProtocol<T: ObjectStorage> {
+    pub protocol: Protocol,
+    pub capabilities: Vec<Capability>,
     pub path: PathBuf,
     pub service_type: Option<ServiceType>,
     pub storage: Arc<T>,
+}
+
+// Is that useful?
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Protocol {
+    Local,
+    Http,
+    Ssh,
+    Git,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -44,15 +54,19 @@ impl ServiceType {
     }
 }
 
-///
-///
-///
-#[allow(unused)]
-#[derive(Debug)]
-pub enum AckMode {
+
+// TODO: Additional Capabilitys need to be added.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Capability {
     MultiAck,
     MultiAckDetailed,
-    Neither,
+    SideBand,
+    SideBand64k,
+    ReportStatus,
+    ReportStatusv2,
+    OfsDelta,
+    DeepenSince,
+    DeepenNot,
 }
 
 pub enum SideBind {
@@ -137,16 +151,17 @@ impl RefCommand {
 }
 
 #[allow(unused)]
-impl<T: ObjectStorage> HttpProtocol<T> {
-    pub fn new(path: PathBuf, service_name: &str, storage: Arc<T>) -> Self {
+impl<T: ObjectStorage> PackProtocol<T> {
+    pub fn new( path: PathBuf, service_name: &str, storage: Arc<T>) -> Self {
         let service_type = if service_name.is_empty() {
             None
         } else {
             Some(ServiceType::new(service_name))
         };
-        HttpProtocol {
-            mode: AckMode::MultiAckDetailed,
-            // ref_list: Vec::new(),
+        PackProtocol {
+            // TODO: remove hard code here
+            protocol: Protocol::Ssh,
+            capabilities: Vec::new(),
             service_type,
             path,
             storage,
@@ -157,14 +172,14 @@ impl<T: ObjectStorage> HttpProtocol<T> {
     //     self.service_type = Some(ServiceType::new(&service_name));
     // }
 
-    #[allow(unused)]
-    pub fn value_in_ack_mode<'a>(mode: &AckMode) -> &'a str {
-        match mode {
-            AckMode::MultiAck => "multi_ack",
-            AckMode::MultiAckDetailed => "multi_ack_detailed",
-            AckMode::Neither => "",
-        }
-    }
+    // #[allow(unused)]
+    // pub fn value_in_ack_mode<'a>(mode: &AckMode) -> &'a str {
+    //     match mode {
+    //         AckMode::MultiAck => "multi_ack",
+    //         AckMode::MultiAckDetailed => "multi_ack_detailed",
+    //         AckMode::Neither => "",
+    //     }
+    // }
 }
 
 #[derive(Subcommand)]

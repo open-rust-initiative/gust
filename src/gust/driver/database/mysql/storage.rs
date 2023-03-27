@@ -34,12 +34,13 @@ impl ObjectStorage for MysqlStorage {
         let commits: Vec<commit::Model> = commit::Entity::find()
             .from_raw_sql(Statement::from_sql_and_values(
                 DatabaseBackend::MySql,
-                "SELECT * FROM gust.commit where ? LIKE CONCAT(repo_path, '%')",
+                r#"SELECT * FROM gust.commit where ? LIKE CONCAT(repo_path, '%')"#,
                 [path_str.into()],
             ))
             .all(&self.connection)
             .await
             .unwrap();
+        tracing::debug!("path_str: {}", path_str);
         if commits.is_empty() {
             String::from_utf8_lossy(&[b'0'; 40]).to_string()
         } else {
@@ -95,6 +96,8 @@ impl ObjectStorage for MysqlStorage {
             .all(&self.connection)
             .await
             .unwrap();
+        tracing::debug!("repo_path: {:?}", repo_path);
+
         let root = self.search_root_by_path(repo_path).await.unwrap();
         model_to_tree(&node_models, &root, &mut metadata_vec);
 
@@ -113,13 +116,6 @@ impl ObjectStorage for MysqlStorage {
     async fn handle_pull_pack_data(&self) -> Vec<u8> {
         todo!();
     }
-
-    // fn get_path(&self) -> PathBuf {
-    //     self.repo_path.clone()
-    // }
-    // fn set_path(&mut self, params: Params) {
-    //     self.repo_path = params.get_repo_path();
-    // }
 }
 
 impl MysqlStorage {
@@ -167,6 +163,7 @@ impl MysqlStorage {
     }
 
     async fn search_root_by_path(&self, repo_path: &Path) -> Option<node::Model> {
+        tracing::debug!("file_name: {:?}", repo_path.file_name());
         node::Entity::find()
             // .filter(node::Column::Path.like(repo_path.to_str().unwrap()))
             .filter(node::Column::Name.eq(repo_path.file_name().unwrap().to_str().unwrap()))

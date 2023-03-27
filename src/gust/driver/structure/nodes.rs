@@ -309,7 +309,7 @@ pub struct SaveModel {
 /// new: protocol => structure => storage
 pub async fn build_node_tree(
     result: &ObjDecodedMap,
-    repo_path: &PathBuf,
+    repo_path: &Path,
 ) -> Result<SaveModel, anyhow::Error> {
     let commit = &result.commits[0];
     let tree_id = commit.tree_id;
@@ -331,7 +331,7 @@ pub async fn build_node_tree(
     let tree = repo.tree_map.get(&tree_id).unwrap();
     let mut repo_root = tree.convert_to_node(repo_path);
 
-    repo.build_from_root_tree(tree, &mut repo_root, &mut repo_path.clone());
+    repo.build_from_root_tree(tree, &mut repo_root, &mut repo_path.to_path_buf());
     let mut save_model = SaveModel {
         nodes: Vec::new(),
         nodes_data: Vec::new(),
