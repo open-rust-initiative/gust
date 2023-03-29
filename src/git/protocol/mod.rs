@@ -3,7 +3,7 @@
 //!
 //!
 
-use std::{fs::File, path::PathBuf, sync::Arc, clone};
+use std::{fs::File, path::PathBuf, str::FromStr, sync::Arc};
 
 use clap::Subcommand;
 
@@ -21,6 +21,7 @@ pub struct PackProtocol<T: ObjectStorage> {
     pub path: PathBuf,
     pub service_type: Option<ServiceType>,
     pub storage: Arc<T>,
+    pub command_list: Vec<RefCommand>,
 }
 
 // Is that useful?
@@ -39,13 +40,6 @@ pub enum ServiceType {
 }
 
 impl ServiceType {
-    pub fn new(service_name: &str) -> Self {
-        match service_name {
-            "git-upload-pack" => ServiceType::UploadPack,
-            "git-receive-pack" => ServiceType::ReceivePack,
-            _ => panic!("service type not supported"),
-        }
-    }
     pub fn to_string(&self) -> String {
         match self {
             ServiceType::UploadPack => "git-upload-pack".to_owned(),
@@ -53,7 +47,17 @@ impl ServiceType {
         }
     }
 }
+impl FromStr for ServiceType {
+    type Err = ();
 
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "git-upload-pack" => Ok(ServiceType::UploadPack),
+            "git-receive-pack" => Ok(ServiceType::ReceivePack),
+            _ => Err(()),
+        }
+    }
+}
 
 // TODO: Additional Capabilitys need to be added.
 #[derive(Debug, Clone, PartialEq)]
@@ -67,6 +71,25 @@ pub enum Capability {
     OfsDelta,
     DeepenSince,
     DeepenNot,
+}
+
+impl FromStr for Capability {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "report-status" => Ok(Capability::ReportStatus),
+            "report-status-v2" => Ok(Capability::ReportStatusv2),
+            "side-band" => Ok(Capability::SideBand),
+            "side-band-64k" => Ok(Capability::SideBand64k),
+            "ofs-delta" => Ok(Capability::OfsDelta),
+            "multi_ack" => Ok(Capability::MultiAck),
+            "multi_ack_detailed" => Ok(Capability::MultiAckDetailed),
+            "deepen-since" => Ok(Capability::DeepenSince),
+            "deepen-not" => Ok(Capability::DeepenNot),
+            _ => Err(()),
+        }
+    }
 }
 
 pub enum SideBind {
@@ -152,33 +175,24 @@ impl RefCommand {
 
 #[allow(unused)]
 impl<T: ObjectStorage> PackProtocol<T> {
-    pub fn new( path: PathBuf, service_name: &str, storage: Arc<T>) -> Self {
+    pub fn new(path: PathBuf, service_name: &str, storage: Arc<T>, protocol: Protocol) -> Self {
         let service_type = if service_name.is_empty() {
             None
         } else {
-            Some(ServiceType::new(service_name))
+            Some(service_name.parse::<ServiceType>().unwrap())
         };
         PackProtocol {
-            // TODO: remove hard code here
-            protocol: Protocol::Ssh,
+            protocol,
             capabilities: Vec::new(),
             service_type,
             path,
             storage,
+            command_list: Vec::new(),
         }
     }
 
     // pub fn service_type(&mut self, service_name: &str) {
     //     self.service_type = Some(ServiceType::new(&service_name));
-    // }
-
-    // #[allow(unused)]
-    // pub fn value_in_ack_mode<'a>(mode: &AckMode) -> &'a str {
-    //     match mode {
-    //         AckMode::MultiAck => "multi_ack",
-    //         AckMode::MultiAckDetailed => "multi_ack_detailed",
-    //         AckMode::Neither => "",
-    //     }
     // }
 }
 

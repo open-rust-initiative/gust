@@ -14,10 +14,11 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::io::{AsyncReadExt, BufReader};
 
+use crate::git::protocol::ServiceType;
 use crate::gust::driver::ObjectStorage;
 
 use super::pack::{self};
-use super::PackProtocol;
+use super::{PackProtocol, Protocol};
 
 #[derive(Clone)]
 pub struct SshServer<T: ObjectStorage> {
@@ -25,6 +26,8 @@ pub struct SshServer<T: ObjectStorage> {
     pub clients: Arc<Mutex<HashMap<(usize, ChannelId), Channel<Msg>>>>,
     pub id: usize,
     pub storage: T,
+    // is it a good choice to bind data here?
+    pub pack_protocol: Option<PackProtocol<T>>,
 }
 
 impl<T: ObjectStorage> server::Server for SshServer<T> {
@@ -45,6 +48,7 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
         channel: Channel<Msg>,
         session: Session,
     ) -> Result<(Self, bool, Session), Self::Error> {
+        tracing::info!("SshServer::channel_open_session:{}", channel.id());
         {
             let mut clients = self.clients.lock().unwrap();
             clients.insert((self.id, channel.id()), channel);
@@ -53,7 +57,7 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
     }
 
     async fn exec_request(
-        self,
+        mut self,
         channel: ChannelId,
         data: &[u8],
         mut session: Session,
@@ -81,14 +85,77 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
     }
 
     async fn data(
-        self,
+        mut self,
         channel: ChannelId,
         data: &[u8],
         mut session: Session,
     ) -> Result<(Self, Session), Self::Error> {
+        let pack_protocol = self.pack_protocol.as_mut().unwrap();
         let data_str = String::from_utf8_lossy(data).trim().to_owned();
         tracing::info!("data: {:?}, channel:{}", data_str, channel);
-        let (send_pack_data, buf, pack_protocol) = self.handle_fetch_pack(data).await;
+        match pack_protocol.service_type {
+            Some(ServiceType::UploadPack) => {
+                // let (send_pack_data, buf, pack_protocol) = self.handle_upload_pack(data).await;
+                self.handle_upload_pack(channel, data, &mut session).await;
+            }
+            Some(ServiceType::ReceivePack) => {
+                self.handle_receive_pack(channel, data, &mut session).await;
+            }
+            None => panic!(),
+        };
+        // session.eof(channel);
+        // tracing::info!("send eof");
+        // session.close(channel);
+        Ok((self, session))
+    }
+
+    // async fn channel_eof(
+    //     self,
+    //     channel: ChannelId,
+    //     mut session: Session,
+    // ) -> Result<(Self, Session), Self::Error> {
+    //     // let (self, session) = server::Handler::channel_eof(self, channel, session).await?;
+    //     session.close(channel);
+    //     Ok((self, session))
+    // }
+
+    // async fn channel_close(
+    //     self,
+    //     channel: ChannelId,
+    //     session: Session,
+    // ) -> Result<(Self, Session), Self::Error> {
+    //     tracing::info!("channel_close: {:?}", channel);
+    //     Ok((self, session))
+    // }
+}
+
+impl<T: ObjectStorage> SshServer<T> {
+    async fn handle_git_command(&mut self, command: &str) -> String {
+        let command: Vec<_> = command.split(' ').collect();
+        // command:
+        // Push: git-receive-pack '/root/repotest/src.git'
+        // Pull: git-upload-pack '/root/repotest/src.git'
+        let path = command[1];
+        let end = path.len() - ".git'".len();
+        let mut pack_protocol = PackProtocol::new(
+            PathBuf::from(&path[2..end]),
+            command[0],
+            Arc::new(self.storage.clone()),
+            Protocol::Ssh,
+        );
+        let res = pack_protocol.git_info_refs().await;
+        self.pack_protocol = Some(pack_protocol);
+        String::from_utf8(res.to_vec()).unwrap()
+    }
+
+    async fn handle_upload_pack(&mut self, channel: ChannelId, data: &[u8], session: &mut Session) {
+        let pack_protocol = self.pack_protocol.as_mut().unwrap();
+
+        let (send_pack_data, buf) = pack_protocol
+            .git_upload_pack(&mut Bytes::copy_from_slice(data))
+            .await
+            .unwrap();
+
         tracing::info!("buf is {:?}", buf);
         session.data(channel, String::from_utf8(buf.to_vec()).unwrap().into());
 
@@ -100,42 +167,26 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
                 let mut bytes_out = BytesMut::new();
                 bytes_out.put_slice(pack::PKT_LINE_END_MARKER);
                 session.data(channel, bytes_out.to_vec().into());
-                tracing::info!("close session");
-                return Ok((self, session));
+                return;
             }
             let bytes_out = pack_protocol.build_side_band_format(temp, length);
             tracing::info!("send: bytes_out: {:?}", bytes_out.clone().freeze());
             session.data(channel, bytes_out.to_vec().into());
         }
     }
-}
 
-impl<T: ObjectStorage> SshServer<T> {
-    async fn handle_git_command(&self, command: &str) -> String {
-        let command: Vec<_> = command.split(' ').collect();
-        // example '/root/repotest/src.git'
-        let path = command[1];
-        let end = path.len() - ".git'".len();
-        let mut pack_protocol = PackProtocol::new(
-            PathBuf::from(&path[2..end]),
-            command[0],
-            Arc::new(self.storage.clone()),
-        );
-        let res = pack_protocol.git_info_refs().await;
-        String::from_utf8(res.to_vec()).unwrap()
-    }
+    async fn handle_receive_pack(
+        &mut self,
+        channel: ChannelId,
+        data: &[u8],
+        session: &mut Session,
+    ) {
+        let pack_protocol = self.pack_protocol.as_mut().unwrap();
 
-    async fn handle_fetch_pack(&self, data: &[u8]) -> (Vec<u8>, BytesMut, PackProtocol<T>) {
-        // TODO: replace hard code here
-        let pack_protocol = PackProtocol::new(
-            PathBuf::from("root/repotest/src"),
-            "",
-            Arc::new(self.storage.clone()),
-        );
-        let (send_pack_data, buf) = pack_protocol
-            .git_upload_pack(&mut Bytes::copy_from_slice(data))
+        let buf = pack_protocol
+            .git_receive_pack(Bytes::from(data.to_vec()))
             .await
             .unwrap();
-        (send_pack_data, buf, pack_protocol)
+        session.data(channel, buf.to_vec().into());
     }
 }

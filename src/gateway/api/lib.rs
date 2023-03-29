@@ -21,7 +21,7 @@ use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 
 use crate::git::protocol::ssh::SshServer;
-use crate::git::protocol::{http, PackProtocol};
+use crate::git::protocol::{http, PackProtocol, Protocol};
 use crate::gust::driver::database::mysql;
 use crate::gust::driver::ObjectStorage;
 
@@ -45,11 +45,9 @@ pub struct Params {
 
 impl Params {
     pub fn get_path(&self) -> PathBuf {
-        PathBuf::from(
-            self.path.clone())
+        PathBuf::from(self.path.clone())
             // .join(&self.path2)
-            .join(self.repo.trim_end_matches(".git"),
-        )
+            .join(self.repo.trim_end_matches(".git"))
     }
 }
 
@@ -98,7 +96,7 @@ pub async fn ssh_server() -> Result<(), std::io::Error> {
     let client_pubkey = Arc::new(client_key.clone_public_key().unwrap());
 
     let mut config = russh::server::Config::default();
-    config.connection_timeout = Some(std::time::Duration::from_secs(5));
+    config.connection_timeout = Some(std::time::Duration::from_secs(10));
     config.auth_rejection_time = std::time::Duration::from_secs(3);
     config.keys.push(client_key);
 
@@ -108,6 +106,7 @@ pub async fn ssh_server() -> Result<(), std::io::Error> {
         clients: Arc::new(Mutex::new(HashMap::new())),
         id: 0,
         storage: mysql::init().await,
+        pack_protocol: None,
     };
     russh::server::run(config, "0.0.0.0:2222", sh).await
 }
@@ -128,6 +127,7 @@ where
             params.get_path(),
             &service_name,
             Arc::new(state.storage.clone()),
+            Protocol::Http,
         );
         let mut headers = HashMap::new();
         headers.insert(
@@ -167,7 +167,12 @@ async fn git_upload_pack<T>(
 where
     T: ObjectStorage + 'static,
 {
-    let pack_protocol = PackProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
+    let pack_protocol = PackProtocol::new(
+        params.get_path(),
+        "",
+        Arc::new(state.storage.clone()),
+        Protocol::Http,
+    );
 
     http::git_upload_pack(req, pack_protocol).await
 }
@@ -181,9 +186,14 @@ async fn git_receive_pack<T>(
     req: Request<Body>,
 ) -> Result<Response<Body>, (StatusCode, String)>
 where
-    T: ObjectStorage,
+    T: ObjectStorage + 'static,
 {
     tracing::info!("req: {:?}", req);
-    let pack_protocol = PackProtocol::new(params.get_path(), "", Arc::new(state.storage.clone()));
-    pack_protocol.git_receive_pack(req).await
+    let pack_protocol = PackProtocol::new(
+        params.get_path(),
+        "",
+        Arc::new(state.storage.clone()),
+        Protocol::Http,
+    );
+    http::git_receive_pack(req, pack_protocol).await
 }

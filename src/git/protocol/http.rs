@@ -5,7 +5,7 @@ use axum::body::Body;
 use axum::http::response::Builder;
 use axum::http::{Response, StatusCode};
 
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, BytesMut, Bytes};
 
 use futures::StreamExt;
 use hyper::body::Sender;
@@ -48,14 +48,14 @@ pub async fn send_pack<T: ObjectStorage>(
             return Ok(());
         }
         let bytes_out = pack_protocol.build_side_band_format(temp, length);
-        // println!("send: bytes_out: {:?}", bytes_out.clone().freeze());
+        // tracing::info!("send: bytes_out: {:?}", bytes_out.clone().freeze());
         sender.send_data(bytes_out.freeze()).await.unwrap();
     }
 }
 
 pub async fn git_upload_pack<T: ObjectStorage + 'static>(
     req: Request<Body>,
-    pack_protocol: PackProtocol<T>,
+    mut pack_protocol: PackProtocol<T>,
 ) -> Result<Response<Body>, (StatusCode, String)> {
     let (_parts, mut body) = req.into_parts();
 
@@ -80,4 +80,27 @@ pub async fn git_upload_pack<T: ObjectStorage + 'static>(
 
     tokio::spawn(send_pack(sender, send_pack_data, pack_protocol));
     Ok(resp.body(body).unwrap())
+}
+
+pub async fn git_receive_pack<T: ObjectStorage + 'static>(
+    req: Request<Body>,
+    mut pack_protocol: PackProtocol<T>,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let (_parts, mut body) = req.into_parts();
+    let mut combined_body_bytes = Vec::new();
+    while let Some(chunk) = body.next().await {
+        let body_bytes = chunk.unwrap();
+        combined_body_bytes.extend(&body_bytes);
+    }
+
+    let buf = pack_protocol
+        .git_receive_pack( Bytes::from(combined_body_bytes))
+        .await
+        .unwrap();
+    let body = Body::from(buf.freeze());
+    tracing::info!("report status:{:?}", body);
+    let resp = build_res_header("application/x-git-receive-pack-result".to_owned());
+
+    let resp = resp.body(body).unwrap();
+    Ok(resp)
 }
