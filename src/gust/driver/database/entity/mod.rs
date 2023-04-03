@@ -5,5 +5,4 @@ pub mod prelude;
 pub mod commit;
 pub mod node;
 pub mod node_data;
-pub mod object_content;
-pub mod object_info;
+pub mod refs;

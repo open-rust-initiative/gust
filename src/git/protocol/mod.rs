@@ -6,8 +6,12 @@
 use std::{fs::File, path::PathBuf, str::FromStr, sync::Arc};
 
 use clap::Subcommand;
+use sea_orm::{ActiveValue::NotSet, Set};
 
-use crate::{git::protocol::pack::SP, gust::driver::ObjectStorage};
+use crate::{
+    git::protocol::pack::SP,
+    gust::driver::{database::entity::refs, ObjectStorage, ZERO_ID},
+};
 
 use super::pack::Pack;
 pub mod http;
@@ -121,6 +125,14 @@ pub struct RefCommand {
     pub new_id: String,
     pub status: String,
     pub error_msg: String,
+    pub command_type: Command,
+}
+
+#[derive(Debug, Clone)]
+pub enum Command {
+    Create,
+    Delete,
+    Update,
 }
 
 impl RefCommand {
@@ -129,12 +141,20 @@ impl RefCommand {
     const FAILED_STATUS: &str = "ng";
 
     pub fn new(old_id: String, new_id: String, ref_name: String) -> Self {
+        let command_type = if ZERO_ID == old_id {
+            Command::Create
+        } else if ZERO_ID == new_id {
+            Command::Delete
+        } else {
+            Command::Update
+        };
         RefCommand {
             ref_name,
             old_id,
             new_id,
             status: RefCommand::OK_STATUS.to_owned(),
             error_msg: "".to_owned(),
+            command_type,
         }
     }
 
@@ -170,6 +190,17 @@ impl RefCommand {
     pub fn failed(&mut self, msg: String) {
         self.status = RefCommand::FAILED_STATUS.to_owned();
         self.error_msg = msg;
+    }
+
+    pub fn convert_to_model(&self, path: &str) -> refs::ActiveModel {
+        refs::ActiveModel {
+            id: NotSet,
+            ref_git_id: Set(self.new_id.to_owned()),
+            ref_name: Set(self.ref_name.to_string()),
+            repo_path: Set(path.to_owned()),
+            created_at: Set(chrono::Utc::now().naive_utc()),
+            updated_at: Set(chrono::Utc::now().naive_utc()),
+        }
     }
 }
 

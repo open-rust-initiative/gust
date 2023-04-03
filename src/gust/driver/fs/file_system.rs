@@ -15,7 +15,7 @@ impl ObjectStorage for FileSystem {
         let content = content.strip_suffix('\n').unwrap();
         let object_id = match std::fs::read_to_string(base_path.join(content)) {
             Ok(object_id) => object_id.strip_suffix('\n').unwrap().to_owned(),
-            _ => String::from_utf8_lossy(&[b'0'; 40]).to_string(),
+            _ => String::from_utf8_lossy(&ZERO_ID).to_string(),
         };
 
         // init repo: if dir not exists or is empty

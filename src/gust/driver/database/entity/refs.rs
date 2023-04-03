@@ -3,13 +3,15 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "object_content")]
+#[sea_orm(table_name = "refs")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i64,
-    // #[sea_orm(column_type = "Custom(\"MEDIUMTEXT\".to_owned())")]
-    // pub file: String,
-    pub hash: String,
+    pub id: i32,
+    pub repo_path: String,
+    pub ref_name: String,
+    pub ref_git_id: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

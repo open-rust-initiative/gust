@@ -92,10 +92,9 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
     ) -> Result<(Self, Session), Self::Error> {
         let pack_protocol = self.pack_protocol.as_mut().unwrap();
         let data_str = String::from_utf8_lossy(data).trim().to_owned();
-        tracing::info!("data: {:?}, channel:{}", data_str, channel);
+        tracing::info!("SSH: client sends data: {:?}, channel:{}", data_str, channel);
         match pack_protocol.service_type {
             Some(ServiceType::UploadPack) => {
-                // let (send_pack_data, buf, pack_protocol) = self.handle_upload_pack(data).await;
                 self.handle_upload_pack(channel, data, &mut session).await;
             }
             Some(ServiceType::ReceivePack) => {
@@ -103,9 +102,6 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
             }
             None => panic!(),
         };
-        // session.eof(channel);
-        // tracing::info!("send eof");
-        // session.close(channel);
         Ok((self, session))
     }
 
@@ -114,8 +110,16 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
     //     channel: ChannelId,
     //     mut session: Session,
     // ) -> Result<(Self, Session), Self::Error> {
-    //     // let (self, session) = server::Handler::channel_eof(self, channel, session).await?;
-    //     session.close(channel);
+    //     // session.close(channel);
+    //     // match session.flush() {
+    //     //     Ok(_) => {},
+    //     //     Err(e) => println!("Error flushing session: {:?}", e),
+    //     // }
+    //     // session.disconnect(Disconnect::ByApplication, "channel close", "en");
+    //     // match session.disconnect(None, "Closing session") {
+    //     //     Ok(_) => {},
+    //     //     Err(e) => println!("Error disconnecting session: {:?}", e),
+    //     // }
     //     Ok((self, session))
     // }
 
@@ -166,6 +170,7 @@ impl<T: ObjectStorage> SshServer<T> {
             if temp.is_empty() {
                 let mut bytes_out = BytesMut::new();
                 bytes_out.put_slice(pack::PKT_LINE_END_MARKER);
+                tracing::info!("send: ends: {:?}", bytes_out.clone().freeze());
                 session.data(channel, bytes_out.to_vec().into());
                 return;
             }
@@ -187,6 +192,8 @@ impl<T: ObjectStorage> SshServer<T> {
             .git_receive_pack(Bytes::from(data.to_vec()))
             .await
             .unwrap();
-        session.data(channel, buf.to_vec().into());
+        if !buf.is_empty() {
+            session.data(channel, buf.to_vec().into());
+        }
     }
 }

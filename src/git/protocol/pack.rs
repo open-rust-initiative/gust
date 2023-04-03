@@ -3,19 +3,14 @@
 //!
 //!
 use std::collections::{HashMap, HashSet};
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 
 use anyhow::Result;
-use axum::body::Body;
-use axum::http::{Response, StatusCode};
-use bstr::ByteSlice;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::Utc;
-use futures::StreamExt;
-use hyper::Request;
 
 use crate::git::hash::Hash;
 use crate::git::object::base::blob::Blob;
@@ -23,8 +18,8 @@ use crate::git::object::base::commit::Commit;
 use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::Pack;
-use crate::git::protocol::{http, PackProtocol, RefCommand};
-use crate::gust::driver::ObjectStorage;
+use crate::git::protocol::{PackProtocol, RefCommand};
+use crate::gust::driver::{ObjectStorage, ZERO_ID};
 
 use super::{Capability, Protocol, ServiceType, SideBind};
 
@@ -51,11 +46,9 @@ const UPLOAD_CAP_LIST: &str =
 impl<T: ObjectStorage> PackProtocol<T> {
     pub async fn git_info_refs(&mut self) -> BytesMut {
         let service_type = self.service_type.unwrap();
-        // use zero_id if init_repo
-        let zero_id = String::from_utf8_lossy(&[b'0'; 40]).to_string();
         // The stream MUST include capability declarations behind a NUL on the first ref.
         let object_id = self.storage.get_head_object_id(&self.path).await;
-        let name = if object_id == zero_id {
+        let name = if object_id == ZERO_ID {
             "capabilities^{}"
         } else {
             "HEAD"
@@ -152,12 +145,9 @@ impl<T: ObjectStorage> PackProtocol<T> {
         Ok((send_pack_data, buf))
     }
 
-    pub async fn git_receive_pack(
-        &mut self,
-        mut body_bytes: Bytes,
-    ) -> Result<BytesMut> {
+    pub async fn git_receive_pack(&mut self, mut body_bytes: Bytes) -> Result<Bytes> {
         if body_bytes.starts_with(&[b'P', b'A', b'C', b'K']) {
-            let mut command = self.command_list.pop().unwrap();
+            let mut command = self.command_list.last().unwrap().to_owned();
             let temp_file = format!("./temp-{}.pack", Utc::now().timestamp());
             let mut file = OpenOptions::new()
                 .write(true)
@@ -173,36 +163,39 @@ impl<T: ObjectStorage> PackProtocol<T> {
                 .save_packfile(decoded_pack, &self.path)
                 .await
                 .unwrap();
+            self.storage.handle_refs(&command, &self.path).await;
             if !save_result {
                 command.failed(String::from("db operation failed"));
             }
+            fs::remove_file(temp_file).unwrap();
 
             // After receiving the pack data from the sender, the receiver sends a report
             let mut report_status = BytesMut::new();
             // TODO: replace this hard code "unpack ok\n"
             add_pkt_line_string(&mut report_status, "unpack ok\n".to_owned());
             for command in &self.command_list {
-                add_pkt_line_string(&mut report_status, command.status.clone());
+                add_pkt_line_string(&mut report_status, command.get_status());
             }
             report_status.put(&PKT_LINE_END_MARKER[..]);
 
             let length = report_status.len();
-            let buf = self.build_side_band_format(report_status, length);
-
-            Ok(buf)
+            let mut buf = self.build_side_band_format(report_status, length);
+            buf.put(&PKT_LINE_END_MARKER[..]);
+            Ok(buf.into())
         } else {
-            // let mut command_status: Vec<String> = vec![];
             tracing::debug!("bytes from client: {:?}", body_bytes);
-            let (_, mut pkt_line) = read_pkt_line(&mut body_bytes);
+            let (bytes_take, mut pkt_line) = read_pkt_line(&mut body_bytes);
+            if bytes_take == 0 {
+                if pkt_line.is_empty() {
+                    return Ok(body_bytes);
+                }
+            }
             let command = self.parse_ref_update(&mut pkt_line);
             self.parse_capabilities(&String::from_utf8(pkt_line.to_vec()).unwrap());
             tracing::debug!("comamnd: {:?}, caps:{:?}", command, self.capabilities);
             self.command_list.push(command);
-            Ok(BytesMut::new())
+            Ok(body_bytes.split_off(4))
         }
-
-        // if body_bytes.copy_to_bytes(4).to_vec() == PKT_LINE_END_MARKER {
-        // }
     }
 
     // if capabilities contains SideBand/64k process data with sideband format else do nothing
@@ -216,7 +209,6 @@ impl<T: ObjectStorage> PackProtocol<T> {
             to_bytes.put(Bytes::from(format!("{length:04x}")));
             to_bytes.put_u8(SideBind::PackfileData.value());
             to_bytes.put(from_bytes);
-            to_bytes.put(&PKT_LINE_END_MARKER[..]);
             return to_bytes;
         }
         from_bytes

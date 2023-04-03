@@ -2,11 +2,12 @@
 //!
 //!
 use std::collections::HashMap;
-use std::fs::File;
+
+use std::env;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
-use std::{env, net::SocketAddr};
+use std::sync::Arc;
 
 use anyhow::Result;
 use axum::body::Body;
@@ -15,12 +16,10 @@ use axum::http::{Response, StatusCode};
 use axum::routing::{get, post};
 use axum::{Router, Server};
 use hyper::Request;
-use russh_keys::key::KeyPair;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use tower_cookies::CookieManagerLayer;
 
-use crate::git::protocol::ssh::SshServer;
 use crate::git::protocol::{http, PackProtocol, Protocol};
 use crate::gust::driver::database::mysql;
 use crate::gust::driver::ObjectStorage;
@@ -66,7 +65,7 @@ pub async fn http_server() -> Result<(), Box<dyn std::error::Error>> {
         .route("/:repo/git-receive-pack", post(git_receive_pack));
 
     let app = Router::new()
-        .nest("/:path", git_routes)
+        .nest("/:path/", git_routes)
         .layer(ServiceBuilder::new().layer(CookieManagerLayer::new()))
         .with_state(state);
 
@@ -74,41 +73,6 @@ pub async fn http_server() -> Result<(), Box<dyn std::error::Error>> {
     Server::bind(&addr).serve(app.into_make_service()).await?;
 
     Ok(())
-}
-
-/// start a ssh server
-pub async fn ssh_server() -> Result<(), std::io::Error> {
-    let ssh_root = env::var("SSH_ROOT").expect("WORK_DIR is not set in .env file");
-    let file_name = PathBuf::from(ssh_root).join("id_ed25519");
-    let client_key: KeyPair = match File::open(&file_name) {
-        Ok(_) => russh_keys::load_secret_key(file_name, None).unwrap(),
-        Err(err) => match err.kind() {
-            // ErrorKind::NotFound => {
-            //     tracing::info!("key not found: {:?}, init a new one", file_name);
-            //     let client_key = russh_keys::key::KeyPair::generate_ed25519().unwrap();
-            //     let pub_key = client_key.clone_public_key().unwrap();
-            //     write_public_key_base64(File::create(&file_name).unwrap(), &pub_key).unwrap();
-            //     client_key
-            // }
-            _ => panic!("Error opening key: {:?}, {}", file_name, err),
-        },
-    };
-    let client_pubkey = Arc::new(client_key.clone_public_key().unwrap());
-
-    let mut config = russh::server::Config::default();
-    config.connection_timeout = Some(std::time::Duration::from_secs(10));
-    config.auth_rejection_time = std::time::Duration::from_secs(3);
-    config.keys.push(client_key);
-
-    let config = Arc::new(config);
-    let sh = SshServer {
-        client_pubkey,
-        clients: Arc::new(Mutex::new(HashMap::new())),
-        id: 0,
-        storage: mysql::init().await,
-        pack_protocol: None,
-    };
-    russh::server::run(config, "0.0.0.0:2222", sh).await
 }
 
 /// Discovering Reference

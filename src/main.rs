@@ -42,10 +42,9 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{command, Parser};
+use gateway::api::lib;
 use git::protocol::ServeCommand;
 use gust::driver::utils::id_generator;
-
-use crate::gateway::api::lib;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -77,7 +76,7 @@ pub async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
 
     // let cli = Cli::parse();
-    // lib::http_server().await.unwrap();
-    lib::ssh_server().await.unwrap();
+    lib::http_server().await.unwrap();
+    // ssh_server::server().await.unwrap();
     Ok(())
 }
