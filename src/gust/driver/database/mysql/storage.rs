@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::git::object::base::commit::Commit;
 use crate::git::object::metadata::MetaData;
@@ -30,10 +30,7 @@ impl MysqlStorage {
 
 #[async_trait]
 impl ObjectStorage for MysqlStorage {
-    /// subdir clone process:
-    /// 1. search HEAD by repo_path
-    ///     => not foun
-    async fn get_head_object_id(&self, repo_path: &PathBuf) -> String {
+    async fn get_head_object_id(&self, repo_path: &Path) -> String {
         let path_str = repo_path.to_str().unwrap();
         // consider a search condition: root/repotest2/src
         // let commits: Vec<commit::Model> = commit::Entity::find()
@@ -59,7 +56,6 @@ impl ObjectStorage for MysqlStorage {
                 // repo_path is subdirectory of some commit
                 if repo_path.starts_with(refs.repo_path.clone()) {
                     return self.generate_child_commit_and_refs(refs, repo_path).await;
-                    // return fake_commit.meta.id.to_plain_str();
                 }
             }
             //situation: repo_path: root/repotest2/src, commit: root/repotest
@@ -67,7 +63,7 @@ impl ObjectStorage for MysqlStorage {
         }
     }
 
-    async fn get_ref_object_id(&self, repo_path: &PathBuf) -> HashMap<String, String> {
+    async fn get_ref_object_id(&self, repo_path: &Path) -> HashMap<String, String> {
         // assuming HEAD points to branch master.
         let mut map = HashMap::new();
         let refs: Vec<refs::Model> = refs::Entity::find()
@@ -81,38 +77,30 @@ impl ObjectStorage for MysqlStorage {
         map
     }
 
-    async fn handle_refs(&self, command: &RefCommand, path: &PathBuf) {
+    async fn handle_refs(&self, command: &RefCommand, path: &Path) {
         match command.command_type {
             Command::Create => self.save_refs(command, path).await,
-
-            Command::Delete => {
-                todo!()
-            }
-
-            Command::Update => {
-                todo!()
-            }
+            Command::Delete => self.delete_refs(command, path).await,
+            Command::Update => self.update_refs(command, path).await,
         }
     }
 
     async fn save_packfile(
         &self,
         decoded_pack: Pack,
-        repo_path: &PathBuf,
-    ) -> Result<bool, anyhow::Error> {
+        repo_path: &Path,
+    ) -> Result<(), anyhow::Error> {
         let mut result = ObjDecodedMap::default();
         result.update_from_cache(&decoded_pack.result);
-        result.check_completeness().unwrap();
-
+        // result.check_completeness()?;
         let SaveModel { nodes, nodes_data } = build_node_tree(&result, repo_path).await.unwrap();
-
-        let node_result = self.save_nodes(nodes).await.unwrap();
-        let data_result = self.save_node_data(nodes_data).await.unwrap();
-        let commit_result = self.save_commits(&result.commits, repo_path).await.unwrap();
-        Ok(data_result && node_result && commit_result)
+        self.save_nodes(nodes).await.unwrap();
+        self.save_node_data(nodes_data).await.unwrap();
+        self.save_commits(&result.commits, repo_path).await.unwrap();
+        Ok(())
     }
 
-    async fn get_full_pack_data(&self, repo_path: &PathBuf) -> Vec<u8> {
+    async fn get_full_pack_data(&self, repo_path: &Path) -> Vec<u8> {
         let mut metadata_vec: Vec<MetaData> = Vec::new();
         let blob_models: Vec<node_data::Model> = node_data::Entity::find()
             .all(&self.connection)
@@ -160,10 +148,34 @@ impl MysqlStorage {
         .await
     }
 
-    async fn save_refs(&self, command: &RefCommand, path: &PathBuf) {
-        let mut save_models: Vec<refs::ActiveModel> = Vec::new();
+    async fn save_refs(&self, command: &RefCommand, path: &Path) {
+        let mut save_models: Vec<refs::ActiveModel> = vec![];
         save_models.push(command.convert_to_model(path.to_str().unwrap()));
         batch_save_model(&self.connection, save_models)
+            .await
+            .unwrap();
+    }
+
+    async fn update_refs(&self, command: &RefCommand, path: &Path) {
+        let ref_data: Option<refs::Model> = refs::Entity::find()
+            .filter(refs::Column::RefGitId.eq(&command.old_id))
+            .filter(refs::Column::RepoPath.eq(path.to_str().unwrap()))
+            .one(&self.connection)
+            .await
+            .unwrap();
+        let mut ref_data: refs::ActiveModel = ref_data.unwrap().into();
+        ref_data.ref_git_id = Set(command.new_id.to_owned());
+        ref_data.update(&self.connection).await.unwrap();
+    }
+
+    async fn delete_refs(&self, command: &RefCommand, path: &Path) {
+        let delete_ref = refs::ActiveModel {
+            ref_git_id: Set(command.old_id.to_owned()),
+            repo_path: Set(path.to_str().unwrap().to_owned()),
+            ..Default::default()
+        };
+        refs::Entity::delete(delete_ref)
+            .exec(&self.connection)
             .await
             .unwrap();
     }
@@ -245,12 +257,21 @@ impl MysqlStorage {
 
     async fn search_root_by_path(&self, repo_path: &Path) -> Option<node::Model> {
         tracing::debug!("file_name: {:?}", repo_path.file_name());
-        node::Entity::find()
-            // .filter(node::Column::Path.like(repo_path.to_str().unwrap()))
+        let res = node::Entity::find()
             .filter(node::Column::Name.eq(repo_path.file_name().unwrap().to_str().unwrap()))
             .one(&self.connection)
             .await
-            .unwrap()
+            .unwrap();
+        if let Some(res) = res {
+            Some(res)
+        } else {
+            node::Entity::find()
+                .filter(node::Column::Path.eq(repo_path.to_str().unwrap()))
+                .filter(node::Column::Name.eq(""))
+                .one(&self.connection)
+                .await
+                .unwrap()
+        }
     }
 }
 

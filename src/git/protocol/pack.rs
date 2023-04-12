@@ -82,10 +82,8 @@ impl<T: ObjectStorage> PackProtocol<T> {
         loop {
             let (bytes_take, pkt_line) = read_pkt_line(upload_request);
             // if read 0000
-            if bytes_take == 0 {
-                if pkt_line.is_empty() {
-                    break;
-                }
+            if bytes_take == 0 && pkt_line.is_empty() {
+                break;
             }
             tracing::info!("read line: {:?}", pkt_line);
             let dst = pkt_line.to_vec();
@@ -147,7 +145,7 @@ impl<T: ObjectStorage> PackProtocol<T> {
 
     pub async fn git_receive_pack(&mut self, mut body_bytes: Bytes) -> Result<Bytes> {
         if body_bytes.starts_with(&[b'P', b'A', b'C', b'K']) {
-            let mut command = self.command_list.last().unwrap().to_owned();
+            let command = self.command_list.last_mut().unwrap();
             let temp_file = format!("./temp-{}.pack", Utc::now().timestamp());
             let mut file = OpenOptions::new()
                 .write(true)
@@ -158,13 +156,11 @@ impl<T: ObjectStorage> PackProtocol<T> {
             let decoded_pack = command
                 .unpack(&mut std::fs::File::open(&temp_file).unwrap())
                 .unwrap();
-            let save_result = self
-                .storage
-                .save_packfile(decoded_pack, &self.path)
-                .await
-                .unwrap();
-            self.storage.handle_refs(&command, &self.path).await;
-            if !save_result {
+            let pack_result = self.storage.save_packfile(decoded_pack, &self.path).await;
+            if pack_result.is_ok() {
+                self.storage.handle_refs(&command, &self.path).await;
+            } else {
+                tracing::error!("{}", pack_result.err().unwrap());
                 command.failed(String::from("db operation failed"));
             }
             fs::remove_file(temp_file).unwrap();
@@ -185,20 +181,18 @@ impl<T: ObjectStorage> PackProtocol<T> {
         } else {
             tracing::debug!("bytes from client: {:?}", body_bytes);
             let (bytes_take, mut pkt_line) = read_pkt_line(&mut body_bytes);
-            if bytes_take == 0 {
-                if pkt_line.is_empty() {
-                    return Ok(body_bytes);
-                }
+            if bytes_take == 0 && pkt_line.is_empty() {
+                return Ok(body_bytes);
             }
             let command = self.parse_ref_update(&mut pkt_line);
             self.parse_capabilities(&String::from_utf8(pkt_line.to_vec()).unwrap());
-            tracing::debug!("comamnd: {:?}, caps:{:?}", command, self.capabilities);
+            tracing::debug!("init comamnd: {:?}, caps:{:?}", command, self.capabilities);
             self.command_list.push(command);
             Ok(body_bytes.split_off(4))
         }
     }
 
-    // if capabilities contains SideBand/64k process data with sideband format else do nothing
+    // if SideBand/64k capability is enabled, pack data should send with sideband format
     pub fn build_side_band_format(&self, from_bytes: BytesMut, length: usize) -> BytesMut {
         let capabilities = &self.capabilities;
         if capabilities.contains(&Capability::SideBand)
@@ -213,6 +207,7 @@ impl<T: ObjectStorage> PackProtocol<T> {
         }
         from_bytes
     }
+
     pub fn build_smart_reply(&self, ref_list: &Vec<String>, service: String) -> BytesMut {
         let mut pkt_line_stream = BytesMut::new();
         if self.protocol == Protocol::Http {
@@ -250,7 +245,8 @@ impl<T: ObjectStorage> PackProtocol<T> {
 
 fn read_until_white_space(bytes: &mut Bytes) -> String {
     let mut buf = Vec::new();
-    while let c = bytes.get_u8() {
+    while bytes.has_remaining() {
+        let c = bytes.get_u8();
         if c.is_ascii_whitespace() {
             break;
         }

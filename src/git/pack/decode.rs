@@ -22,7 +22,7 @@ use crate::git::pack::cache::PackObjectCache;
 /// 用于存储解析出的object抽象对象的hashmap
 #[derive(Default, Clone)]
 pub struct ObjDecodedMap {
-    pub _map_hash: HashMap<Hash, Arc<ObjectClass>>,
+    pub map_hash: HashMap<Hash, Arc<ObjectClass>>,
     pub blobs: Vec<blob::Blob>,
     pub trees: Vec<tree::Tree>,
     pub tags: Vec<tag::Tag>,
@@ -61,7 +61,7 @@ impl ObjDecodedMap {
                 }
                 _ => panic!("src/git/pack/decode.rs: 33 invalid type in encoded metadata"),
             };
-            self._map_hash.insert(key.clone(), Arc::new(_obj));
+            self.map_hash.insert(key.clone(), Arc::new(_obj));
         }
     }
 
@@ -72,15 +72,15 @@ impl ObjDecodedMap {
     #[allow(unused)]
     pub fn check_completeness(&mut self) -> Result<(), GitError> {
         //验证对象树 tree object的完整性 确保tree item下的hash值有对应的object
-        for _tree in self.trees.iter() {
-            for item in &_tree.tree_items {
+        for tree in self.trees.iter() {
+            for item in &tree.tree_items {
                 // 保存对象名与hash值的对应
                 self.name_map.insert(item.id.clone(), item.filename.clone());
                 // 检查是否存在对应hash
-                if self._map_hash.get(&item.id) == None {
+                if self.map_hash.get(&item.id) == None {
                     return Err(GitError::UnCompletedPackObject(format!(
-                        "can't find hash value:{}",
-                        &_tree.meta.id
+                        "can't find hash value: {}",
+                        &tree.meta.id
                     )));
                 }
             }
@@ -150,7 +150,7 @@ impl ObjDecodedMap {
 
 impl Display for ObjDecodedMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (key, value) in self._map_hash.iter() {
+        for (key, value) in self.map_hash.iter() {
             writeln!(f, "*********************").unwrap();
             writeln!(f, "Hash: {}", key).unwrap();
             writeln!(f, "Type: {}", value).unwrap();

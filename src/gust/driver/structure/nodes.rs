@@ -35,15 +35,6 @@ pub struct Repo {
     // pub cache: LruCache<String, FileNode>,
 }
 
-// pub struct Commit {
-//     pub id: String,
-//     pub object_id: Hash,
-//     pub parent_ids: Vec<Hash>,
-//     pub root_tree: Hash,
-//     pub msg: String,
-//     pub author: String,
-// }
-
 pub struct TreeNode {
     pub nid: i64,
     pub pid: i64,
@@ -62,20 +53,8 @@ pub struct FileNode {
     pub name: String,
     pub path: PathBuf,
     pub mode: Vec<u8>,
-    pub data: Vec<u8>,
 }
 
-/// the clone process will be:
-/// 1. parse a path from clone url
-/// 2. get Node and it's children form datasource and init it
-/// 3. get objects from directory structure
-/// 4. zip objects to pack and generate fake commits if necessary?
-///
-/// the push process might like:
-/// 1. parse pack to objects, these objects are both new to the directory
-/// 2. 找到这些objects对应的tree结构变动生成提交记录
-///
-///
 /// define the node common behaviour
 pub trait Node {
     fn get_id(&self) -> i64;
@@ -233,7 +212,6 @@ impl Node for FileNode {
             path: PathBuf::new(),
             name,
             git_id: Hash::default(),
-            data: Vec::new(),
             mode: Vec::new(),
         }
     }
@@ -277,7 +255,6 @@ impl Node for FileNode {
             name: node.name,
             path: PathBuf::from(node.path),
             mode: node.mode,
-            data: Vec::new(),
         })
     }
 }
@@ -312,13 +289,14 @@ pub async fn build_node_tree(
     repo_path: &Path,
 ) -> Result<SaveModel, anyhow::Error> {
     let commit = &result.commits[0];
-    let tree_id = commit.tree_id;
+    let commit_tree_id = commit.tree_id;
     let tree_map: HashMap<Hash, Tree> = result
         .trees
         .clone()
         .into_iter()
         .map(|tree| (tree.meta.id, tree))
         .collect();
+
     let blob_map: HashMap<Hash, Blob> = result
         .blobs
         .clone()
@@ -328,7 +306,7 @@ pub async fn build_node_tree(
 
     let repo = Repo { tree_map, blob_map };
 
-    let tree = repo.tree_map.get(&tree_id).unwrap();
+    let tree = repo.tree_map.get(&commit_tree_id).unwrap();
     let mut repo_root = tree.convert_to_node(repo_path);
 
     repo.build_from_root_tree(tree, &mut repo_root, &mut repo_path.to_path_buf());
@@ -357,11 +335,10 @@ impl Repo {
                     Some(child) => child,
                     None => panic!("Something wrong!:{}", &item.filename),
                 };
-                self.build_from_root_tree(
-                    self.tree_map.get(&item.id).unwrap(),
-                    child_node,
-                    repo_path,
-                );
+                let item = self.tree_map.get(&item.id);
+                if let Some(item) = item {
+                    self.build_from_root_tree(item, child_node, repo_path);
+                }
                 repo_path.pop();
             } else {
                 node.add_child(item.convert_to_node(node.get_id(), repo_path));
@@ -384,12 +361,10 @@ impl Repo {
                 self.traverse_node(child.as_ref(), depth + 1, save_model, blob_map);
             }
         } else {
-            nodes_data.push(
-                blob_map
-                    .get(&node.get_git_id())
-                    .unwrap()
-                    .convert_to_model(node.get_id()),
-            );
+            let blob = blob_map.get(&node.get_git_id());
+            if let Some(data) = blob {
+                nodes_data.push(data.convert_to_model(node.get_id()));
+            }
         }
     }
 }

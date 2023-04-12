@@ -12,19 +12,11 @@ use crate::git::object::base::tree::*;
 use crate::git::object::base::ObjectClass;
 use crate::git::object::metadata::MetaData;
 
-use super::BaseObject;
-
 /// Git Object: blob
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Blob {
     pub filename: String,
     pub meta: MetaData,
-}
-
-impl BaseObject for Blob {
-    fn get_object_type(&self) -> ObjectClass {
-        ObjectClass::BLOB(self.to_owned())
-    }
 }
 
 impl Ord for Blob {

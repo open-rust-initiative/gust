@@ -17,8 +17,6 @@ use crate::git::object::base::ObjectClass;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 
-use super::BaseObject;
-
 /// Git Object: commit
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
@@ -29,12 +27,6 @@ pub struct Commit {
     pub author: AuthorSign,
     pub committer: AuthorSign,
     pub message: String,
-}
-
-impl BaseObject for Commit {
-    fn get_object_type(&self) -> ObjectClass {
-        ObjectClass::COMMIT(self.to_owned())
-    }
 }
 
 impl Ord for Commit {

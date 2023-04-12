@@ -46,6 +46,4 @@ impl ObjectClass {
     }
 }
 
-pub trait BaseObject {
-    fn get_object_type(&self) -> ObjectClass;
-}
+

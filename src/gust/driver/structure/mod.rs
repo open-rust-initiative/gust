@@ -118,7 +118,6 @@ impl GitNodeObject for TreeItem {
                 path: path.to_path_buf(),
                 mode: self.mode.clone(),
                 name: self.filename.clone(),
-                data: Vec::new(),
             }),
             TreeItemType::Tree => Box::new(TreeNode {
                 nid: self.generate_id(),

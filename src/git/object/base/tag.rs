@@ -17,8 +17,6 @@ use crate::git::object::base::sign::AuthorSign;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 
-use super::{BaseObject, ObjectClass};
-
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tag {
@@ -28,12 +26,6 @@ pub struct Tag {
     pub tag: String,
     pub tagger: AuthorSign,
     pub message: String,
-}
-
-impl BaseObject for Tag {
-    fn get_object_type(&self) -> ObjectClass {
-        ObjectClass::TAG(self.to_owned())
-    }
 }
 
 impl Ord for Tag {
