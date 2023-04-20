@@ -18,7 +18,7 @@ pub mod http;
 pub mod pack;
 pub mod ssh;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PackProtocol<T: ObjectStorage> {
     pub protocol: Protocol,
     pub capabilities: Vec<Capability>,
@@ -29,9 +29,10 @@ pub struct PackProtocol<T: ObjectStorage> {
 }
 
 // Is that useful?
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum Protocol {
     Local,
+    #[default]
     Http,
     Ssh,
     Git,
@@ -63,7 +64,7 @@ impl FromStr for ServiceType {
     }
 }
 
-// TODO: Additional Capabilitys need to be added.
+// TODO: Additional Capabilitys need to be supplemented.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Capability {
     MultiAck,
@@ -158,8 +159,12 @@ impl RefCommand {
         }
     }
 
-    pub fn unpack(&mut self, pack_file: &mut File) -> Result<Pack, anyhow::Error> {
-        match Pack::decode(pack_file) {
+    pub async fn unpack<T: ObjectStorage>(
+        &mut self,
+        pack_file: &mut File,
+        storage: &T,
+    ) -> Result<Pack, anyhow::Error> {
+        match Pack::decode(pack_file, storage).await {
             Ok(decoded_pack) => {
                 self.status = RefCommand::OK_STATUS.to_owned();
                 Ok(decoded_pack)

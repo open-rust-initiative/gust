@@ -17,8 +17,6 @@ use axum::routing::{get, post};
 use axum::{Router, Server};
 use hyper::Request;
 use serde::{Deserialize, Serialize};
-use tower::ServiceBuilder;
-use tower_cookies::CookieManagerLayer;
 
 use crate::git::protocol::{http, PackProtocol, Protocol};
 use crate::gust::driver::database::mysql;
@@ -66,7 +64,6 @@ pub async fn http_server() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .nest("/:path/", git_routes)
-        .layer(ServiceBuilder::new().layer(CookieManagerLayer::new()))
         .with_state(state);
 
     let addr = SocketAddr::from_str(&server_url).unwrap();

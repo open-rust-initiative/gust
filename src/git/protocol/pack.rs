@@ -154,11 +154,11 @@ impl<T: ObjectStorage> PackProtocol<T> {
                 .unwrap();
             file.write(&body_bytes).unwrap();
             let decoded_pack = command
-                .unpack(&mut std::fs::File::open(&temp_file).unwrap())
+                .unpack(&mut std::fs::File::open(&temp_file).unwrap(), self.storage.as_ref()).await
                 .unwrap();
             let pack_result = self.storage.save_packfile(decoded_pack, &self.path).await;
             if pack_result.is_ok() {
-                self.storage.handle_refs(&command, &self.path).await;
+                self.storage.handle_refs(command, &self.path).await;
             } else {
                 tracing::error!("{}", pack_result.err().unwrap());
                 command.failed(String::from("db operation failed"));
@@ -223,7 +223,7 @@ impl<T: ObjectStorage> PackProtocol<T> {
     }
 
     pub fn parse_capabilities(&mut self, cap_str: &str) {
-        let cap_vec: Vec<_> = cap_str.split(" ").collect();
+        let cap_vec: Vec<_> = cap_str.split(' ').collect();
         for cap in cap_vec {
             let res = cap.trim().parse::<Capability>();
             if let Ok(cap) = res {
@@ -234,12 +234,11 @@ impl<T: ObjectStorage> PackProtocol<T> {
 
     // the first line contains the capabilities
     pub fn parse_ref_update(&self, pkt_line: &mut Bytes) -> RefCommand {
-        let command = RefCommand::new(
+        RefCommand::new(
             read_until_white_space(pkt_line),
             read_until_white_space(pkt_line),
             read_until_white_space(pkt_line),
-        );
-        command
+        )
     }
 }
 

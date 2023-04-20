@@ -238,6 +238,7 @@ mod tests {
     use std::path::{Path, PathBuf};
 
     use bstr::ByteSlice;
+    use tokio_test::block_on;
 
     use crate::git::utils;
 
@@ -276,9 +277,9 @@ mod tests {
     fn test_idx_write_to_file() {
         // "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack"
         use super::super::pack;
-        let packs = pack::Pack::decode_file(
+        let packs = block_on(pack::Pack::decode_file(
             "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
-        );
+        ));
         let idx = Idx::encode(packs);
 
         let mut file = std::fs::File::create("./test.idx").expect("create failed");

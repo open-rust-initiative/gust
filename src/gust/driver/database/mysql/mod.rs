@@ -18,7 +18,7 @@ pub async fn init() -> MysqlStorage {
         .idle_timeout(Duration::from_secs(8))
         .max_lifetime(Duration::from_secs(8))
         .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Error);
+        .sqlx_logging_level(log::LevelFilter::Debug);
     MysqlStorage::new(
         Database::connect(opt)
             .await

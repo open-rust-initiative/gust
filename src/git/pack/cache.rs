@@ -39,7 +39,7 @@ impl PackObjectCache {
         self.by_hash.get_mut(_hash)
     }
 
-    pub fn hash_object(&mut self, hash: Hash) -> Option<&mut Arc<MetaData>> {
-        self.by_hash.get_mut(&hash)
+    pub fn hash_object(&mut self, hash: Hash) -> Option<&Arc<MetaData>> {
+        self.by_hash.get(&hash)
     }
 }

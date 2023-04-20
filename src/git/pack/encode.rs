@@ -337,6 +337,7 @@ mod tests {
     use std::io::Write;
 
     use bstr::ByteSlice;
+    use tokio_test::block_on;
 
     use crate::git::pack::{decode::ObjDecodedMap, Pack};
 
@@ -345,9 +346,9 @@ mod tests {
     #[test]
     fn test_object_dir_encode() {
         Pack::pack_object_dir("./resources/total", "./resources/total/output");
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/total/output/pack-7ea8ad41c9d438654ef28297ecc874842c7d10de.pack",
-        );
+        ));
         println!("{}", decoded_pack.get_object_number());
         assert_eq!(
             "7ea8ad41c9d438654ef28297ecc874842c7d10de",
@@ -358,9 +359,9 @@ mod tests {
     //
     #[test]
     fn test_a_real_pack_de_en() {
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
-        );
+        ));
         let mut map = ObjDecodedMap::default();
         map.update_from_cache(&decoded_pack.get_cache());
         Pack::write(&mut map, TEST_DIR).unwrap();
@@ -370,12 +371,12 @@ mod tests {
 
     #[test]
     fn test_multi_pack_encode() {
-        let pack_1 = Pack::decode_file(
+        let pack_1 = block_on(Pack::decode_file(
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
-        );
-        let pack_2 = Pack::decode_file(
+        ));
+        let pack_2 = block_on(Pack::decode_file(
             "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
-        );
+        ));
 
         let mut map = ObjDecodedMap::default();
         map.update_from_cache(&pack_1.get_cache());
@@ -431,9 +432,9 @@ mod tests {
     #[test]
     fn test_delta_pack_ok() {
         let mut _map = ObjDecodedMap::default();
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
-        );
+        ));
         assert_eq!(
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_plain_str()
@@ -448,8 +449,10 @@ mod tests {
         let mut file = std::fs::File::create(file_name).expect("create failed");
         file.write_all(data_write.as_bytes()).expect("write failed");
 
-        let decoded_pack =
-            Pack::decode_file(&format!("pack-{}.pack", _pack.signature.to_plain_str()));
+        let decoded_pack = block_on(Pack::decode_file(&format!(
+            "pack-{}.pack",
+            _pack.signature.to_plain_str()
+        )));
         assert_eq!(
             "aa2ab2eb4e6b37daf6dcadf1b6f0d8520c14dc89",
             decoded_pack.signature.to_plain_str()

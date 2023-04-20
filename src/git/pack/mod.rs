@@ -15,6 +15,9 @@ use crate::git::object::delta::*;
 use crate::git::object::metadata::MetaData;
 use crate::git::pack::cache::PackObjectCache;
 use crate::git::utils;
+use crate::gust::driver::database::mysql::storage::MysqlStorage;
+use crate::gust::driver::ObjectStorage;
+use async_recursion::async_recursion;
 
 pub mod cache;
 pub mod decode;
@@ -45,7 +48,10 @@ impl Pack {
     ///  - in: pack_file: &mut File
     ///  - out: The `Pack` Struct
     #[allow(unused)]
-    pub fn decode(pack_file: &mut File) -> Result<Self, GitError> {
+    pub async fn decode<T: ObjectStorage>(
+        pack_file: &mut File,
+        storage: &T,
+    ) -> Result<Self, GitError> {
         // Check the Header of Pack File
         let mut _pack = Self::check_header(pack_file)?;
 
@@ -55,7 +61,7 @@ impl Pack {
         for i in 0.._pack.number_of_objects {
             if i % 1000 == 0 {
                 tracing::info!(
-                    "{}/{},{},{}",
+                    "Unpacking: Index/Total:{}/{}, HashMap Size:{}, OffsetMap Size:{}",
                     i,
                     _pack.number_of_objects,
                     cache.by_hash.len(),
@@ -65,7 +71,7 @@ impl Pack {
             //update offset of the Object
             let offset = utils::get_offset(pack_file).unwrap();
             //Get the next Object by the Pack::next_object() func
-            let object = Pack::next_object(pack_file, offset, &mut cache)?;
+            let object = Pack::next_object(pack_file, offset, &mut cache, storage).await?;
             // Larger offsets would require a version-2 pack index
             let offset = u32::try_from(offset)
                 .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
@@ -117,7 +123,7 @@ impl Pack {
 
     /// Decode the pack file helped by the according decoded idx file
     #[allow(unused)]
-    pub fn decode_by_idx(idx: &mut Idx, pack_file: &mut File) -> Result<Self, GitError> {
+    pub async fn decode_by_idx(idx: &mut Idx, pack_file: &mut File) -> Result<Self, GitError> {
         let mut _pack = Self::check_header(pack_file)?;
         let object_num = idx.number_of_objects;
         _pack.number_of_objects = u32::try_from(object_num)
@@ -126,7 +132,14 @@ impl Pack {
         let mut cache = PackObjectCache::default();
 
         for idx_item in idx.idx_items.iter() {
-            Pack::next_object(pack_file, idx_item.offset.try_into().unwrap(), &mut cache).unwrap();
+            Pack::next_object(
+                pack_file,
+                idx_item.offset.try_into().unwrap(),
+                &mut cache,
+                &MysqlStorage::default(),
+            )
+            .await
+            .unwrap();
         }
         let mut result = decode::ObjDecodedMap::default();
         result.update_from_cache(&mut cache);
@@ -149,10 +162,12 @@ impl Pack {
     }
     /// Get the Object from File by the Give Offset<br>
     /// By the way , the cache can hold the fount object
-    pub fn next_object(
+    #[async_recursion]
+    pub async fn next_object<T: ObjectStorage>(
         pack_file: &mut File,
         offset: u64,
         cache: &mut PackObjectCache,
+        storage: &T,
     ) -> Result<Arc<MetaData>, GitError> {
         use super::object::types::ObjectType;
         utils::seek(pack_file, offset).unwrap();
@@ -182,7 +197,7 @@ impl Pack {
                     Arc::clone(object)
                 } else {
                     //递归调用 找出base object
-                    Pack::next_object(pack_file, base_offset, cache)?
+                    Pack::next_object(pack_file, base_offset, cache, storage).await?
                 };
                 utils::seek(pack_file, offset).unwrap();
                 let base_obj = base_object.as_ref();
@@ -195,11 +210,11 @@ impl Pack {
                 let hash = utils::read_hash(pack_file).unwrap();
                 //let object;
                 let base_object = if let Some(object) = cache.hash_object(hash) {
-                    object
+                    object.to_owned()
                 } else {
                     // object = read_object(hash)?;
                     // &object
-                    return Err(GitError::NotFountHashValue(hash.to_string()));
+                    Arc::new(storage.get_hash_object(&hash.to_plain_str()).await.unwrap())
                 };
                 apply_delta(pack_file, &base_object)
             }
@@ -242,9 +257,9 @@ impl Pack {
     /// ```
     ///
     #[allow(unused)]
-    pub fn decode_file(file: &str) -> Pack {
+    pub async fn decode_file(file: &str) -> Pack {
         let mut pack_file = File::open(&Path::new(file)).unwrap();
-        let decoded_pack = match Pack::decode(&mut pack_file) {
+        let decoded_pack = match Pack::decode(&mut pack_file, &MysqlStorage::default()).await {
             Ok(f) => f,
             Err(e) => match e {
                 GitError::NotFountHashValue(a) => panic!("{}", a),
@@ -264,6 +279,7 @@ mod tests {
     use std::io::BufReader;
     use std::io::Read;
     use std::path::Path;
+    use tokio_test::block_on;
 
     use crate::git::idx::Idx;
 
@@ -272,9 +288,9 @@ mod tests {
     /// Test the pack File decode standalone
     #[test]
     fn test_decode_pack_file1() {
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
-        );
+        ));
         assert_eq!(
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_plain_str()
@@ -283,9 +299,9 @@ mod tests {
 
     #[test]
     fn test_decode_pack_file_with_print() {
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/data/test/pack-8d36a6464e1f284e5e9d06683689ee751d4b2687.pack",
-        );
+        ));
         assert_eq!(
             "8d36a6464e1f284e5e9d06683689ee751d4b2687",
             decoded_pack.signature.to_plain_str()
@@ -294,9 +310,9 @@ mod tests {
 
     #[test]
     fn test_parse_simple_pack() {
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/test1/pack-1d0e6c14760c956c173ede71cb28f33d921e232f.pack",
-        );
+        ));
         assert_eq!(
             "1d0e6c14760c956c173ede71cb28f33d921e232f",
             decoded_pack.signature.to_plain_str()
@@ -306,9 +322,9 @@ mod tests {
 
     #[test]
     fn test_parse_simple_pack2() {
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/test2/pack-8c81e90db37ef77494efe4f31daddad8b494e099.pack",
-        );
+        ));
         assert_eq!(
             "8c81e90db37ef77494efe4f31daddad8b494e099",
             decoded_pack.signature.to_plain_str()
@@ -346,7 +362,7 @@ mod tests {
 
         let mut idx = Idx::default();
         idx.decode(buffer).unwrap();
-        let decoded_pack = Pack::decode_by_idx(&mut idx, &mut pack_file).unwrap();
+        let decoded_pack = block_on(Pack::decode_by_idx(&mut idx, &mut pack_file)).unwrap();
         assert_eq!(*b"PACK", decoded_pack.head);
         assert_eq!(2, decoded_pack.version);
         assert_eq!(

@@ -11,6 +11,7 @@ use crate::git::hash::Hash;
 use crate::git::pack::cache::PackObjectCache;
 use crate::git::pack::Pack;
 use crate::git::utils;
+use crate::gust::driver::database::mysql::storage::MysqlStorage;
 
 impl Eq for Pack {}
 
@@ -44,7 +45,7 @@ impl PartialEq for Pack {
 
 impl Pack {
     #[allow(unused)]
-    pub fn decode_with_cache(&self, cache: &mut PackObjectCache) -> Result<Self, GitError> {
+    pub async fn decode_with_cache(&self, cache: &mut PackObjectCache) -> Result<Self, GitError> {
         let mut pack_file = File::open(self.pack_file.clone()).unwrap();
         // Check the Header of Pack File
         let mut _pack = Self::check_header(&mut pack_file).unwrap();
@@ -53,7 +54,7 @@ impl Pack {
             //update offset of the Object
             let offset = utils::get_offset(&mut pack_file).unwrap();
             //Get the next Object by the Pack::next_object() func
-            let object = Pack::next_object(&mut pack_file, offset, cache).unwrap();
+            let object = Pack::next_object(&mut pack_file, offset, cache, &MysqlStorage::default()).await.unwrap();
             // Larger offsets would require a version-2 pack index
             let offset = u32::try_from(offset)
                 .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))
@@ -68,7 +69,7 @@ impl Pack {
     }
 
     #[allow(dead_code)]
-    pub fn multi_decode(root: &str) -> Result<Self, GitError> {
+    pub async fn multi_decode(root: &str) -> Result<Self, GitError> {
         let mut total_pack = Self::default();
         total_pack.number_of_objects = 0;
         let (files, _hash_vec) = utils::find_all_pack_file(root);
@@ -81,7 +82,7 @@ impl Pack {
         pack_vec.sort();
         let mut cache = PackObjectCache::default();
         for _pack_ in pack_vec.iter_mut() {
-            _pack_.decode_with_cache(&mut cache)?;
+            _pack_.decode_with_cache(&mut cache).await?;
             total_pack.number_of_objects += _pack_.number_of_objects;
         }
         total_pack.result = Arc::new(cache);

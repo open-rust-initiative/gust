@@ -165,15 +165,17 @@ impl Display for ObjDecodedMap {
 
 #[cfg(test)]
 mod tests {
+    use tokio_test::block_on;
+
     use super::super::Pack;
     use super::ObjDecodedMap;
 
     #[test]
     pub fn test_map_new() {
         let mut _map = ObjDecodedMap::default();
-        let decoded_pack = Pack::decode_file(
+        let decoded_pack = block_on(Pack::decode_file(
             "./resources/data/test/pack-6590ba86f4e863e1c2c985b046e1d2f1a78a0089.pack",
-        );
+        ));
         assert_eq!(
             "6590ba86f4e863e1c2c985b046e1d2f1a78a0089",
             decoded_pack.signature.to_plain_str()

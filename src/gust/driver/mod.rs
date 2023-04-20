@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::Path};
 
 use async_trait::async_trait;
 
-use crate::git::{pack::Pack, protocol::RefCommand};
+use crate::git::{pack::Pack, protocol::RefCommand, errors::GitError, object::metadata::MetaData};
 
 pub mod database;
 pub mod fs;
@@ -19,7 +19,7 @@ pub const ZERO_ID: &'static str = match std::str::from_utf8(&[b'0'; 40]) {
 };
 
 #[async_trait]
-pub trait ObjectStorage: Clone + Send + Sync {
+pub trait ObjectStorage: Clone + Send + Sync + std::fmt::Debug {
     async fn get_head_object_id(&self, path: &Path) -> String;
 
     async fn get_ref_object_id(&self, path: &Path) -> HashMap<String, String>;
@@ -35,4 +35,7 @@ pub trait ObjectStorage: Clone + Send + Sync {
     async fn get_full_pack_data(&self, repo_path: &Path) -> Vec<u8>;
 
     async fn handle_pull_pack_data(&self) -> Vec<u8>;
+
+    // get hash object from db if missing cache in unpack process
+    async fn get_hash_object(&self, hash: &str) -> Result<MetaData, GitError>;
 }
