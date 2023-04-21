@@ -75,32 +75,32 @@ impl<T: ObjectStorage> PackProtocol<T> {
         &mut self,
         upload_request: &mut Bytes,
     ) -> Result<(Vec<u8>, BytesMut)> {
-        let mut want: Vec<String> = Vec::new();
-        let mut have: Vec<String> = Vec::new();
+        let mut want: HashSet<String> = HashSet::new();
+        let mut have: HashSet<String> = HashSet::new();
 
         let mut first_line = true;
         loop {
             let (bytes_take, pkt_line) = read_pkt_line(upload_request);
             // if read 0000
             if bytes_take == 0 && pkt_line.is_empty() {
-                break;
+                continue;
             }
-            tracing::info!("read line: {:?}", pkt_line);
+            tracing::debug!("read line: {:?}", pkt_line);
             let dst = pkt_line.to_vec();
             let commands = &dst[0..4];
 
             match commands {
-                b"want" => want.push(String::from_utf8(dst[5..45].to_vec()).unwrap()),
-                b"have" => have.push(String::from_utf8(dst[5..45].to_vec()).unwrap()),
+                b"want" => want.insert(String::from_utf8(dst[5..45].to_vec()).unwrap()),
+                b"have" => have.insert(String::from_utf8(dst[5..45].to_vec()).unwrap()),
                 b"done" => break,
                 other => {
-                    println!(
+                    tracing::error!(
                         "unsupported command: {:?}",
                         String::from_utf8(other.to_vec())
                     );
                     continue;
                 }
-            }
+            };
             if first_line {
                 self.parse_capabilities(&String::from_utf8(dst[46..].to_vec()).unwrap());
                 first_line = false;
@@ -114,31 +114,52 @@ impl<T: ObjectStorage> PackProtocol<T> {
             self.capabilities
         );
 
-        let send_pack_data;
+        let mut send_pack_data = vec![];
         let mut buf = BytesMut::new();
 
         if have.is_empty() {
-            send_pack_data = self.storage.get_full_pack_data(&self.path).await;
+            send_pack_data = self.storage.get_full_pack_data(&self.path).await.unwrap();
             add_pkt_line_string(&mut buf, String::from("NAK\n"));
         } else {
-            let object_root = self.path.join(".git/objects");
-            // TODO storage.handle_pull_pack_data(&self.path).await;
-            let mut decoded_pack = Pack::default();
-            let meta_map: HashMap<Hash, MetaData> =
-                find_common_base(Hash::from_str(&want[0]).unwrap(), &object_root, &have);
-            send_pack_data = decoded_pack.encode(Some(meta_map.into_values().collect()));
+            // let object_root = self.path.join(".git/objects");
 
-            // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
-            // it is ready to send data with ACK obj-id ready lines,
-            // and signals the identified common commits with ACK obj-id common lines
-            for commit in &have {
-                add_pkt_line_string(&mut buf, format!("ACK {} common\n", commit));
+            // let mut decoded_pack = Pack::default();
+            // let meta_map: HashMap<Hash, MetaData> =
+            // find_common_base(Hash::from_str(&want[0]).unwrap(), &object_root, &have);
+            // send_pack_data = decoded_pack.encode(Some(meta_map.into_values().collect()));
+
+            if self.capabilities.contains(&Capability::MultiAckDetailed) {
+                // multi_ack_detailed mode, the server will differentiate the ACKs where it is signaling that
+                // it is ready to send data with ACK obj-id ready lines,
+                // and signals the identified common commits with ACK obj-id common lines
+                for hash in &have {
+                    if self.storage.get_commit_by_hash(hash).await.is_ok() {
+                        add_pkt_line_string(&mut buf, format!("ACK {} common\n", hash));
+                    }
+                    // no need to send NAK in this mode if missing commit?
+                }
+
+                send_pack_data = self
+                    .storage
+                    .get_incremental_pack_data(&self.path, &want, &have)
+                    .await
+                    .unwrap();
+
+                for hash in &want {
+                    if self.storage.get_commit_by_hash(hash).await.is_ok() {
+                        add_pkt_line_string(&mut buf, format!("ACK {} common\n", hash));
+                    }
+                    if self.capabilities.contains(&Capability::NoDone) {
+                        // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
+                        // following its first "ACK obj-id ready" message.
+                        add_pkt_line_string(&mut buf, format!("ACK {} ready\n", hash));
+                    }
+                }
+            } else {
+                tracing::error!("capability unsupported");
             }
-            // If multi_ack_detailed and no-done are both present, then the sender is free to immediately send a pack
-            // following its first "ACK obj-id ready" message.
-            add_pkt_line_string(&mut buf, format!("ACK {} ready\n", have[have.len() - 1]));
 
-            add_pkt_line_string(&mut buf, format!("ACK {} \n", have[have.len() - 1]));
+            add_pkt_line_string(&mut buf, format!("ACK {} \n", "27dd8d4cf39f3868c6eee38b601bc9e9939304f5"));
         }
         Ok((send_pack_data, buf))
     }
@@ -154,7 +175,11 @@ impl<T: ObjectStorage> PackProtocol<T> {
                 .unwrap();
             file.write(&body_bytes).unwrap();
             let decoded_pack = command
-                .unpack(&mut std::fs::File::open(&temp_file).unwrap(), self.storage.as_ref()).await
+                .unpack(
+                    &mut std::fs::File::open(&temp_file).unwrap(),
+                    self.storage.as_ref(),
+                )
+                .await
                 .unwrap();
             let pack_result = self.storage.save_packfile(decoded_pack, &self.path).await;
             if pack_result.is_ok() {

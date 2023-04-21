@@ -2,11 +2,11 @@
 //!
 //！
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::{HashMap, HashSet}, path::Path};
 
 use async_trait::async_trait;
 
-use crate::git::{pack::Pack, protocol::RefCommand, errors::GitError, object::metadata::MetaData};
+use crate::git::{errors::GitError, object::metadata::MetaData, pack::Pack, protocol::RefCommand};
 
 pub mod database;
 pub mod fs;
@@ -32,10 +32,17 @@ pub trait ObjectStorage: Clone + Send + Sync + std::fmt::Debug {
         repo_path: &Path,
     ) -> Result<(), anyhow::Error>;
 
-    async fn get_full_pack_data(&self, repo_path: &Path) -> Vec<u8>;
+    async fn get_full_pack_data(&self, repo_path: &Path) -> Result<Vec<u8>, GitError>;
 
-    async fn handle_pull_pack_data(&self) -> Vec<u8>;
+    async fn get_incremental_pack_data(
+        &self,
+        repo_path: &Path,
+        want: &HashSet<String>,
+        have: &HashSet<String>,
+    ) -> Result<Vec<u8>, GitError>;
 
-    // get hash object from db if missing cache in unpack process
+    async fn get_commit_by_hash(&self, hash: &str) -> Result<MetaData, GitError>;
+
+    // get hash object from db if missing cache in unpack process, this object must be tree or blob
     async fn get_hash_object(&self, hash: &str) -> Result<MetaData, GitError>;
 }

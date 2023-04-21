@@ -69,6 +69,7 @@ impl FromStr for ServiceType {
 pub enum Capability {
     MultiAck,
     MultiAckDetailed,
+    NoDone,
     SideBand,
     SideBand64k,
     ReportStatus,
@@ -90,6 +91,7 @@ impl FromStr for Capability {
             "ofs-delta" => Ok(Capability::OfsDelta),
             "multi_ack" => Ok(Capability::MultiAck),
             "multi_ack_detailed" => Ok(Capability::MultiAckDetailed),
+            "no-done" => Ok(Capability::NoDone),
             "deepen-since" => Ok(Capability::DeepenSince),
             "deepen-not" => Ok(Capability::DeepenNot),
             _ => Err(()),
