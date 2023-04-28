@@ -97,7 +97,7 @@ impl ObjectStorage for MysqlStorage {
         let mut hash_meta: HashMap<String, MetaData> = HashMap::new();
 
         let commits = self
-            .get_all_commits_by_path(repo_path.to_str().unwrap())
+            .get_all_commits_by_path(repo_path)
             .await
             .unwrap();
         for c_meta in commits {
@@ -122,7 +122,7 @@ impl ObjectStorage for MysqlStorage {
     ) -> Result<Vec<u8>, GitError> {
         let mut hash_meta: HashMap<String, MetaData> = HashMap::new();
         let all_commits = self
-            .get_all_commits_by_path(repo_path.to_str().unwrap())
+            .get_all_commits_by_path(repo_path)
             .await
             .unwrap();
 
@@ -191,9 +191,9 @@ impl ObjectStorage for MysqlStorage {
 }
 
 impl MysqlStorage {
-    async fn get_all_commits_by_path(&self, path: &str) -> Result<Vec<MetaData>, anyhow::Error> {
+    async fn get_all_commits_by_path(&self, path: &Path) -> Result<Vec<MetaData>, anyhow::Error> {
         let commits: Vec<commit::Model> = commit::Entity::find()
-            .filter(commit::Column::RepoPath.eq(path))
+            .filter(commit::Column::RepoPath.eq(path.to_str().unwrap()))
             .all(&self.connection)
             .await
             .unwrap();
