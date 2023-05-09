@@ -25,9 +25,9 @@ pub fn generate_id() -> i64 {
         times -= 1;
     }
     let duration = start.elapsed().as_millis();
-    println!(
-        "Program finished after {} millis seconds! Last id {}",
-        duration, new_id
-    );
+    // tracing::info!(
+    //     "Program finished after {} millis seconds! Last id {}",
+    //     duration, new_id
+    // );
     new_id
 }

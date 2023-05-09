@@ -5,7 +5,6 @@
 
 use std::{fs::File, path::PathBuf, str::FromStr, sync::Arc};
 
-use clap::Subcommand;
 use sea_orm::{ActiveValue::NotSet, Set};
 
 use crate::{
@@ -234,16 +233,3 @@ impl<T: ObjectStorage> PackProtocol<T> {
     // }
 }
 
-#[derive(Subcommand)]
-pub enum ServeCommand {
-    Serve {
-        #[arg(short, long)]
-        port: Option<u16>,
-
-        #[arg(short, long, value_name = "FILE")]
-        key_path: Option<PathBuf>,
-
-        #[arg(short, long, value_name = "FILE")]
-        cert_path: Option<PathBuf>,
-    },
-}

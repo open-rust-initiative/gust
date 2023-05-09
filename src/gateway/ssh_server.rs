@@ -3,7 +3,9 @@
 //!
 use std::collections::HashMap;
 use std::env;
+use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -14,9 +16,10 @@ use tokio::io::AsyncWriteExt;
 
 use crate::git::protocol::ssh::SshServer;
 use crate::gust::driver::database::mysql;
+use crate::ServeConfig;
 
 /// start a ssh server
-pub async fn server() -> Result<(), std::io::Error> {
+pub async fn server(command: &ServeConfig) -> Result<(), std::io::Error> {
     let client_key = load_key().await.unwrap();
     let client_pubkey = Arc::new(client_key.clone_public_key().unwrap());
 
@@ -33,7 +36,16 @@ pub async fn server() -> Result<(), std::io::Error> {
         storage: mysql::init().await,
         pack_protocol: None,
     };
-    russh::server::run(config, "0.0.0.0:2222", sh).await
+
+    let ServeConfig {
+        host,
+        port,
+        key_path,
+        cert_path,
+    } = command;
+    let server_url = format!("{}:{}", host, port);
+    let addr = SocketAddr::from_str(&server_url).unwrap();
+    russh::server::run(config, addr, sh).await
 }
 
 async fn load_key() -> Result<KeyPair> {

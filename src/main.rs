@@ -41,25 +41,26 @@ use std::env;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{command, Parser};
+use clap::{command, Args, Parser, Subcommand};
 use gateway::api::lib;
-use git::protocol::ServeCommand;
 use gust::driver::utils::id_generator;
 
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author = "Open Rust Initiative")]
+#[command(about = "Mega is building a monorepo engine to enable Git and trunk-based development at scale")]
+#[command( version, long_about = None)]
 struct Cli {
-    // custom configuration file
+    /// custom configuration file
     #[arg(short, long, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    //custom log file
+    /// custom log file
     #[arg(short, long, value_name = "FILE")]
     log_path: Option<PathBuf>,
 
-    //subcommand serve
+    /// subcommand serve
     #[command(subcommand)]
-    serve_command: Option<ServeCommand>,
+    serve_command: ServeCommand,
 }
 
 /// The main entry of the application.
@@ -75,8 +76,38 @@ pub async fn main() -> Result<()> {
     id_generator::set_up_options().unwrap();
     dotenvy::dotenv().ok();
 
-    // let cli = Cli::parse();
-    lib::http_server().await.unwrap();
-    // ssh_server::server().await.unwrap();
+    let cli = Cli::parse();
+
+    match &cli.serve_command {
+        ServeCommand::Http(config) => {
+            lib::http_server(config).await.unwrap();
+        }
+        ServeCommand::Ssh(config) => {
+            gateway::ssh_server::server(config).await.unwrap();
+        }
+    }
     Ok(())
+}
+
+#[derive(Subcommand)]
+pub enum ServeCommand {
+    /// start http server
+    Http(ServeConfig),
+    /// start ssh server
+    Ssh(ServeConfig),
+}
+
+#[derive(Args)]
+pub struct ServeConfig {
+    #[arg(long, default_value_t = String::from("0.0.0.0"))]
+    host: String,
+
+    #[arg(short, long, default_value_t = 8000)]
+    port: u16,
+
+    #[arg(short, long, value_name = "FILE")]
+    key_path: Option<PathBuf>,
+
+    #[arg(short, long, value_name = "FILE")]
+    cert_path: Option<PathBuf>,
 }

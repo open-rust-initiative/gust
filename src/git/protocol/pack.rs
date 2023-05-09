@@ -159,12 +159,22 @@ impl<T: ObjectStorage> PackProtocol<T> {
                 tracing::error!("capability unsupported");
             }
 
-            add_pkt_line_string(&mut buf, format!("ACK {} \n", "27dd8d4cf39f3868c6eee38b601bc9e9939304f5"));
+            add_pkt_line_string(
+                &mut buf,
+                format!("ACK {} \n", "27dd8d4cf39f3868c6eee38b601bc9e9939304f5"),
+            );
         }
         Ok((send_pack_data, buf))
     }
 
     pub async fn git_receive_pack(&mut self, mut body_bytes: Bytes) -> Result<Bytes> {
+
+        if body_bytes.len() < 1000 {
+            tracing::debug!("bytes from client: {:?}", body_bytes);
+        } else {
+            tracing::debug!("too large to print")
+        }
+
         if body_bytes.starts_with(&[b'P', b'A', b'C', b'K']) {
             let command = self.command_list.last_mut().unwrap();
             let temp_file = format!("./temp-{}.pack", Utc::now().timestamp());
@@ -173,7 +183,7 @@ impl<T: ObjectStorage> PackProtocol<T> {
                 .create(true)
                 .open(&temp_file)
                 .unwrap();
-            file.write(&body_bytes).unwrap();
+            file.write_all(&body_bytes).unwrap();
             let decoded_pack = command
                 .unpack(
                     &mut std::fs::File::open(&temp_file).unwrap(),
@@ -204,7 +214,6 @@ impl<T: ObjectStorage> PackProtocol<T> {
             buf.put(&PKT_LINE_END_MARKER[..]);
             Ok(buf.into())
         } else {
-            tracing::debug!("bytes from client: {:?}", body_bytes);
             let (bytes_take, mut pkt_line) = read_pkt_line(&mut body_bytes);
             if bytes_take == 0 && pkt_line.is_empty() {
                 return Ok(body_bytes);
@@ -383,6 +392,9 @@ fn add_pkt_line_string(pkt_line_stream: &mut BytesMut, buf_str: String) {
 
 /// Read a single pkt-format line from body chunk, return the single line length and line bytes
 pub fn read_pkt_line(bytes: &mut Bytes) -> (usize, Bytes) {
+    if bytes.is_empty() {
+        return (0, Bytes::new());
+    }
     let pkt_length = bytes.copy_to_bytes(4);
     let pkt_length =
         usize::from_str_radix(&String::from_utf8(pkt_length.to_vec()).unwrap(), 16).unwrap();

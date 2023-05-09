@@ -223,7 +223,7 @@ pub fn seek(file: &mut File, offset: u64) -> io::Result<()> {
 ///
 #[allow(unused)]
 pub fn get_offset(file: &mut File) -> io::Result<u64> {
-    file.seek(SeekFrom::Current(0))
+    file.stream_position()
 }
 
 /// Call reader() to process a zlib stream from a file.

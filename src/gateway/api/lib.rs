@@ -23,6 +23,7 @@ use serde::Deserialize;
 use crate::git::protocol::{http, PackProtocol, Protocol};
 use crate::gust::driver::database::mysql;
 use crate::gust::driver::ObjectStorage;
+use crate::{ServeConfig};
 
 #[derive(Clone)]
 struct AppState<T: ObjectStorage> {
@@ -38,9 +39,8 @@ pub fn remove_git_suffix(uri: Uri, git_suffix: &str) -> PathBuf {
     PathBuf::from(uri.path().replace(".git", "").replace(git_suffix, ""))
 }
 
-pub async fn http_server() -> Result<(), Box<dyn std::error::Error>> {
-    let host = env::var("HOST").expect("HOST is not set in .env file");
-    let port = env::var("PORT").expect("PORT is not set in .env file");
+pub async fn http_server(config: &ServeConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let ServeConfig {host, port, key_path, cert_path} = config;
     let server_url = format!("{}:{}", host, port);
 
     let state = AppState {
