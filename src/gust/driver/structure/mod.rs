@@ -17,7 +17,7 @@ use std::{path::{Path, PathBuf}, str::FromStr};
 use self::nodes::{FileNode, Node, TreeNode};
 
 use super::{
-    database::entity::{commit, node, node_data},
+    database::entity::{commit, node},
     utils::id_generator::{self, generate_id},
 };
 
@@ -31,19 +31,22 @@ pub trait GitNodeObject {
     }
 }
 
-impl Blob {
-    pub fn convert_to_model(&self, node_id: i64) -> node_data::ActiveModel {
-        node_data::ActiveModel {
-            id: NotSet,
-            node_id: Set(node_id),
-            git_id: Set(self.meta.id.to_plain_str()),
-            data: Set(self.meta.data.clone()),
-            content_sha: NotSet,
-            created_at: Set(chrono::Utc::now().naive_utc()),
-            updated_at: Set(chrono::Utc::now().naive_utc()),
-        }
-    }
-}
+// impl Blob {
+//     pub fn convert_to_model(&self, node_id: i64) -> node::ActiveModel {
+//         node::ActiveModel {
+//             id: NotSet,
+//             node_id: Set(node_id),
+//             git_id: Set(self.meta.id.to_plain_str()),
+//             data: Set(self.meta.data.clone()),
+//             content_sha: NotSet,
+//             mode: Set(Vec::new()),
+//             name: Set(),
+//             node_type: Set("blob".to_owned()),
+//             created_at: Set(chrono::Utc::now().naive_utc()),
+//             updated_at: Set(chrono::Utc::now().naive_utc()),
+//         }
+//     }
+// }
 
 impl Commit {
     pub fn build_from_model_and_root(model: &commit::Model, root: node::Model) -> Commit {

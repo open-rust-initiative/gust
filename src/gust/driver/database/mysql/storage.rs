@@ -3,21 +3,21 @@ use std::path::Path;
 
 use crate::git::errors::GitError;
 use crate::git::object::base::commit::Commit;
-use crate::git::object::base::tree::{Tree, TreeItem};
+use crate::git::object::base::tree::Tree;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 use crate::git::pack::decode::ObjDecodedMap;
 use crate::git::pack::Pack;
 use crate::git::protocol::{Command, RefCommand};
-use crate::gust::driver::database::entity::{commit, node, node_data, refs};
-use crate::gust::driver::structure::nodes::{build_node_tree, SaveModel};
+use crate::gust::driver::database::entity::{commit, node, refs};
+use crate::gust::driver::structure::nodes::build_node_tree;
 use crate::gust::driver::{ObjectStorage, ZERO_ID};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use sea_orm::ActiveValue::NotSet;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseBackend, DatabaseConnection, DbErr, EntityTrait,
-    InsertResult, QueryFilter, Set, Statement,
+    QueryFilter, Set, Statement,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -86,9 +86,8 @@ impl ObjectStorage for MysqlStorage {
         let mut result = ObjDecodedMap::default();
         result.update_from_cache(&decoded_pack.result);
         // result.check_completeness()?;
-        let SaveModel { nodes, nodes_data } = build_node_tree(&result, repo_path).await.unwrap();
+        let nodes = build_node_tree(&result, repo_path).await.unwrap();
         self.save_nodes(nodes).await.unwrap();
-        self.save_node_data(nodes_data).await.unwrap();
         self.save_commits(&result.commits, repo_path).await.unwrap();
         Ok(())
     }
@@ -96,10 +95,7 @@ impl ObjectStorage for MysqlStorage {
     async fn get_full_pack_data(&self, repo_path: &Path) -> Result<Vec<u8>, GitError> {
         let mut hash_meta: HashMap<String, MetaData> = HashMap::new();
 
-        let commits = self
-            .get_all_commits_by_path(repo_path)
-            .await
-            .unwrap();
+        let commits = self.get_all_commits_by_path(repo_path).await.unwrap();
         for c_meta in commits {
             let c = Commit::new(c_meta);
             hash_meta.insert(c.meta.id.to_plain_str(), c.meta);
@@ -121,10 +117,7 @@ impl ObjectStorage for MysqlStorage {
         _have: &HashSet<String>,
     ) -> Result<Vec<u8>, GitError> {
         let mut hash_meta: HashMap<String, MetaData> = HashMap::new();
-        let all_commits = self
-            .get_all_commits_by_path(repo_path)
-            .await
-            .unwrap();
+        let all_commits = self.get_all_commits_by_path(repo_path).await.unwrap();
 
         for c_meta in all_commits {
             if want.contains(&c_meta.id.to_plain_str()) {
@@ -164,25 +157,20 @@ impl ObjectStorage for MysqlStorage {
 
         if let Some(model) = model {
             if model.node_type == "tree" {
-                let mut tree_items: Vec<TreeItem> = Vec::new();
-                let childs = node::Entity::find()
-                    .filter(node::Column::Pid.eq(hash))
-                    .all(&self.connection)
-                    .await
-                    .unwrap();
-                for c in childs {
-                    tree_items.push(TreeItem::convert_from_model(c));
-                }
-                let t = Tree::convert_from_model(&model, tree_items);
-                let meta = t.encode_metadata().unwrap();
-                Ok(meta)
+                // let mut tree_items: Vec<TreeItem> = Vec::new();
+                // let childs = node::Entity::find()
+                //     .filter(node::Column::Pid.eq(hash))
+                //     .all(&self.connection)
+                //     .await
+                //     .unwrap();
+                // for c in childs {
+                //     tree_items.push(TreeItem::convert_from_model(c));
+                // }
+                // let t = Tree::convert_from_model(&model, tree_items);
+                // let meta = t.encode_metadata().unwrap();
+                Ok(MetaData::new(ObjectType::Tree, &model.data))
             } else {
-                let model = node_data::Entity::find()
-                    .filter(node_data::Column::GitId.eq(hash))
-                    .one(&self.connection)
-                    .await
-                    .unwrap();
-                Ok(MetaData::new(ObjectType::Blob, &model.unwrap().data))
+                Ok(MetaData::new(ObjectType::Blob, &model.data))
             }
         } else {
             return Err(GitError::NotFountHashValue(hash.to_string()));
@@ -279,15 +267,15 @@ impl MysqlStorage {
         Ok(true)
     }
 
-    async fn save_node_data(
-        &self,
-        save_models: Vec<node_data::ActiveModel>,
-    ) -> Result<bool, anyhow::Error> {
-        batch_save_model(&self.connection, save_models)
-            .await
-            .unwrap();
-        Ok(true)
-    }
+    // async fn save_node_data(
+    //     &self,
+    //     save_models: Vec<node_data::ActiveModel>,
+    // ) -> Result<bool, anyhow::Error> {
+    //     batch_save_model(&self.connection, save_models)
+    //         .await
+    //         .unwrap();
+    //     Ok(true)
+    // }
 
     /// Because the requested path is a subdirectory of the original project directory,
     /// a new fake commit is needed to point the subdirectory, so we need to
@@ -355,35 +343,25 @@ impl MysqlStorage {
     // retrieve all sub trees recursively
     #[async_recursion]
     async fn get_child_trees(&self, root: &node::Model, hash_meta: &mut HashMap<String, MetaData>) {
-        let mut tree_items: Vec<TreeItem> = Vec::new();
-
+        let t = Tree::new(MetaData::new(ObjectType::Tree, &root.data));
+        let mut child_ids = vec![];
+        for item in t.tree_items {
+            child_ids.push(item.id.to_plain_str());
+        }
         let childs = node::Entity::find()
-            .filter(node::Column::Pid.eq(&root.git_id))
+            .filter(node::Column::GitId.is_in(child_ids))
             .all(&self.connection)
             .await
             .unwrap();
-        let mut blob_ids = vec![];
         for c in childs {
             if c.node_type == "tree" {
                 self.get_child_trees(&c, hash_meta).await;
             } else {
-                blob_ids.push(c.git_id.clone());
+                let b_meta = MetaData::new(ObjectType::Blob, &c.data);
+                hash_meta.insert(b_meta.id.to_plain_str(), b_meta);
             }
-            tree_items.push(TreeItem::convert_from_model(c));
         }
-
-        let blob_models: Vec<node_data::Model> = node_data::Entity::find()
-            .filter(node_data::Column::GitId.is_in(blob_ids))
-            .all(&self.connection)
-            .await
-            .unwrap();
-        for b in blob_models {
-            let b_meta = MetaData::new(ObjectType::Blob, &b.data);
-            hash_meta.insert(b_meta.id.to_plain_str(), b_meta);
-        }
-
-        let t = Tree::convert_from_model(root, tree_items);
-        let t_meta = t.encode_metadata().unwrap();
+        let t_meta = t.meta;
         tracing::info!("{}, {}", t_meta.id, t.tree_name);
         hash_meta.insert(t_meta.id.to_plain_str(), t_meta);
     }
@@ -393,19 +371,17 @@ impl MysqlStorage {
 async fn batch_save_model<E, A>(
     conn: &DatabaseConnection,
     save_models: Vec<A>,
-) -> Result<Vec<InsertResult<A>>, anyhow::Error>
+) -> Result<(), anyhow::Error>
 where
     E: EntityTrait,
     A: ActiveModelTrait<Entity = E> + From<<E as EntityTrait>::Model> + Send,
 {
-    let mut result_vec = Vec::new();
-    for chunk in save_models.chunks(1000) {
-        let save_result = E::insert_many(chunk.iter().cloned())
-            .exec(conn)
-            .await
-            .unwrap();
-        // println!("{:?}", save_result);
-        result_vec.push(save_result);
+    let mut futures = Vec::new();
+
+    for chunk in save_models.chunks(200) {
+        let save_result = E::insert_many(chunk.iter().cloned()).exec(conn);
+        futures.push(save_result);
     }
-    Ok(result_vec)
+    futures::future::join_all(futures).await;
+    Ok(())
 }

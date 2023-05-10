@@ -1,6 +1,6 @@
 use std::{
     any::Any,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -16,7 +16,7 @@ use crate::{
         pack::decode::ObjDecodedMap,
     },
     gust::driver::{
-        database::entity::{node, node_data},
+        database::entity::node,
         utils::id_generator::{self, generate_id},
     },
 };
@@ -27,7 +27,7 @@ pub struct Repo {
     // pub repo_root: Box<dyn Node>,
     pub tree_map: HashMap<Hash, Tree>,
     pub blob_map: HashMap<Hash, Blob>,
-    // pub repo_path: PathBuf,
+    pub tree_build_cache: HashSet<Hash>,
     // todo: limit the size of the cache
     // pub cache: LruCache<String, FileNode>,
 }
@@ -87,16 +87,11 @@ pub trait Node {
         "".to_string()
     }
 
-    // fetch all tree and blob objects from directory structure(only the current version)
-    fn convert_to_objects(&self) {
-        todo!()
-    }
-
     fn convert_to_model(&self) -> node::ActiveModel;
 
-    fn convert_from_model(node: node::Model, children: Vec<Box<dyn Node>>) -> Box<dyn Node>
-    where
-        Self: Sized;
+    // fn convert_from_model(node: node::Model, children: Vec<Box<dyn Node>>) -> Box<dyn Node>
+    // where
+    //     Self: Sized;
 }
 
 impl Node for TreeNode {
@@ -134,16 +129,17 @@ impl Node for TreeNode {
         }
     }
 
+    /// convert children relations to data vec
     fn convert_to_model(&self) -> node::ActiveModel {
         node::ActiveModel {
             id: NotSet,
-            pid: Set(self.pid.clone()),
             node_id: Set(self.nid),
             git_id: Set(self.git_id.to_plain_str()),
             node_type: Set("tree".to_owned()),
             name: Set(self.name.to_string()),
-            // path: Set(self.path.to_str().unwrap().to_owned()),
             mode: Set(self.mode.clone()),
+            content_sha: NotSet,
+            data: NotSet,
             created_at: Set(chrono::Utc::now().naive_utc()),
             updated_at: Set(chrono::Utc::now().naive_utc()),
         }
@@ -165,17 +161,18 @@ impl Node for TreeNode {
         self
     }
 
-    fn convert_from_model(node: node::Model, children: Vec<Box<dyn Node>>) -> Box<dyn Node> {
-        Box::new(TreeNode {
-            nid: node.node_id,
-            pid: node.pid,
-            git_id: Hash::from_bytes(node.git_id.as_bytes()).unwrap(),
-            name: node.name,
-            path: PathBuf::new(),
-            mode: node.mode,
-            children,
-        })
-    }
+    // fn convert_from_model(node: node::Model, children: Vec<Box<dyn Node>>) -> Box<dyn Node> {
+    //     Box::new(TreeNode {
+    //         nid: node.node_id,
+    //         pid: node.pid,
+    //         git_id: Hash::from_bytes(node.git_id.as_bytes()).unwrap(),
+    //         name: node.name,
+    //         path: PathBuf::new(),
+    //         mode: node.mode,
+    //         children,
+    //         data: Vec::new(),
+    //     })
+    // }
 }
 
 impl Node for FileNode {
@@ -216,13 +213,13 @@ impl Node for FileNode {
     fn convert_to_model(&self) -> node::ActiveModel {
         node::ActiveModel {
             id: NotSet,
-            pid: Set(self.pid.clone()),
             node_id: Set(self.nid),
             git_id: Set(self.git_id.to_plain_str()),
             node_type: Set("blob".to_owned()),
             name: Set(self.name.to_string()),
-            // path: Set(self.path.to_str().unwrap().to_owned()),
             mode: Set(self.mode.clone()),
+            content_sha: NotSet,
+            data:NotSet,
             created_at: Set(chrono::Utc::now().naive_utc()),
             updated_at: Set(chrono::Utc::now().naive_utc()),
         }
@@ -244,16 +241,16 @@ impl Node for FileNode {
         self
     }
 
-    fn convert_from_model(node: node::Model, _: Vec<Box<dyn Node>>) -> Box<dyn Node> {
-        Box::new(FileNode {
-            nid: node.node_id,
-            pid: node.pid,
-            git_id: Hash::from_bytes(node.git_id.as_bytes()).unwrap(),
-            name: node.name,
-            path: PathBuf::new(),
-            mode: node.mode,
-        })
-    }
+    // fn convert_from_model(node: node::Model, _: Vec<Box<dyn Node>>) -> Box<dyn Node> {
+    //     Box::new(FileNode {
+    //         nid: node.node_id,
+    //         pid: node.pid,
+    //         git_id: Hash::from_bytes(node.git_id.as_bytes()).unwrap(),
+    //         name: node.name,
+    //         path: PathBuf::new(),
+    //         mode: node.mode,
+    //     })
+    // }
 }
 
 impl TreeNode {
@@ -271,22 +268,15 @@ impl TreeNode {
     }
 }
 
-pub struct SaveModel {
-    pub nodes: Vec<node::ActiveModel>,
-    pub nodes_data: Vec<node_data::ActiveModel>,
-}
-
 /// this method is used to build node tree and persist node data to database. Conversion order:
 /// 1. Git TreeItem => Struct Node => DB Model
 /// 2. Git Blob => DB Model
 /// current: protocol => storage => structure
-/// new: protocol => structure => storage
+/// expected: protocol => structure => storage
 pub async fn build_node_tree(
     result: &ObjDecodedMap,
-    repo_path: &Path,
-) -> Result<SaveModel, anyhow::Error> {
-    let commit = &result.commits[0];
-    let commit_tree_id = commit.tree_id;
+    _: &Path,
+) -> Result<Vec<node::ActiveModel>, anyhow::Error> {
     let tree_map: HashMap<Hash, Tree> = result
         .trees
         .clone()
@@ -301,87 +291,97 @@ pub async fn build_node_tree(
         .map(|b| (b.meta.id, b))
         .collect();
 
-    let repo = Repo { tree_map, blob_map };
-
-    let tree = repo.tree_map.get(&commit_tree_id).unwrap();
-    let mut repo_root = tree.convert_to_node();
-
-    repo.build_from_root_tree(tree, &mut repo_root, &mut repo_path.to_path_buf());
-    let mut save_model = SaveModel {
-        nodes: Vec::new(),
-        nodes_data: Vec::new(),
+    let mut repo = Repo {
+        tree_map,
+        blob_map,
+        tree_build_cache: HashSet::new(),
     };
-    repo.traverse_node(repo_root.as_ref(), 0, &mut save_model, &repo.blob_map);
-    Ok(save_model)
+
+    let mut nodes = Vec::new();
+
+    for commit in &result.commits {
+        let commit_tree_id = commit.tree_id;
+        let tree = &repo.tree_map.get(&commit_tree_id).unwrap().clone();
+        let mut root_node = tree.convert_to_node();
+        repo.build_node_tree(tree, &mut root_node);
+        nodes.extend(repo.convert_node_to_model(root_node.as_ref(), 0));
+    }
+    Ok(nodes)
 }
 
 impl Repo {
     /// convert Git TreeItem => Struct Node and build node tree
-    pub fn build_from_root_tree(
-        &self,
+    pub fn build_node_tree(
+        &mut self,
         tree: &Tree,
         node: &mut Box<dyn Node>,
-        repo_path: &mut PathBuf,
     ) {
         for item in &tree.tree_items {
+            if let Some(_) = self.tree_build_cache.get(&item.id) {
+                continue;
+            }
             if item.item_type == TreeItemType::Tree {
-                repo_path.push(item.filename.clone());
-                let child_node: Box<dyn Node> =
-                    item.convert_to_node(node.get_git_id().to_plain_str());
-                node.add_child(child_node);
+                // repo_path.push(item.filename.clone());
+                let pid = node.get_git_id().to_plain_str();
+                node.add_child(item.convert_to_node(pid));
                 let child_node = match node.find_child(&item.filename) {
                     Some(child) => child,
                     None => panic!("Something wrong!:{}", &item.filename),
                 };
                 let item = self.tree_map.get(&item.id);
                 if let Some(item) = item {
-                    self.build_from_root_tree(item, child_node, repo_path);
+                    self.build_node_tree(&item.clone(), child_node);
                 }
-                repo_path.pop();
+                // repo_path.pop();
             } else {
-                node.add_child(item.convert_to_node(node.get_git_id().to_plain_str()));
+                let child = item.convert_to_node(node.get_git_id().to_plain_str());
+                node.add_child(child);
             }
+            self.tree_build_cache.insert(item.id);
         }
     }
+
     /// conver Node to db entity and for later persistent
-    pub fn traverse_node(
+    pub fn convert_node_to_model(
         &self,
         node: &dyn Node,
         depth: u32,
-        save_model: &mut SaveModel,
-        blob_map: &HashMap<Hash, Blob>,
-    ) {
+        // nodes: &mut Vec<node::ActiveModel>,
+        // blob_map: &HashMap<Hash, Blob>,
+    ) -> Vec<node::ActiveModel> {
         print_node(node, depth);
-        let SaveModel { nodes, nodes_data } = save_model;
+        let mut nodes: Vec<node::ActiveModel> = Vec::new();
         nodes.push(node.convert_to_model());
         if node.is_a_directory() {
             for child in node.get_children().iter() {
-                self.traverse_node(child.as_ref(), depth + 1, save_model, blob_map);
-            }
-        } else {
-            let blob = blob_map.get(&node.get_git_id());
-            if let Some(blob) = blob {
-                nodes_data.push(blob.convert_to_model(node.get_id()));
+                nodes.extend(self.convert_node_to_model(child.as_ref(), depth + 1));
             }
         }
+        // else {
+        //     let blob = blob_map.get(&node.get_git_id());
+        //     if let Some(blob) = blob {
+        //         nodes.push(blob.convert_to_model(node.get_id()));
+        //     }
+        // }
+        nodes
     }
 }
 
 // Model => Node => Tree ?
-pub fn model_to_node(nodes_model: &Vec<node::Model>, pid: &str) -> Vec<Box<dyn Node>> {
-    let mut nodes: Vec<Box<dyn Node>> = Vec::new();
-    for model in nodes_model {
-        if model.pid == pid {
-            if model.node_type == "blob" {
-                nodes.push(FileNode::convert_from_model(model.clone(), Vec::new()));
-            } else {
-                let childs = model_to_node(nodes_model, &model.pid);
-                nodes.push(TreeNode::convert_from_model(model.clone(), childs));
-            }
-        }
-    }
-    nodes
-}
+// pub fn model_to_node(nodes_model: &Vec<node::Model>, pid: &str) -> Vec<Box<dyn Node>> {
+//     let mut nodes: Vec<Box<dyn Node>> = Vec::new();
+//     for model in nodes_model {
+//         if model.pid == pid {
+//             if model.node_type == "blob" {
+//                 nodes.push(FileNode::convert_from_model(model.clone(), Vec::new()));
+//             } else {
+//                 let childs = model_to_node(nodes_model, &model.pid);
+//                 nodes.push(TreeNode::convert_from_model(model.clone(), childs));
+//             }
+//         }
+//     }
+//     nodes
+// }
 
 /// Print a node with format.
 pub fn print_node(node: &dyn Node, depth: u32) {
