@@ -40,6 +40,7 @@ pub struct TreeNode {
     pub path: PathBuf,
     pub mode: Vec<u8>,
     pub children: Vec<Box<dyn Node>>,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +51,7 @@ pub struct FileNode {
     pub name: String,
     pub path: PathBuf,
     pub mode: Vec<u8>,
+    pub data: Vec<u8>,
 }
 
 /// define the node common behaviour
@@ -126,11 +128,14 @@ impl Node for TreeNode {
             mode: Vec::new(),
             git_id: Hash::default(),
             children: Vec::new(),
+            data: Vec::new(),
         }
     }
 
     /// convert children relations to data vec
     fn convert_to_model(&self) -> node::ActiveModel {
+        // tracing::info!("tree {}", Arc::strong_count(&self.data));
+        // tracing::info!("tree {}", Arc::strong_count(&Arc::clone(&self.data)));
         node::ActiveModel {
             id: NotSet,
             node_id: Set(self.nid),
@@ -139,7 +144,7 @@ impl Node for TreeNode {
             name: Set(self.name.to_string()),
             mode: Set(self.mode.clone()),
             content_sha: NotSet,
-            data: NotSet,
+            data: Set(self.data.clone()),
             created_at: Set(chrono::Utc::now().naive_utc()),
             updated_at: Set(chrono::Utc::now().naive_utc()),
         }
@@ -207,6 +212,7 @@ impl Node for FileNode {
             name,
             git_id: Hash::default(),
             mode: Vec::new(),
+            data: Vec::new(),
         }
     }
 
@@ -219,7 +225,7 @@ impl Node for FileNode {
             name: Set(self.name.to_string()),
             mode: Set(self.mode.clone()),
             content_sha: NotSet,
-            data:NotSet,
+            data: Set(self.data.clone()),
             created_at: Set(chrono::Utc::now().naive_utc()),
             updated_at: Set(chrono::Utc::now().naive_utc()),
         }
@@ -264,6 +270,7 @@ impl TreeNode {
             path: PathBuf::from("/"),
             mode: Vec::new(),
             children: Vec::new(),
+            data: Vec::new(),
         })
     }
 }
@@ -302,28 +309,25 @@ pub async fn build_node_tree(
     for commit in &result.commits {
         let commit_tree_id = commit.tree_id;
         let tree = &repo.tree_map.get(&commit_tree_id).unwrap().clone();
-        let mut root_node = tree.convert_to_node();
+        let mut root_node = tree.convert_to_node(None);
         repo.build_node_tree(tree, &mut root_node);
         nodes.extend(repo.convert_node_to_model(root_node.as_ref(), 0));
+        print!("--------------------------------");
     }
     Ok(nodes)
 }
 
 impl Repo {
     /// convert Git TreeItem => Struct Node and build node tree
-    pub fn build_node_tree(
-        &mut self,
-        tree: &Tree,
-        node: &mut Box<dyn Node>,
-    ) {
+    pub fn build_node_tree(&mut self, tree: &Tree, node: &mut Box<dyn Node>) {
         for item in &tree.tree_items {
             if let Some(_) = self.tree_build_cache.get(&item.id) {
                 continue;
             }
             if item.item_type == TreeItemType::Tree {
                 // repo_path.push(item.filename.clone());
-                let pid = node.get_git_id().to_plain_str();
-                node.add_child(item.convert_to_node(pid));
+                let tree = self.tree_map.get(&item.id).unwrap();
+                node.add_child(tree.convert_to_node(Some(item)));
                 let child_node = match node.find_child(&item.filename) {
                     Some(child) => child,
                     None => panic!("Something wrong!:{}", &item.filename),
@@ -334,35 +338,23 @@ impl Repo {
                 }
                 // repo_path.pop();
             } else {
-                let child = item.convert_to_node(node.get_git_id().to_plain_str());
-                node.add_child(child);
+                let blob = self.blob_map.get(&item.id).unwrap();
+                node.add_child(blob.convert_to_node(Some(item)));
             }
             self.tree_build_cache.insert(item.id);
         }
     }
 
     /// conver Node to db entity and for later persistent
-    pub fn convert_node_to_model(
-        &self,
-        node: &dyn Node,
-        depth: u32,
-        // nodes: &mut Vec<node::ActiveModel>,
-        // blob_map: &HashMap<Hash, Blob>,
-    ) -> Vec<node::ActiveModel> {
+    pub fn convert_node_to_model(&self, node: &dyn Node, depth: u32) -> Vec<node::ActiveModel> {
         print_node(node, depth);
         let mut nodes: Vec<node::ActiveModel> = Vec::new();
         nodes.push(node.convert_to_model());
         if node.is_a_directory() {
-            for child in node.get_children().iter() {
+            for child in node.get_children() {
                 nodes.extend(self.convert_node_to_model(child.as_ref(), depth + 1));
             }
         }
-        // else {
-        //     let blob = blob_map.get(&node.get_git_id());
-        //     if let Some(blob) = blob {
-        //         nodes.push(blob.convert_to_model(node.get_id()));
-        //     }
-        // }
         nodes
     }
 }

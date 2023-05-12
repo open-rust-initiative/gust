@@ -6,6 +6,7 @@
 /// Git Object: tag
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::sync::Arc;
 
 use bstr::ByteSlice;
 
@@ -20,7 +21,7 @@ use crate::git::object::types::ObjectType;
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tag {
-    pub meta: MetaData,
+    pub meta: Arc<MetaData>,
     pub object: Hash,
     pub t: ObjectType,
     pub tag: String,
@@ -50,7 +51,7 @@ impl PartialEq for Tag {
 impl Tag {
     /// Tag 的构造函数 接收一个@param meta::Metadata
     /// 同时执行tag解码 -> `fn decode_metadata`
-    pub fn new(meta: MetaData) -> Self {
+    pub fn new(meta: Arc<MetaData>) -> Self {
         let mut a = Self {
             meta: meta.clone(),
             object: meta.id.clone(),
@@ -158,6 +159,7 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
+    use std::sync::Arc;
     use std::vec;
 
     use crate::git::hash::Hash;
@@ -185,7 +187,7 @@ mod tests {
         );
 
         let mut tag = Tag {
-            meta,
+            meta: Arc::new(meta),
             object: Hash::default(),
             t: ObjectType::Commit,
             tag: "".to_string(),
@@ -232,7 +234,7 @@ mod tests {
             delta_header: vec![],
         };
 
-        let tag = Tag::new(meta);
+        let tag = Tag::new(Arc::new(meta));
 
         println!("{}", tag);
     }
@@ -251,7 +253,7 @@ mod tests {
         };
 
         let mut tag = Tag {
-            meta,
+            meta: Arc::new(meta),
             object: Hash::from_str("6414e45babf0bdd043ba40d31123053cfebef26c").unwrap(),
             t: ObjectType::Commit,
             tag: "v1.1.0".to_string(),
@@ -259,7 +261,7 @@ mod tests {
             message: "\nIt's a lastest object\n-----BEGIN PGP SIGNATURE-----\n\niQIzBAABCAAdFiEEanuf5/5ADLU2lvsCZL9E4tsHuXIFAmKHWxcACgkQZL9E4tsH\nuXIeFhAAtX+foSvc7/1lb98+QfRjHcpO+LX+LroTaq/QGOTX/2gE+tHD2TJAga1I\nVqDEz8fh8AE366FC7UCjCb5nvsCCox2htzbIxAjsc9L/JckWtxl6WOa/5OZssrDQ\nFtX39BNNl+4TfNn/z1XV+28c9yB1N5HSoP2gzdLoASw3y9n6E0FyzLdoXPILgmJI\nL4DAG/OFkixK+I+TsK+6995497h9BCi3x30dOjfxZS9ptiKhqWulbkflvvM9Cnie\n7obXYmnoe0jBjSfO5GgJlOYcLzE9MMYYzIx47/4lcrCbQXnojkW3KV03PEXGfRCL\nw/y8oBHVvNVRF0Jn+o7F+mzIrbF6Ufku63MfRf7WmbbS3B63CILEjNyuOFoe8mDb\nrmAUffzQSrgnvBk+g01slb6Q+q7Urw6wqHtBPn3ums/inHE9ymTqS7ffmRifUfR8\nD8LvhwpSUI7BdiN6HznRFPxMXzohYIqAJbUltjr4Q7qw/kJI+305Xcs1U5AUIaOp\n77p2UFHRVoMM5mpPOCSwsVJ6cSuOjWXf9afcNMrhgclKefM0aXXnd2p5zTUEe99T\nlAtXHuprRwxtSQUzHxJCdGlUGRGRR2aS9W984SNDVmcegnOIrZD2pVm/tjDwVex5\nMuAuKHr8et1EKyvKCnta6USq7WC2l6RdsCaAYzSTQ7ljEi9A+6Q=\n=/9g0\n-----END PGP SIGNATURE-----\n".to_string(),
         };
 
-        tag.meta = tag.encode_metadata().unwrap();
+        tag.meta = Arc::new(tag.encode_metadata().unwrap());
         assert_eq!(
             "e5c324b03b72b26f11557c4955c6d17c68dc8595",
             tag.meta.id.to_plain_str()

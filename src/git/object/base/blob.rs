@@ -4,6 +4,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use bstr::BString;
 
@@ -16,7 +17,7 @@ use crate::git::object::metadata::MetaData;
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Blob {
     pub filename: String,
-    pub meta: MetaData,
+    pub meta: Arc<MetaData>,
 }
 
 impl Ord for Blob {
@@ -52,11 +53,11 @@ impl PartialEq for Blob {
 impl Blob {
     pub fn parse_from_file(path: PathBuf) -> Self {
         let meta = ObjectClass::parse_meta(path);
-        Blob::new(meta)
+        Blob::new(Arc::new(meta))
     }
 
     #[allow(unused)]
-    pub fn new(metadata: MetaData) -> Self {
+    pub fn new(metadata: Arc<MetaData>) -> Self {
         Self {
             meta: metadata,
             filename: String::new(),
@@ -109,6 +110,7 @@ mod tests {
     use std::io::BufReader;
     use std::io::Read;
     use std::path::{Path, PathBuf};
+    use std::sync::Arc;
 
     use crate::git::object::metadata::MetaData;
     use crate::git::object::types::ObjectType;
@@ -150,7 +152,7 @@ mod tests {
         assert_eq!(meta.t, crate::git::object::types::ObjectType::Blob);
 
         let blob = Blob {
-            meta: meta,
+            meta: Arc::new(meta),
             filename: String::new(),
         };
 

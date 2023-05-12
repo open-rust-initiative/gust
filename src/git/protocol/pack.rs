@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
-use std::str::FromStr;
+use std::sync::Arc;
 
 use anyhow::Result;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -17,7 +17,6 @@ use crate::git::object::base::blob::Blob;
 use crate::git::object::base::commit::Commit;
 use crate::git::object::base::tree::{Tree, TreeItemType};
 use crate::git::object::metadata::MetaData;
-use crate::git::pack::Pack;
 use crate::git::protocol::{PackProtocol, RefCommand};
 use crate::gust::driver::{ObjectStorage, ZERO_ID};
 
@@ -168,11 +167,8 @@ impl<T: ObjectStorage> PackProtocol<T> {
     }
 
     pub async fn git_receive_pack(&mut self, mut body_bytes: Bytes) -> Result<Bytes> {
-
         if body_bytes.len() < 1000 {
             tracing::debug!("bytes from client: {:?}", body_bytes);
-        } else {
-            tracing::debug!("too large to print")
         }
 
         if body_bytes.starts_with(&[b'P', b'A', b'C', b'K']) {
@@ -310,7 +306,7 @@ fn find_common_base(
             break;
         }
         commits.push(commit.clone());
-        result.insert(commit.meta.id, commit.meta);
+        result.insert(commit.meta.id, Arc::try_unwrap(commit.meta).unwrap());
 
         let parent_ids = commit.parent_tree_ids;
 
@@ -354,7 +350,7 @@ fn parse_tree(
     );
     basic_objects.insert(tree_id);
     if !init_basic {
-        result.insert(tree_id, tree.meta.to_owned());
+        result.insert(tree_id, Arc::try_unwrap(tree.meta).unwrap());
     }
 
     for tree_item in tree.tree_items {
@@ -370,7 +366,7 @@ fn parse_tree(
                             .join(tree_item.id.to_folder())
                             .join(tree_item.id.to_filename()),
                     );
-                    result.insert(blob.meta.id, blob.meta);
+                    result.insert(blob.meta.id, Arc::try_unwrap(blob.meta).unwrap());
                 }
             }
             TreeItemType::BlobExecutable => todo!(),

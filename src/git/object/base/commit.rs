@@ -5,6 +5,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use bstr::ByteSlice;
 
@@ -21,7 +22,7 @@ use crate::git::object::types::ObjectType;
 #[allow(unused)]
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Commit {
-    pub meta: MetaData,
+    pub meta: Arc<MetaData>,
     pub tree_id: Hash,
     pub parent_tree_ids: Vec<Hash>,
     pub author: AuthorSign,
@@ -51,11 +52,11 @@ impl PartialEq for Commit {
 impl Commit {
     pub fn parse_from_file(path: PathBuf) -> Self {
         let meta = ObjectClass::parse_meta(path);
-        Commit::new(meta)
+        Commit::new(Arc::new(meta))
     }
 
     ///
-    pub fn new(metadata: MetaData) -> Self {
+    pub fn new(metadata: Arc<MetaData>) -> Self {
         let mut a = Self {
             meta: metadata,
             tree_id: Hash::default(),
@@ -180,6 +181,7 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
     use std::str::FromStr;
+    use std::sync::Arc;
 
     use crate::git::hash::Hash;
     use crate::git::object::types::ObjectType;
@@ -193,7 +195,7 @@ mod tests {
             .expect("Read error!");
 
         Commit {
-            meta,
+            meta: Arc::new(meta),
             tree_id: Hash::default(),
             parent_tree_ids: vec![],
             author: AuthorSign {
@@ -268,7 +270,7 @@ mod tests {
         };
 
         let mut commit = super::Commit {
-            meta,
+            meta: Arc::new(meta),
             tree_id: Hash::from_str("9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20").unwrap(),
             parent_tree_ids: vec![
                 Hash::from_str("1b490ec04712d147bbe7c8b3a6d86ed4d3587a6a").unwrap(),
@@ -278,7 +280,7 @@ mod tests {
             message: "gpgsig -----BEGIN PGP SIGNATURE-----\n \n iQIzBAABCAAdFiEEanuf5/5ADLU2lvsCZL9E4tsHuXIFAmJRs88ACgkQZL9E4tsH\n uXJAmBAAtubFjLjNzIgal1/Gwy/zlpw7aQvVO2xcX3Xhbeb0UJyKvrSm/Ht19kiz\n 6Bc8ZV75mpKKip93XAljUgWgAO6Q4DUFnVA5bwF1vvhKHbgXLr+I8q+5GqmLW61U\n oBrB/3aJJ/uAxElQz5nOhgB7ztCfeKQ5egbhBXn9QGqPg/RkfQmDPYsU7evk1J0Z\n CyKinbSNe0c92qE95nURzozFb1zf0rO9NtnpYohFCEO5qyuoV4nz7npnJD4Miqy9\n IUQapeJeZC7eDvU8AWbxARrkXQkyfLSebDVcqbz7WfQz+4dhoK7jADaB48oKpR/K\n bKZDJU9a2t2nPC1ojzjQJgXZ6x4linQofBR8wE1ns3W5RoRgcBSj8dQMNH8wXa/T\n oQD6hlCJpjvbiYHuc3tSgCESI4ZU7zGpL9BAQK+C91T8CUamycF1H7TAHXdzNClR\n bWO4EeRzvwZZyIL029DYFxD2IFN7OQb5jc7JvcroIW8jUN0sMPS6jY+d0bg5pgIs\n yJjmI6qPYy7R35OElfTlw8aVSOAnVbQh7MZt6n3JUyezwK9MwbiKdAYKOLYaVaC0\n ++SY+NV4Dwe6W72KhFhxwOJQRGMfES1mRxy4n85BgqfCGy7STGSBOmon3VZEl89z\n rmvdX0JXy93hGH0oUQINsN9bzpsdaQUWVND8wAnb0+sU4LvJz90=\n =9qni\n -----END PGP SIGNATURE-----\n\nAdd gust.md and modify gitmega.md\n\nSigned-off-by: Quanyi Ma <eli@patch.sh>\n".to_string(),
         };
 
-        commit.meta = commit.encode_metadata().unwrap();
+        commit.meta = Arc::new(commit.encode_metadata().unwrap());
 
         assert_eq!(
             "3b8bc1e152af7ed6b69f2acfa8be709d1733e1bb",

@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::git::errors::GitError;
 use crate::git::object::base::commit::Commit;
@@ -97,9 +98,9 @@ impl ObjectStorage for MysqlStorage {
 
         let commits = self.get_all_commits_by_path(repo_path).await.unwrap();
         for c_meta in commits {
-            let c = Commit::new(c_meta);
-            hash_meta.insert(c.meta.id.to_plain_str(), c.meta);
-            tracing::info!("{}", c.tree_id.to_plain_str());
+            let c = Commit::new(Arc::new(c_meta));
+            hash_meta.insert(c.meta.id.to_plain_str(), Arc::try_unwrap(c.meta).unwrap());
+            tracing::info!("Parse Commit's all sub tree{}", c.tree_id.to_plain_str());
             if let Some(root) = self.get_node_by_id(&c.tree_id.to_plain_str()).await {
                 self.get_child_trees(&root, &mut hash_meta).await
             } else {
@@ -121,7 +122,7 @@ impl ObjectStorage for MysqlStorage {
 
         for c_meta in all_commits {
             if want.contains(&c_meta.id.to_plain_str()) {
-                let c = Commit::new(c_meta);
+                let c = Commit::new(Arc::new(c_meta));
                 if let Some(root) = self.get_node_by_id(&c.tree_id.to_plain_str()).await {
                     self.get_child_trees(&root, &mut hash_meta).await
                 } else {
@@ -247,9 +248,32 @@ impl MysqlStorage {
             .await
     }
 
-    async fn save_nodes(&self, objects: Vec<node::ActiveModel>) -> Result<bool, anyhow::Error> {
+    async fn save_nodes(&self, nodes: Vec<node::ActiveModel>) -> Result<bool, anyhow::Error> {
         let conn = &self.connection;
-        batch_save_model(conn, objects).await.unwrap();
+        let mut sum = 0;
+        let mut batch_nodes = Vec::new();
+        for node in nodes {
+            // let model = node.try_into_model().unwrap();
+            let size = node.data.as_ref().len();
+            let limit = 10 * 1024 * 1024;
+            if sum + size < limit && batch_nodes.len() < 50 {
+                sum += size;
+                batch_nodes.push(node);
+            } else {
+                node::Entity::insert_many(batch_nodes)
+                    .exec(conn)
+                    .await
+                    .unwrap();
+                sum = 0;
+                batch_nodes = Vec::new();
+            }
+        }
+        if batch_nodes.len() != 0 {
+            node::Entity::insert_many(batch_nodes)
+                .exec(conn)
+                .await
+                .unwrap();
+        }
         Ok(true)
     }
 
@@ -343,10 +367,12 @@ impl MysqlStorage {
     // retrieve all sub trees recursively
     #[async_recursion]
     async fn get_child_trees(&self, root: &node::Model, hash_meta: &mut HashMap<String, MetaData>) {
-        let t = Tree::new(MetaData::new(ObjectType::Tree, &root.data));
+        let t = Tree::new(Arc::new(MetaData::new(ObjectType::Tree, &root.data)));
         let mut child_ids = vec![];
         for item in t.tree_items {
-            child_ids.push(item.id.to_plain_str());
+            if !hash_meta.contains_key(&item.id.to_plain_str()) {
+                child_ids.push(item.id.to_plain_str());
+            }
         }
         let childs = node::Entity::find()
             .filter(node::Column::GitId.is_in(child_ids))
@@ -363,7 +389,7 @@ impl MysqlStorage {
         }
         let t_meta = t.meta;
         tracing::info!("{}, {}", t_meta.id, t.tree_name);
-        hash_meta.insert(t_meta.id.to_plain_str(), t_meta);
+        hash_meta.insert(t_meta.id.to_plain_str(), Arc::try_unwrap(t_meta).unwrap());
     }
 }
 
@@ -378,10 +404,11 @@ where
 {
     let mut futures = Vec::new();
 
-    for chunk in save_models.chunks(200) {
-        let save_result = E::insert_many(chunk.iter().cloned()).exec(conn);
+    // notice that sqlx not support packets larger than 16MB now
+    for chunk in save_models.chunks(100) {
+        let save_result = E::insert_many(chunk.iter().cloned()).exec(conn).await;
         futures.push(save_result);
     }
-    futures::future::join_all(futures).await;
+    // futures::future::join_all(futures).await;
     Ok(())
 }

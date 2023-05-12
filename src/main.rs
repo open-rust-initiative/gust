@@ -47,7 +47,9 @@ use gust::driver::utils::id_generator;
 
 #[derive(Parser)]
 #[command(author = "Open Rust Initiative")]
-#[command(about = "Mega is building a monorepo engine to enable Git and trunk-based development at scale")]
+#[command(
+    about = "Mega is building a monorepo engine to enable Git and trunk-based development at scale"
+)]
 #[command( version, long_about = None)]
 struct Cli {
     /// custom configuration file

@@ -7,6 +7,7 @@
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use bstr::ByteSlice;
 use colored::Colorize;
@@ -85,7 +86,7 @@ pub struct TreeItem {
 
 #[derive(Eq, Debug, Hash, Clone)]
 pub struct Tree {
-    pub meta: MetaData,
+    pub meta: Arc<MetaData>,
     pub tree_items: Vec<TreeItem>,
     pub tree_name: String,
 }
@@ -143,10 +144,10 @@ impl Display for Tree {
 impl Tree {
     pub fn parse_from_file(path: PathBuf) -> Self {
         let meta = ObjectClass::parse_meta(path);
-        Tree::new(meta)
+        Tree::new(Arc::new(meta))
     }
 
-    pub fn new(metadata: MetaData) -> Self {
+    pub fn new(metadata: Arc<MetaData>) -> Self {
         let mut a = Self {
             meta: metadata,
             tree_items: vec![],
@@ -214,6 +215,7 @@ mod tests {
     use std::env;
     use std::path::Path;
     use std::path::PathBuf;
+    use std::sync::Arc;
     use std::vec;
 
     use crate::git::hash::Hash;
@@ -231,8 +233,8 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-82352c3a6a7a8bd32011751699c7a3648d1b5d3c-gitmega.md");
 
-        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
-            .expect("Read error!");
+        let meta = Arc::new(MetaData::read_object_from_file(path.to_str().unwrap().to_string())
+            .expect("Read error!"));
 
         assert_eq!(meta.t, ObjectType::Blob);
         assert_eq!(
@@ -255,18 +257,18 @@ mod tests {
 
         let mut tree = Tree {
             tree_name: String::new(),
-            meta: MetaData {
+            meta: Arc::new(MetaData {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
                 id: Hash::default(),
                 size: 0,
                 data: vec![],
                 delta_header: vec![],
-            },
+            }),
             tree_items: vec![item],
         };
 
-        tree.meta = tree.encode_metadata().unwrap();
+        tree.meta = Arc::new(tree.encode_metadata().unwrap());
         tree.write_to_file("/tmp".to_string())
             .expect("Write error!");
 
@@ -279,8 +281,8 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-fc1a505ac94f98cc5f29100a2d9aef97027a32fb-gitmega.md");
 
-        let meta_gitmega = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
-            .expect("Read error!");
+        let meta_gitmega = Arc::new(MetaData::read_object_from_file(path.to_str().unwrap().to_string())
+            .expect("Read error!"));
 
         let blob_gitmega = Blob {
             meta: meta_gitmega,
@@ -294,8 +296,8 @@ mod tests {
         path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/blob-a3b55a2ce16d2429dae2d690d2c15bcf26fbe33c-gust.md");
 
-        let meta_gust = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
-            .expect("Read error!");
+        let meta_gust = Arc::new(MetaData::read_object_from_file(path.to_str().unwrap().to_string())
+            .expect("Read error!"));
 
         let blob_gust = Blob {
             meta: meta_gust,
@@ -306,18 +308,18 @@ mod tests {
 
         let mut tree = Tree {
             tree_name: String::new(),
-            meta: MetaData {
+            meta: Arc::new(MetaData {
                 t: ObjectType::Tree,
                 h: HashType::Sha1,
                 id: Hash::default(),
                 size: 0,
                 data: vec![],
                 delta_header: vec![],
-            },
+            }),
             tree_items: vec![item_gitmega, item_gust],
         };
 
-        tree.meta = tree.encode_metadata().unwrap();
+        tree.meta = Arc::new(tree.encode_metadata().unwrap());
         tree.write_to_file("/tmp".to_string())
             .expect("Write error!");
 
@@ -331,8 +333,8 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/tree-1bdbc1e723aa199e83e33ecf1bb19f874a56ebc3");
 
-        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
-            .expect("Read error!");
+        let meta = Arc::new(MetaData::read_object_from_file(path.to_str().unwrap().to_string())
+            .expect("Read error!"));
 
         assert_eq!(ObjectType::Tree, meta.t);
         assert_eq!(38, meta.size);
@@ -368,8 +370,8 @@ mod tests {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources/data/test/tree-9bbe4087bedef91e50dc0c1a930c1d3e86fd5f20");
 
-        let meta = MetaData::read_object_from_file(path.to_str().unwrap().to_string())
-            .expect("Read error!");
+        let meta = Arc::new(MetaData::read_object_from_file(path.to_str().unwrap().to_string())
+            .expect("Read error!"));
 
         assert_eq!(ObjectType::Tree, meta.t);
         assert_eq!(73, meta.size);
