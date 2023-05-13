@@ -4,16 +4,22 @@
 //!
 use std::collections::HashMap;
 use std::fmt::{self, Display};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use colored::Colorize;
 
 use obj::base::ObjectClass;
 use obj::base::{blob, commit, tag, tree};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use rayon::ThreadPoolBuilder;
 
 use crate::git::errors::GitError;
 use crate::git::hash::Hash;
 use crate::git::object as obj;
+use crate::git::object::base::blob::Blob;
+use crate::git::object::base::commit::Commit;
+use crate::git::object::base::tag::Tag;
+use crate::git::object::base::tree::Tree;
 use crate::git::object::metadata::MetaData;
 use crate::git::object::types::ObjectType;
 use crate::git::pack::cache::PackObjectCache;
@@ -35,34 +41,67 @@ impl ObjDecodedMap {
     /// 通过cache对不同结构进行进一步解析
     #[allow(unused)]
     pub fn update_from_cache(&mut self, cache: &PackObjectCache) {
-        for (key, value) in cache.by_hash.iter() {
-            let metadata = MetaData::new(value.t, &value.data);
-            let _obj: ObjectClass = match value.t {
-                // 交给各自的new函数,通过metadata来解码
-                ObjectType::Blob => {
-                    let a = blob::Blob::new(metadata);
-                    self.blobs.push(a.clone());
-                    ObjectClass::BLOB(a)
+        let builder = ThreadPoolBuilder::new().num_threads(8);
+        let pool = builder.build().unwrap();
+        let mut blobs: Arc<RwLock<Vec<Blob>>> = Default::default();
+        let mut commits: Arc<RwLock<Vec<Commit>>> = Default::default();
+        let mut trees: Arc<RwLock<Vec<Tree>>> = Default::default();
+        let mut tags: Arc<RwLock<Vec<Tag>>> = Default::default();
+
+        pool.install(|| {
+            cache.by_hash.par_iter().for_each(|(key, value)| {
+                let metadata = value.clone();
+                match value.t {
+                    // 交给各自的new函数,通过metadata来解码
+                    ObjectType::Blob => {
+                        blobs.write().unwrap().push(Blob::new(metadata));
+                    }
+                    ObjectType::Commit => {
+                        commits.write().unwrap().push(Commit::new(metadata));
+                    }
+                    ObjectType::Tag => {
+                        tags.write().unwrap().push(Tag::new(metadata));
+                    }
+                    ObjectType::Tree => {
+                        trees.write().unwrap().push(Tree::new(metadata));
+                    }
+                    _ => panic!("src/git/pack/decode.rs: 33 invalid type in encoded metadata"),
                 }
-                ObjectType::Commit => {
-                    let a = commit::Commit::new(metadata);
-                    self.commits.push(a.clone());
-                    ObjectClass::COMMIT(a)
-                }
-                ObjectType::Tag => {
-                    let a = tag::Tag::new(metadata);
-                    self.tags.push(a.clone());
-                    ObjectClass::TAG(a)
-                }
-                ObjectType::Tree => {
-                    let a = tree::Tree::new(metadata);
-                    self.trees.push(a.clone());
-                    ObjectClass::TREE(a)
-                }
-                _ => panic!("src/git/pack/decode.rs: 33 invalid type in encoded metadata"),
-            };
-            self.map_hash.insert(key.clone(), Arc::new(_obj));
-        }
+            });
+        });
+        self.blobs = blobs.read().unwrap().to_vec();
+        self.commits = commits.read().unwrap().to_vec();
+        self.trees = trees.read().unwrap().to_vec();
+        self.tags = tags.read().unwrap().to_vec();
+
+        // for (key, value) in cache.by_hash.iter() {
+        //     let metadata = MetaData::new(value.t, &value.data);
+        //     match value.t {
+        //         // 交给各自的new函数,通过metadata来解码
+        //         ObjectType::Blob => {
+        //             let a = blob::Blob::new(metadata);
+        //             self.blobs.push(a);
+        //             // ObjectClass::BLOB(a)
+        //         }
+        //         ObjectType::Commit => {
+        //             let a = commit::Commit::new(metadata);
+        //             self.commits.push(a);
+        //             // ObjectClass::COMMIT(a)
+        //         }
+        //         ObjectType::Tag => {
+        //             let a = tag::Tag::new(metadata);
+        //             self.tags.push(a);
+        //             // ObjectClass::TAG(a)
+        //         }
+        //         ObjectType::Tree => {
+        //             let a = tree::Tree::new(metadata);
+        //             self.trees.push(a);
+        //             // ObjectClass::TREE(a)
+        //         }
+        //         _ => panic!("src/git/pack/decode.rs: 33 invalid type in encoded metadata"),
+        //     };
+        //     // self.map_hash.insert(key.clone(), Arc::new(obj_class));
+        // }
     }
 
     /// 虽然这里看起来是encode的事情，但实际上还是对object的深度解析，所以放在这里了。
@@ -116,16 +155,16 @@ impl ObjDecodedMap {
     pub fn vec_sliding_window(&self) -> Vec<MetaData> {
         let mut list = vec![];
         for c in self.commits.iter() {
-            list.push(c.meta.clone());
+            list.push(Arc::try_unwrap(c.meta.clone()).unwrap());
         }
         for t in self.tags.iter() {
-            list.push(t.meta.clone());
+            list.push(Arc::try_unwrap(t.meta.clone()).unwrap());
         }
         for tree in self.trees.iter() {
-            list.push(tree.meta.clone());
+            list.push(Arc::try_unwrap(tree.meta.clone()).unwrap());
         }
         for blob in self.blobs.iter() {
-            list.push(blob.meta.clone());
+            list.push(Arc::try_unwrap(blob.meta.clone()).unwrap());
         }
 
         list

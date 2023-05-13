@@ -61,11 +61,13 @@ impl Pack {
         for i in 0.._pack.number_of_objects {
             if i % 1000 == 0 {
                 tracing::info!(
-                    "Unpacking: Index/Total:{}/{}, HashMap Size:{}, OffsetMap Size:{}",
+                    "Unpacking: Idx/Total:{}/{}, Hash/Offset Map Size:{}/{}, Obj/Delta count, {}/{}",
                     i,
                     _pack.number_of_objects,
                     cache.by_hash.len(),
-                    cache.by_offset.len()
+                    cache.by_offset.len(),
+                    cache.base,
+                    cache.delta,
                 );
             }
             //update offset of the Object
@@ -183,6 +185,7 @@ impl Pack {
                         "Incorrect object size"
                     )));
                 }
+                cache.base += 1;
                 Ok(MetaData::new(ObjectType::number_type(type_num), &contents))
             }),
             // Delta; base object is at an offset in the same packfile
@@ -202,6 +205,7 @@ impl Pack {
                 utils::seek(pack_file, offset).unwrap();
                 let base_obj = base_object.as_ref();
                 let objs = apply_delta(pack_file, base_obj)?;
+                cache.delta += 1;
                 Ok(objs)
             }
             // Delta; base object is given by a hash outside the packfile

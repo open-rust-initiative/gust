@@ -15,6 +15,8 @@ pub struct PackObjectCache {
     pub by_hash: BTreeMap<Hash, Arc<MetaData>>,
     pub by_offset: HashMap<Hash, u64>,
     pub offset_hash: BTreeMap<u64, Hash>,
+    pub base: u32,
+    pub delta: u32,
 }
 
 //
