@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use entity::node;
 use sea_orm::{ActiveValue::NotSet, Set};
 
 use crate::{
@@ -15,10 +16,7 @@ use crate::{
         },
         pack::decode::ObjDecodedMap,
     },
-    gust::driver::{
-        database::entity::node,
-        utils::id_generator::{self, generate_id},
-    },
+    gust::driver::utils::id_generator::{self, generate_id},
 };
 
 use super::GitNodeObject;
@@ -392,13 +390,11 @@ pub fn print_node(node: &dyn Node, depth: u32) {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
-
     use crate::gust::driver::{
-        database::entity::node,
         structure::nodes::{Node, TreeNode},
         utils::id_generator,
     };
+    use std::path::PathBuf;
 
     use super::FileNode;
 

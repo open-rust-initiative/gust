@@ -11,7 +11,6 @@ pub struct Model {
     pub tree: String,
     pub pid: Option<String>,
     pub meta: Vec<u8>,
-    // pub is_head: bool,
     pub repo_path: String,
     pub author: Option<String>,
     pub committer: Option<String>,

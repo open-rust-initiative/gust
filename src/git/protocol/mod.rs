@@ -5,11 +5,12 @@
 
 use std::{fs::File, path::PathBuf, str::FromStr, sync::Arc};
 
+use entity::refs;
 use sea_orm::{ActiveValue::NotSet, Set};
 
 use crate::{
     git::protocol::pack::SP,
-    gust::driver::{database::entity::refs, ObjectStorage, ZERO_ID},
+    gust::driver::{ObjectStorage, ZERO_ID},
 };
 
 use super::pack::Pack;
@@ -232,4 +233,3 @@ impl<T: ObjectStorage> PackProtocol<T> {
     //     self.service_type = Some(ServiceType::new(&service_name));
     // }
 }
-

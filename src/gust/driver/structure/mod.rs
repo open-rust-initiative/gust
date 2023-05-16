@@ -19,11 +19,8 @@ use std::{
 };
 
 use self::nodes::{FileNode, Node, TreeNode};
-
-use super::{
-    database::entity::{commit, node},
-    utils::id_generator::{self, generate_id},
-};
+use super::utils::id_generator::{self, generate_id};
+use entity::{commit, node};
 
 pub mod nodes;
 

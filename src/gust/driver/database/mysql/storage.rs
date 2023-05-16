@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::git::errors::GitError;
+use crate::git::hash::Hash;
 use crate::git::object::base::commit::Commit;
 use crate::git::object::base::tree::Tree;
 use crate::git::object::metadata::MetaData;
@@ -10,11 +12,11 @@ use crate::git::object::types::ObjectType;
 use crate::git::pack::decode::ObjDecodedMap;
 use crate::git::pack::Pack;
 use crate::git::protocol::{Command, RefCommand};
-use crate::gust::driver::database::entity::{commit, node, refs};
 use crate::gust::driver::structure::nodes::build_node_tree;
 use crate::gust::driver::{ObjectStorage, ZERO_ID};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
+use entity::{commit, node, refs};
 use sea_orm::ActiveValue::NotSet;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseBackend, DatabaseConnection, DbErr, EntityTrait,
@@ -86,7 +88,6 @@ impl ObjectStorage for MysqlStorage {
     ) -> Result<(), anyhow::Error> {
         let mut result = ObjDecodedMap::default();
         result.update_from_cache(&decoded_pack.result);
-        // result.check_completeness()?;
         let nodes = build_node_tree(&result, repo_path).await.unwrap();
         self.save_nodes(nodes).await.unwrap();
         self.save_commits(&result.commits, repo_path).await.unwrap();
@@ -96,15 +97,25 @@ impl ObjectStorage for MysqlStorage {
     async fn get_full_pack_data(&self, repo_path: &Path) -> Result<Vec<u8>, GitError> {
         let mut hash_meta: HashMap<String, MetaData> = HashMap::new();
 
-        let commits = self.get_all_commits_by_path(repo_path).await.unwrap();
-        for c_meta in commits {
+        let commit_metas = self.get_all_commits_by_path(repo_path).await.unwrap();
+        let mut commits = Vec::new();
+        let mut tree_ids = Vec::new();
+
+        for c_meta in commit_metas {
             let c = Commit::new(Arc::new(c_meta));
-            hash_meta.insert(c.meta.id.to_plain_str(), Arc::try_unwrap(c.meta).unwrap());
-            tracing::info!("Parse Commit's all sub tree{}", c.tree_id.to_plain_str());
-            if let Some(root) = self.get_node_by_id(&c.tree_id.to_plain_str()).await {
+            tree_ids.push(c.tree_id.to_plain_str());
+            commits.push(c);
+        }
+        let trees = self.get_nodes_by_ids(tree_ids).await;
+        for commit in commits {
+            hash_meta.insert(
+                commit.meta.id.to_plain_str(),
+                Arc::try_unwrap(commit.meta).unwrap(),
+            );
+            if let Some(root) = trees.get(&commit.tree_id) {
                 self.get_child_trees(&root, &mut hash_meta).await
             } else {
-                return Err(GitError::InvalidTreeObject(c.tree_id.to_plain_str()));
+                return Err(GitError::InvalidTreeObject(commit.tree_id.to_plain_str()));
             };
         }
         let result: Vec<u8> = Pack::default().encode(Some(hash_meta.into_values().collect()));
@@ -266,6 +277,7 @@ impl MysqlStorage {
                     .unwrap();
                 sum = 0;
                 batch_nodes = Vec::new();
+                batch_nodes.push(node);
             }
         }
         if batch_nodes.len() != 0 {
@@ -362,6 +374,17 @@ impl MysqlStorage {
             .one(&self.connection)
             .await
             .unwrap()
+    }
+
+    async fn get_nodes_by_ids(&self, ids: Vec<String>) -> HashMap<Hash, node::Model> {
+        node::Entity::find()
+            .filter(node::Column::GitId.is_in(ids))
+            .all(&self.connection)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|f| (Hash::from_str(&f.git_id).unwrap(), f))
+            .collect()
     }
 
     // retrieve all sub trees recursively
