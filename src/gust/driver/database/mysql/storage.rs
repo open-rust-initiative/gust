@@ -1,10 +1,12 @@
+use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::git::errors::GitError;
+use crate::git::errors::{GitError, GitLFSError};
 use crate::git::hash::Hash;
+use crate::git::lfs::structs::*;
 use crate::git::object::base::commit::Commit;
 use crate::git::object::base::tree::Tree;
 use crate::git::object::metadata::MetaData;
@@ -16,7 +18,10 @@ use crate::gust::driver::structure::nodes::build_node_tree;
 use crate::gust::driver::{ObjectStorage, ZERO_ID};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
-use entity::{commit, node, refs};
+use chrono::prelude::*;
+use entity::{commit, locks, meta, node, refs};
+use futures::lock;
+use rayon::vec;
 use sea_orm::ActiveValue::NotSet;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseBackend, DatabaseConnection, DbErr, EntityTrait,
@@ -186,6 +191,290 @@ impl ObjectStorage for MysqlStorage {
             }
         } else {
             return Err(GitError::NotFountHashValue(hash.to_string()));
+        }
+    }
+
+    async fn lfs_get_meta(&self, v: &RequestVars) -> Result<MetaObject, GitLFSError> {
+        let result = meta::Entity::find_by_id(v.oid.clone())
+            .one(&self.connection)
+            .await
+            .unwrap();
+
+        match result {
+            Some(val) => Ok(MetaObject {
+                oid: val.oid,
+                size: val.size,
+                exist: val.exist,
+            }),
+            None => Err(GitLFSError::GeneralError("".to_string())),
+        }
+    }
+
+    async fn lfs_put_meta(&self, v: &RequestVars) -> Result<MetaObject, GitLFSError> {
+        // Check if already exist.
+        let result = meta::Entity::find_by_id(v.oid.clone())
+            .one(&self.connection)
+            .await
+            .unwrap();
+        if result.is_some() {
+            let result = result.unwrap();
+            return Ok(MetaObject {
+                oid: result.oid,
+                size: result.size,
+                exist: true,
+            });
+        }
+
+        // Put into database if not exist.
+        let meta = MetaObject {
+            oid: v.oid.to_string(),
+            size: v.size,
+            exist: true,
+        };
+
+        let meta_to = meta::ActiveModel {
+            oid: Set(meta.oid.to_owned()),
+            size: Set(meta.size.to_owned()),
+            exist: Set(true),
+        };
+
+        let res = meta::Entity::insert(meta_to).exec(&self.connection).await;
+        match res {
+            Ok(_) => Ok(meta),
+            Err(_) => Err(GitLFSError::GeneralError("".to_string())),
+        }
+    }
+
+    async fn lfs_delete_meta(&self, v: &RequestVars) -> Result<(), GitLFSError> {
+        let res = meta::Entity::delete_by_id(v.oid.to_owned())
+            .exec(&self.connection)
+            .await;
+        match res {
+            Ok(_) => Ok(()),
+            Err(_) => Err(GitLFSError::GeneralError("".to_string())),
+        }
+    }
+
+    async fn lfs_get_locks(&self, refspec: &str) -> Result<Vec<Lock>, GitLFSError> {
+        let result = locks::Entity::find_by_id(refspec)
+            .one(&self.connection)
+            .await
+            .unwrap();
+
+        match result {
+            Some(val) => {
+                let data = val.data.to_owned();
+                let locks: Vec<Lock> = serde_json::from_str(&data).unwrap();
+                Ok(locks)
+            }
+            None => Err(GitLFSError::GeneralError("".to_string())),
+        }
+    }
+
+    async fn lfs_get_filtered_locks(
+        &self,
+        refspec: &str,
+        path: &str,
+        cursor: &str,
+        limit: &str,
+    ) -> Result<(Vec<Lock>, String), GitLFSError> {
+        let mut locks = match self.lfs_get_locks(refspec).await {
+            Ok(locks) => locks,
+            Err(_) => vec![],
+        };
+
+        println!("Locks retrieved: {:?}", locks);
+
+        if cursor != "" {
+            let mut last_seen = -1;
+            for (i, v) in locks.iter().enumerate() {
+                if v.id == *cursor {
+                    last_seen = i as i32;
+                    break;
+                }
+            }
+
+            if last_seen > -1 {
+                locks = locks.split_off(last_seen as usize);
+            } else {
+                // Cursor not found.
+                return Err(GitLFSError::GeneralError("".to_string()));
+            }
+        }
+
+        if path != "" {
+            let mut filterd = Vec::<Lock>::new();
+            for lock in locks.iter() {
+                if lock.path == *path {
+                    filterd.push(Lock {
+                        id: lock.id.to_owned(),
+                        path: lock.path.to_owned(),
+                        owner: lock.owner.clone(),
+                        locked_at: lock.locked_at.to_owned(),
+                    });
+                }
+            }
+            locks = filterd;
+        }
+
+        let mut next = "".to_string();
+        if limit != "" {
+            let mut size = limit.parse::<i64>().unwrap();
+            size = min(size, locks.len() as i64);
+
+            if size + 1 < locks.len() as i64 {
+                next = locks[size as usize].id.to_owned();
+            }
+            let _ = locks.split_off(size as usize);
+        }
+
+        Ok((locks, next))
+    }
+
+    async fn lfs_add_lock(&self, repo: &str, locks: Vec<Lock>) -> Result<(), GitLFSError> {
+        let result = locks::Entity::find_by_id(repo.to_owned())
+            .one(&self.connection)
+            .await
+            .unwrap();
+
+        match result {
+            // Update
+            Some(val) => {
+                let d = val.data.to_owned();
+                let mut locks_from_data = if d != "" {
+                    let locks_from_data: Vec<Lock> = serde_json::from_str(&d).unwrap();
+                    locks_from_data
+                } else {
+                    vec![]
+                };
+                let mut locks = locks;
+                locks_from_data.append(&mut locks);
+
+                locks_from_data.sort_by(|a, b| {
+                    a.locked_at
+                        .partial_cmp(&b.locked_at)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                let d = serde_json::to_string(&locks_from_data).unwrap();
+
+                let mut lock_to: locks::ActiveModel = val.into();
+                lock_to.data = Set(d.to_owned());
+                let res = lock_to.update(&self.connection).await;
+                match res.is_ok() {
+                    true => Ok(()),
+                    false => Err(GitLFSError::GeneralError("".to_string())),
+                }
+            }
+            // Insert
+            None => {
+                let mut locks = locks;
+                locks.sort_by(|a, b| {
+                    a.locked_at
+                        .partial_cmp(&b.locked_at)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+                let data = serde_json::to_string(&locks).unwrap();
+                let lock_to = locks::ActiveModel {
+                    id: Set(repo.to_owned()),
+                    data: Set(data.to_owned()),
+                };
+                let res = locks::Entity::insert(lock_to).exec(&self.connection).await;
+                match res.is_ok() {
+                    true => Ok(()),
+                    false => Err(GitLFSError::GeneralError("".to_string())),
+                }
+            }
+        }
+    }
+
+    async fn lfs_delete_lock(
+        &self,
+        repo: &str,
+        _user: Option<String>,
+        id: &str,
+        force: bool,
+    ) -> Result<Lock, GitLFSError> {
+        let empty_lock = Lock {
+            id: "".to_owned(),
+            path: "".to_owned(),
+            owner: None,
+            locked_at: {
+                let locked_at: DateTime<Utc> = DateTime::<Utc>::MIN_UTC;
+                locked_at.to_rfc3339().to_string()
+            },
+        };
+        let result = locks::Entity::find_by_id(repo.to_owned())
+            .one(&self.connection)
+            .await
+            .unwrap();
+
+        match result {
+            // Exist, then delete.
+            Some(val) => {
+                let d = val.data.to_owned();
+                let locks_from_data = if d != "" {
+                    let locks_from_data: Vec<Lock> = serde_json::from_str(&d).unwrap();
+                    locks_from_data
+                } else {
+                    vec![]
+                };
+
+                let mut new_locks = Vec::<Lock>::new();
+                let mut lock_to_delete = Lock {
+                    id: "".to_owned(),
+                    path: "".to_owned(),
+                    owner: None,
+                    locked_at: {
+                        let locked_at: DateTime<Utc> = DateTime::<Utc>::MIN_UTC;
+                        locked_at.to_rfc3339().to_string()
+                    },
+                };
+
+                for lock in locks_from_data.iter() {
+                    if lock.id == *id {
+                        if lock.owner != None && !force {
+                            return Err(GitLFSError::GeneralError("".to_string()));
+                        }
+                        lock_to_delete.id = lock.id.to_owned();
+                        lock_to_delete.path = lock.path.to_owned();
+                        lock_to_delete.owner = lock.owner.clone();
+                        lock_to_delete.locked_at = lock.locked_at.to_owned();
+                    } else if lock.id.len() > 0 {
+                        new_locks.push(Lock {
+                            id: lock.id.to_owned(),
+                            path: lock.path.to_owned(),
+                            owner: lock.owner.clone(),
+                            locked_at: lock.locked_at.to_owned(),
+                        });
+                    }
+                }
+                if lock_to_delete.id == "" {
+                    return Err(GitLFSError::GeneralError("".to_string()));
+                }
+
+                // No locks remains, delete the repo from database.
+                if new_locks.len() == 0 {
+                    locks::Entity::delete_by_id(repo.to_owned())
+                        .exec(&self.connection)
+                        .await
+                        .unwrap();
+
+                    return Ok(lock_to_delete);
+                }
+
+                // Update remaining locks.
+                let data = serde_json::to_string(&new_locks).unwrap();
+
+                let mut lock_to: locks::ActiveModel = val.into();
+                lock_to.data = Set(data.to_owned());
+                let res = lock_to.update(&self.connection).await;
+                match res.is_ok() {
+                    true => Ok(lock_to_delete),
+                    false => Err(GitLFSError::GeneralError("".to_string())),
+                }
+            }
+            // Not exist, error.
+            None => Err(GitLFSError::GeneralError("".to_string())),
         }
     }
 }

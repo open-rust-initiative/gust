@@ -99,7 +99,7 @@ pub enum ServeCommand {
     Ssh(ServeConfig),
 }
 
-#[derive(Args)]
+#[derive(Args, Clone)]
 pub struct ServeConfig {
     #[arg(long, default_value_t = String::from("0.0.0.0"))]
     host: String,
@@ -112,4 +112,7 @@ pub struct ServeConfig {
 
     #[arg(short, long, value_name = "FILE")]
     cert_path: Option<PathBuf>,
+
+    #[arg(short, long, default_value_t = String::from("lfs_content"))]
+    lfs_content_path: String,
 }
