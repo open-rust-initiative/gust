@@ -50,3 +50,10 @@ pub enum GitError {
     #[error("Can't found Hash value :{0} from current file")]
     NotFountHashValue(String),
 }
+
+#[derive(Error, Debug)]
+#[allow(unused)]
+pub enum GitLFSError {
+    #[error("Something went wrong in Git LFS")]
+    GeneralError(String),
+}

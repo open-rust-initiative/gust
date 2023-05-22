@@ -42,6 +42,7 @@ pub async fn server(command: &ServeConfig) -> Result<(), std::io::Error> {
         port,
         key_path,
         cert_path,
+        lfs_content_path,
     } = command;
     let server_url = format!("{}:{}", host, port);
     let addr = SocketAddr::from_str(&server_url).unwrap();
