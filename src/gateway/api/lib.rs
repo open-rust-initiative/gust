@@ -4,9 +4,7 @@
 use std::collections::HashMap;
 
 use regex::Regex;
-use sea_orm::sea_query::token;
 
-use std::env;
 use std::io::prelude::*;
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -19,10 +17,10 @@ use axum::extract::{Query, State};
 use axum::http::{Response, StatusCode};
 use axum::routing::get;
 use axum::{Router, Server};
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use chrono::{prelude::*, Duration};
-use futures::{lock, StreamExt};
-use hyper::{server, Request, Uri};
+use futures::StreamExt;
+use hyper::{Request, Uri};
 use rand::prelude::*;
 use serde::Deserialize;
 use serde_qs;
@@ -41,8 +39,8 @@ struct AppState<T: ObjectStorage> {
 }
 
 #[derive(Deserialize, Debug)]
-struct ServiceName {
-    pub service: String,
+struct GetParams {
+    pub service: Option<String>,
 }
 
 pub fn remove_git_suffix(uri: Uri, git_suffix: &str) -> PathBuf {
@@ -82,15 +80,12 @@ pub async fn http_server(config: &ServeConfig) -> Result<(), Box<dyn std::error:
 /// Discovering Reference
 async fn get_method_router<T>(
     state: State<AppState<T>>,
+    Query(params): Query<GetParams>,
     uri: Uri,
 ) -> Result<Response<Body>, (StatusCode, String)>
 where
     T: ObjectStorage,
 {
-    // Retrieve service query field.
-    let query = uri.clone();
-    let service_name = query.query().unwrap_or("");
-
     // Routing LFS services.
     if Regex::new(r"/objects/[a-z0-9]+$")
         .unwrap()
@@ -103,7 +98,7 @@ where
         return lfs_download_object(state, tokens[tokens.len() - 1]).await;
     } else if Regex::new(r"/locks$").unwrap().is_match(uri.path()) {
         // Load query parameters into struct.
-        let lock_list_query: LockListQuery = serde_qs::from_str(service_name).unwrap();
+        let lock_list_query: LockListQuery = serde_qs::from_str(&params.service.unwrap()).unwrap();
         return lfs_retrieve_lock(state, lock_list_query).await;
     }
 
@@ -113,7 +108,7 @@ where
             String::from("Operation not supported\n"),
         ));
     }
-
+    let service_name = params.service.unwrap();
     if service_name == "git-upload-pack" || service_name == "git-receive-pack" {
         let mut pack_protocol = PackProtocol::new(
             remove_git_suffix(uri, "/info/refs"),
