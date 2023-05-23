@@ -113,6 +113,6 @@ pub struct ServeConfig {
     #[arg(short, long, value_name = "FILE")]
     cert_path: Option<PathBuf>,
 
-    #[arg(short, long, default_value_t = String::from("lfs_content"))]
-    lfs_content_path: String,
+    #[arg(short, long, default_value_os_t = PathBuf::from("lfs_content"))]
+    lfs_content_path: PathBuf,
 }

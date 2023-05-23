@@ -41,6 +41,11 @@ struct AppState<T: ObjectStorage> {
 #[derive(Deserialize, Debug)]
 struct GetParams {
     pub service: Option<String>,
+    pub refspec: Option<String>,
+    pub id: Option<String>,
+    pub path: Option<String>,
+    pub limit: Option<String>,
+    pub cursor: Option<String>,
 }
 
 pub fn remove_git_suffix(uri: Uri, git_suffix: &str) -> PathBuf {
@@ -98,7 +103,13 @@ where
         return lfs_download_object(state, tokens[tokens.len() - 1]).await;
     } else if Regex::new(r"/locks$").unwrap().is_match(uri.path()) {
         // Load query parameters into struct.
-        let lock_list_query: LockListQuery = serde_qs::from_str(&params.service.unwrap()).unwrap();
+        let lock_list_query = LockListQuery {
+            path: params.path,
+            id: params.id,
+            cursor: params.cursor,
+            limit: params.limit,
+            refspec: params.refspec,
+        };
         return lfs_retrieve_lock(state, lock_list_query).await;
     }
 

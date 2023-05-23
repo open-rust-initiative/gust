@@ -2,14 +2,15 @@ use crate::git::lfs::structs::MetaObject;
 use sha256::digest;
 use std::fs;
 use std::io::prelude::*;
+use std::path::PathBuf;
 use std::path;
 
 pub struct ContentStore {
-    base_path: String,
+    base_path: PathBuf,
 }
 
 impl ContentStore {
-    pub async fn new(base: String) -> ContentStore {
+    pub async fn new(base: PathBuf) -> ContentStore {
         fs::create_dir_all(&base).expect("Create directory failed!");
         ContentStore { base_path: base }
     }
@@ -78,7 +79,7 @@ mod tests {
 
         let content = "test content".as_bytes();
 
-        let content_store = ContentStore::new("content-store".to_owned()).await;
+        let content_store = ContentStore::new(PathBuf::from("content-store")).await;
         assert!(content_store.put(&meta, content).await);
 
         assert!(content_store.exist(&meta).await);
