@@ -54,7 +54,9 @@ impl Pack {
             //update offset of the Object
             let offset = utils::get_offset(&mut pack_file).unwrap();
             //Get the next Object by the Pack::next_object() func
-            let object = Pack::next_object(&mut pack_file, offset, cache, &MysqlStorage::default()).await.unwrap();
+            let object = Pack::next_object(&mut pack_file, offset, cache, &MysqlStorage::default())
+                .await
+                .unwrap();
             // Larger offsets would require a version-2 pack index
             let offset = u32::try_from(offset)
                 .map_err(|_| GitError::InvalidObjectInfo(format!("Packfile is too large")))

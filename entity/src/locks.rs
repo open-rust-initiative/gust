@@ -15,7 +15,6 @@ pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
 
-
 /*
 CREATE TABLE locks (
     id VARCHAR(200),

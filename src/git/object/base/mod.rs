@@ -45,5 +45,3 @@ impl ObjectClass {
         meta
     }
 }
-
-

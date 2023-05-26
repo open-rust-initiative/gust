@@ -2,8 +2,8 @@ use crate::git::lfs::structs::MetaObject;
 use sha256::digest;
 use std::fs;
 use std::io::prelude::*;
-use std::path::PathBuf;
 use std::path;
+use std::path::PathBuf;
 
 pub struct ContentStore {
     base_path: PathBuf,
