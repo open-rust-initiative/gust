@@ -92,7 +92,11 @@ impl<T: ObjectStorage> server::Handler for SshServer<T> {
     ) -> Result<(Self, Session), Self::Error> {
         let pack_protocol = self.pack_protocol.as_mut().unwrap();
         let data_str = String::from_utf8_lossy(data).trim().to_owned();
-        tracing::info!("SSH: client sends data: {:?}, channel:{}", data_str, channel);
+        tracing::info!(
+            "SSH: client sends data: {:?}, channel:{}",
+            data_str,
+            channel
+        );
         match pack_protocol.service_type {
             Some(ServiceType::UploadPack) => {
                 self.handle_upload_pack(channel, data, &mut session).await;
