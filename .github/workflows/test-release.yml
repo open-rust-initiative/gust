@@ -1,0 +1,26 @@
+# Based on https://github.com/actions-rs/meta/blob/master/recipes/quickstart.md
+#
+#
+#
+#
+
+on: [ push ]
+
+name: Base
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Login to swr
+        run: docker login -u cn-east-3@BRZWXOYXDBGPY5MXPHRY -p ${{ secrets.REGISTRY_SECRET }} swr.cn-east-3.myhuaweicloud.com
+      
+      - name: build image
+        run: docker build -t swr.cn-east-3.myhuaweicloud.com/rust-proxy/gust:latest .
+
+      - name: push image
+        run: docker push swr.cn-east-3.myhuaweicloud.com/rust-proxy/gust:latest
