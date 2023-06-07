@@ -3,11 +3,12 @@
 #
 #
 #
+name: Test Purpose for Main Branch
 
-on: [ push ]
-
-name: Base
-
+on:
+  push:
+    branches:
+      - main
 jobs:
   build:
     name: Build
